@@ -44,3 +44,20 @@ Preguntas tipo ¿Cómo podríamos?
 Aplicación del framework AEIOU:
 Ingreso de visitas
 Reserva de amenidades
+
+# Avances 2
+Contiene los documentos correspondientes al segundo avance del proyecto.
+
+Incluye:
+Aplicación de Design Studio
+Evidencias del seguimiento de todos los pasos de Design Studio
+Listado de todas las ideas generadas durante el proceso
+Sketches realizados por cada integrante del equipo
+
+Identificación de las ideas:
+Más repetidas
+Más votadas
+Selección de las ideas que serán incluidas en el producto final
+Historias de Usuario
+Listado de historias de usuario identificadas
+Descripción de funcionalidades desde la perspectiva de los distintos usuarios del sistema
