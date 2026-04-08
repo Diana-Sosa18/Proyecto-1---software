@@ -1,5 +1,14 @@
-export type AuthUser = {
+export type UserRole = "admin" | "guardia" | "residente" | "inquilino";
+
+export interface AuthUser {
   id: number;
-  role: string;
   email: string;
-};
+  role: UserRole;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export type LoginResponse = AuthUser;
