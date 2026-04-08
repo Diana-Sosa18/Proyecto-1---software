@@ -1,7 +1,3 @@
-export default function LoginView() {
-  return <div>LoginView</div>;
-}
-
 import { useMemo, useState, type FormEvent } from "react";
 import { Building2, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useNavigate } from "react-router-dom";

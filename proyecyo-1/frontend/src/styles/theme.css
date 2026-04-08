@@ -1,10 +1,4 @@
 :root {
-  color-scheme: light;
-}
-
-@custom-variant dark (&:is(.dark *));
-
-:root {
   --font-size: 16px;
   --background: #ffffff;
   --foreground: oklch(0.145 0 0);

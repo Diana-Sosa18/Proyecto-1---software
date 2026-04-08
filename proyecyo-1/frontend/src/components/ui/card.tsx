@@ -1,13 +1,3 @@
-import { ReactNode } from "react";
-
-type CardProps = {
-  children: ReactNode;
-};
-
-export function Card({ children }: CardProps) {
-  return <div>{children}</div>;
-}
-
 import * as React from "react";
 
 import { cn } from "./utils";
