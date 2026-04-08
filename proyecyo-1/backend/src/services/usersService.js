@@ -1,0 +1,3 @@
+exports.findAll = async () => {
+  return [];
+};
