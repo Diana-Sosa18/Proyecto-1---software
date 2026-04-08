@@ -1,14 +1,43 @@
 const express = require("express");
+const cors = require("cors");
+
+const { env } = require("./config/env");
 const authRoutes = require("./routes/authRoutes");
 const usersRoutes = require("./routes/usersRoutes");
 const userTypesRoutes = require("./routes/userTypesRoutes");
 
-const app = express();
+function createApp() {
+  const app = express();
 
-app.use(express.json());
-app.get("/health", (_req, res) => res.json({ ok: true }));
-app.use("/api/auth", authRoutes);
-app.use("/api/users", usersRoutes);
-app.use("/api/user-types", userTypesRoutes);
+  app.use(
+    cors({
+      origin: env.FRONTEND_ORIGIN,
+      credentials: true,
+    }),
+  );
 
-module.exports = app;
+  app.use(express.json());
+
+  app.get("/health", (_req, res) => {
+    res.status(200).json({ status: "ok" });
+  });
+
+  app.use(authRoutes);
+  app.use(usersRoutes);
+  app.use(userTypesRoutes);
+
+  app.use((error, _req, res, _next) => {
+    const status = error.status || 500;
+    const message = error.message || "Error interno del servidor";
+
+    if (status >= 500) {
+      console.error(error);
+    }
+
+    res.status(status).json({ message });
+  });
+
+  return app;
+}
+
+module.exports = { createApp };
