@@ -1,0 +1,46 @@
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { PublicRoute } from "@/components/auth/PublicRoute";
+import { useAuth } from "@/hooks/useAuth";
+import { rolePaths } from "@/routes/rolePaths";
+import { AdminView } from "@/views/AdminView";
+import { GuardiaView } from "@/views/GuardiaView";
+import { InquilinoView } from "@/views/InquilinoView";
+import { LoginView } from "@/views/LoginView";
+import { ResidenteView } from "@/views/ResidenteView";
+
+function FallbackRedirect() {
+  const { user } = useAuth();
+  return <Navigate to={user ? rolePaths[user.role] : "/"} replace />;
+}
+
+export function AppRouter() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route element={<PublicRoute />}>
+          <Route path="/" element={<LoginView />} />
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin" element={<AdminView />} />
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={["guardia"]} />}>
+          <Route path="/guardia" element={<GuardiaView />} />
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={["residente"]} />}>
+          <Route path="/residente" element={<ResidenteView />} />
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={["inquilino"]} />}>
+          <Route path="/inquilino" element={<InquilinoView />} />
+        </Route>
+
+        <Route path="*" element={<FallbackRedirect />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
