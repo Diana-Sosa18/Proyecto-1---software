@@ -1,13 +1,20 @@
-FROM node:20
+# Usa Node
+FROM node:18
 
+# Carpeta de trabajo
 WORKDIR /app
 
+# Copia dependencias
 COPY package*.json ./
 
-RUN npm install --include=dev
+# Instala dependencias
+RUN npm install
 
+# Copia todo
 COPY . .
 
+# Expone puerto de Vite
 EXPOSE 5173
 
-CMD ["sh", "-c", "npm install --include=dev && sed -i 's/\\r$//' node_modules/.bin/vite && npm exec vite -- --host 0.0.0.0"]
+# Corre la app
+CMD ["npm", "run", "dev", "--", "--host"]

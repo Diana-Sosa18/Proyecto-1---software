@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export function ResidenteView() {
   return (
-    <AppShell
+    <AppShell 
       role="residente"
       title="Panel de Residente"
       subtitle="Visitas, amenidades, avisos y operación diaria de su unidad residencial."
