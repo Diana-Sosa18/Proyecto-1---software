@@ -70,6 +70,8 @@ async function getResidentHouseByUserId(userId) {
 }
 
 function mapVisit(row) {
+  const qrStatus = getQrStatus(row);
+
   return {
     id_acceso: row.id_acceso,
     id_visitante: row.id_visitante,
@@ -83,9 +85,32 @@ function mapVisit(row) {
     tipo_visita: row.tipo_visita,
     token_qr: row.token_qr,
     estado_acceso: row.estado_acceso,
+    qr_status: qrStatus,
     qr_value: row.token_qr ? `NEXUSVISIT:${row.token_qr}` : null,
     casa: row.casa,
   };
+}
+
+function combineVisitDateTime(fecha, hora) {
+  return new Date(`${fecha}T${hora && hora.length === 5 ? `${hora}:00` : hora}`);
+}
+
+function getQrStatus(visit) {
+  if (visit.estado_acceso === "INGRESO_REGISTRADO") {
+    return "USED";
+  }
+
+  if (visit.estado_acceso === "CANCELADA") {
+    return "CANCELLED";
+  }
+
+  const expiration = combineVisitDateTime(visit.fecha, visit.hora_fin);
+
+  if (!Number.isNaN(expiration.getTime()) && new Date() > expiration) {
+    return "EXPIRED";
+  }
+
+  return "VALID";
 }
 
 function generateQrToken() {
@@ -393,15 +418,31 @@ async function validateQrVisit(qrToken) {
     throw error;
   }
 
-  return mapVisit(visit);
+  const mappedVisit = mapVisit(visit);
+
+  if (mappedVisit.qr_status === "USED") {
+    const error = new Error("Este QR ya fue utilizado.");
+    error.status = 409;
+    throw error;
+  }
+
+  if (mappedVisit.qr_status === "EXPIRED") {
+    const error = new Error("QR expirado.");
+    error.status = 410;
+    throw error;
+  }
+
+  if (mappedVisit.qr_status === "CANCELLED") {
+    const error = new Error("Este QR ya no es valido.");
+    error.status = 410;
+    throw error;
+  }
+
+  return mappedVisit;
 }
 
 async function registerQrEntry(qrToken) {
   const visit = await validateQrVisit(qrToken);
-
-  if (visit.estado_acceso === "INGRESO_REGISTRADO") {
-    return visit;
-  }
 
   const connection = await pool.getConnection();
 

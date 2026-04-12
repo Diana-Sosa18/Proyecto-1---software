@@ -14,6 +14,7 @@ export interface VisitRecord {
   token_qr?: string | null;
   qr_value?: string | null;
   estado_acceso?: "AUTORIZADA" | "INGRESO_REGISTRADO" | "CANCELADA";
+  qr_status?: "VALID" | "USED" | "EXPIRED" | "CANCELLED";
   casa?: string;
 }
 

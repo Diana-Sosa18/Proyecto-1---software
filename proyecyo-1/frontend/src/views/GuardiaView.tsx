@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import jsQR from "jsqr";
 import {
   Camera,
-  PackageCheck,
+  CircleAlert,
   QrCode,
   ScanLine,
   Shield,
@@ -41,6 +41,18 @@ function canUseCamera() {
   return Boolean(navigator.mediaDevices?.getUserMedia) && (window.isSecureContext || isLocalhost);
 }
 
+function getVisitBadge(visit: VisitRecord) {
+  if (visit.qr_status === "EXPIRED") {
+    return "QR expirado";
+  }
+
+  if (visit.qr_status === "USED" || visit.estado_acceso === "INGRESO_REGISTRADO") {
+    return "Ingreso registrado";
+  }
+
+  return "Autorizada";
+}
+
 export function GuardiaView() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -53,6 +65,11 @@ export function GuardiaView() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [manualCode, setManualCode] = useState("");
+  const [validationResult, setValidationResult] = useState<{
+    status: "approved" | "rejected";
+    title: string;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -86,12 +103,12 @@ export function GuardiaView() {
   }, []);
 
   const pendingCount = useMemo(
-    () => visits.filter((visit) => visit.estado_acceso === "AUTORIZADA").length,
+    () => visits.filter((visit) => visit.qr_status === "VALID").length,
     [visits],
   );
 
   const registeredCount = useMemo(
-    () => visits.filter((visit) => visit.estado_acceso === "INGRESO_REGISTRADO").length,
+    () => visits.filter((visit) => visit.qr_status === "USED").length,
     [visits],
   );
 
@@ -126,11 +143,22 @@ export function GuardiaView() {
       setSuccessMessage("");
       const visit = await validateQrRequest({ qrToken });
       setValidatedVisit(visit);
+      setValidationResult({
+        status: "approved",
+        title: "Visita autorizada",
+        message: "QR valido y listo para registrar ingreso.",
+      });
       updateVisitCollection(visit);
       setSuccessMessage("Visita autorizada encontrada.");
     } catch (error) {
       setValidatedVisit(null);
-      setErrorMessage(error instanceof Error ? error.message : "No fue posible validar el QR.");
+      const message = error instanceof Error ? error.message : "No fue posible validar el QR.";
+      setValidationResult({
+        status: "rejected",
+        title: "Acceso rechazado",
+        message,
+      });
+      setErrorMessage(message);
     }
   }
 
@@ -266,10 +294,21 @@ export function GuardiaView() {
       setSuccessMessage("");
       const visit = await registerQrEntryRequest({ qrToken: validatedVisit.token_qr });
       setValidatedVisit(visit);
+      setValidationResult({
+        status: "approved",
+        title: "Ingreso autorizado",
+        message: "El QR fue usado correctamente y ya no funcionara una segunda vez.",
+      });
       updateVisitCollection(visit);
       setSuccessMessage("Ingreso registrado correctamente.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No fue posible registrar el ingreso.");
+      const message = error instanceof Error ? error.message : "No fue posible registrar el ingreso.";
+      setValidationResult({
+        status: "rejected",
+        title: "Acceso rechazado",
+        message,
+      });
+      setErrorMessage(message);
     }
   }
 
@@ -381,6 +420,14 @@ export function GuardiaView() {
                   Registrar ingreso
                 </Button>
               </div>
+            ) : validationResult?.status === "rejected" ? (
+              <div className="space-y-3 rounded-3xl bg-rose-50 p-5 text-rose-700">
+                <div className="flex items-center gap-2">
+                  <CircleAlert className="size-5" />
+                  <p className="font-semibold">{validationResult.title}</p>
+                </div>
+                <p>{validationResult.message}</p>
+              </div>
             ) : (
               <div className="rounded-3xl bg-slate-50 p-5 text-sm text-slate-500">
                 Aun no se ha validado un QR.
@@ -413,7 +460,7 @@ export function GuardiaView() {
                   </p>
                 </div>
                 <span className="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">
-                  {visitor.estado_acceso === "INGRESO_REGISTRADO" ? "Ingreso registrado" : "Autorizada"}
+                  {getVisitBadge(visitor)}
                 </span>
               </div>
             ))
