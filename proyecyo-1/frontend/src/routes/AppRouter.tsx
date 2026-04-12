@@ -9,6 +9,7 @@ import { GuardiaView } from "@/views/GuardiaView";
 import { InquilinoView } from "@/views/InquilinoView";
 import { LoginView } from "@/views/LoginView";
 import { ResidenteView } from "@/views/ResidenteView";
+import { ResidenteVisitsView } from "@/views/ResidenteVisitsView";
 
 function FallbackRedirect() {
   const { user } = useAuth();
@@ -33,6 +34,7 @@ export function AppRouter() {
 
         <Route element={<ProtectedRoute allowedRoles={["residente"]} />}>
           <Route path="/residente" element={<ResidenteView />} />
+          <Route path="/residente/visitas" element={<ResidenteVisitsView />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["inquilino"]} />}>

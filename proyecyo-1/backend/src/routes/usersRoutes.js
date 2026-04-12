@@ -11,12 +11,10 @@ const { requireAdmin } = require("../middlewares/requireAdmin");
 
 const router = express.Router();
 
-router.use(requireAdmin);
-
-router.get("/usuarios", getUsers);
-router.get("/usuarios/:id", getUser);
-router.post("/usuarios", postUser);
-router.put("/usuarios/:id", putUser);
-router.delete("/usuarios/:id", removeUser);
+router.get("/usuarios", requireAdmin, getUsers);
+router.get("/usuarios/:id", requireAdmin, getUser);
+router.post("/usuarios", requireAdmin, postUser);
+router.put("/usuarios/:id", requireAdmin, putUser);
+router.delete("/usuarios/:id", requireAdmin, removeUser);
 
 module.exports = router;

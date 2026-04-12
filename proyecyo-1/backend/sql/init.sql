@@ -242,3 +242,36 @@ VALUES (
     (SELECT id_inquilino FROM INQUILINO WHERE id_usuario = (SELECT id_usuario FROM USUARIO WHERE correo = 'inquilino@test.com')),
     (SELECT id_casa FROM CASA WHERE numero = '302' AND torre = 'B')
 );
+
+INSERT INTO VISITANTE (nombre, dpi, placa)
+VALUES
+    ('Juan Perez', '1234567890123', 'P-456DEF'),
+    ('Ana Lopez', '9876543210987', 'P-789GHI'),
+    ('Maria Garcia', '2345678901234', 'P-123ABC');
+
+INSERT INTO ACCESO (id_visitante, id_casa, fecha, hora_inicio, hora_fin, tipo_visita)
+VALUES
+    (
+        (SELECT id_visitante FROM VISITANTE WHERE dpi = '1234567890123' LIMIT 1),
+        (SELECT id_casa FROM CASA WHERE numero = '302' AND torre = 'B'),
+        CURDATE(),
+        '10:00:00',
+        '12:00:00',
+        'VISITA'
+    ),
+    (
+        (SELECT id_visitante FROM VISITANTE WHERE dpi = '9876543210987' LIMIT 1),
+        (SELECT id_casa FROM CASA WHERE numero = '302' AND torre = 'B'),
+        CURDATE(),
+        '14:00:00',
+        '16:00:00',
+        'VISITA'
+    ),
+    (
+        (SELECT id_visitante FROM VISITANTE WHERE dpi = '2345678901234' LIMIT 1),
+        (SELECT id_casa FROM CASA WHERE numero = '302' AND torre = 'B'),
+        DATE_ADD(CURDATE(), INTERVAL 1 DAY),
+        '09:00:00',
+        '11:00:00',
+        'PROVEEDOR'
+    );

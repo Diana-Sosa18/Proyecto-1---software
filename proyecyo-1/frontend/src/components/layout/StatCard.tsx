@@ -7,11 +7,15 @@ type StatCardProps = {
   value: string;
   helper: string;
   icon: LucideIcon;
+  onClick?: () => void;
 };
 
-export function StatCard({ label, value, helper, icon: Icon }: StatCardProps) {
+export function StatCard({ label, value, helper, icon: Icon, onClick }: StatCardProps) {
   return (
-    <Card className="border-slate-200 bg-white/95">
+    <Card
+      className={`border-slate-200 bg-white/95 ${onClick ? "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md" : ""}`}
+      onClick={onClick}
+    >
       <CardContent className="flex items-start justify-between gap-4 p-6">
         <div>
           <p className="text-sm text-slate-500">{label}</p>
