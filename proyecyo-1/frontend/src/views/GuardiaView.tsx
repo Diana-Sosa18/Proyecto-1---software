@@ -146,10 +146,10 @@ export function GuardiaView() {
       setValidationResult({
         status: "approved",
         title: "Visita autorizada",
-        message: "QR valido y listo para registrar ingreso.",
+        message: "QR valido. El ingreso fue registrado y este QR ya no funcionara una segunda vez.",
       });
       updateVisitCollection(visit);
-      setSuccessMessage("Visita autorizada encontrada.");
+      setSuccessMessage("Visita autorizada e ingreso registrado.");
     } catch (error) {
       setValidatedVisit(null);
       const message = error instanceof Error ? error.message : "No fue posible validar el QR.";
@@ -414,10 +414,10 @@ export function GuardiaView() {
                 <Button
                   type="button"
                   onClick={() => void handleRegisterEntry()}
-                  disabled={validatedVisit.estado_acceso === "INGRESO_REGISTRADO"}
+                  disabled
                   className="rounded-2xl"
                 >
-                  Registrar ingreso
+                  Ingreso ya registrado
                 </Button>
               </div>
             ) : validationResult?.status === "rejected" ? (

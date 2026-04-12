@@ -29,6 +29,7 @@ import {
 import type { FrequentVisitor, VisitPayload, VisitRecord, VisitType } from "@/types/visits";
 
 type VisitFormState = VisitPayload;
+const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 
 const steps = [
   { id: 1, label: "Datos del Visitante", description: "Informacion basica de identificacion" },
@@ -45,17 +46,38 @@ const visitTypeLabels: Record<VisitType, string> = {
 function createInitialForm(): VisitFormState {
   const now = new Date();
   const finish = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  const currentDate = getDateInTimezone(now);
+  const startTime = getTimeInTimezone(now);
+  const finishTime = getTimeInTimezone(finish);
 
   return {
     nombre: "",
     dpi: "",
     placa: "",
     foto: "",
-    fecha: now.toISOString().slice(0, 10),
-    hora_inicio: now.toTimeString().slice(0, 5),
-    hora_fin: finish.toTimeString().slice(0, 5),
+    fecha: currentDate,
+    hora_inicio: startTime,
+    hora_fin: finishTime,
     tipo_visita: "VISITA",
   };
+}
+
+function getDateInTimezone(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: RESIDENTIAL_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function getTimeInTimezone(date: Date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: RESIDENTIAL_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
 }
 
 function formatDate(date: string) {
@@ -67,7 +89,7 @@ function formatDate(date: string) {
 }
 
 function countTodayVisits(visits: VisitRecord[]) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getDateInTimezone(new Date());
   return visits.filter((visit) => visit.fecha === today).length;
 }
 
@@ -220,9 +242,9 @@ export function ResidenteVisitsView() {
         dpi: visitor.dpi,
         placa: visitor.placa,
         foto: "",
-        fecha: now.toISOString().slice(0, 10),
-        hora_inicio: now.toTimeString().slice(0, 5),
-        hora_fin: finish.toTimeString().slice(0, 5),
+        fecha: getDateInTimezone(now),
+        hora_inicio: getTimeInTimezone(now),
+        hora_fin: getTimeInTimezone(finish),
         tipo_visita: "VISITA",
       },
       `Visita rapida autorizada para ${visitor.nombre}.`,

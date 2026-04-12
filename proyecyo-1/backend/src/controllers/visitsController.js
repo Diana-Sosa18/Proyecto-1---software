@@ -55,7 +55,7 @@ async function getGuardVisits(_req, res, next) {
 
 async function postValidateQr(req, res, next) {
   try {
-    const visit = await validateQrVisit((req.body || {}).qrToken);
+    const visit = await registerQrEntry((req.body || {}).qrToken);
     res.status(200).json(visit);
   } catch (error) {
     next(error);

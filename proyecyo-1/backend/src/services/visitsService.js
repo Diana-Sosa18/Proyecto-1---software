@@ -1,5 +1,6 @@
 const { pool, query } = require("../database/mysql");
 const crypto = require("crypto");
+const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -95,6 +96,30 @@ function combineVisitDateTime(fecha, hora) {
   return new Date(`${fecha}T${hora && hora.length === 5 ? `${hora}:00` : hora}`);
 }
 
+function getCurrentDateTimeInTimezone() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: RESIDENTIAL_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    time: `${values.hour}:${values.minute}:${values.second}`,
+  };
+}
+
 function getQrStatus(visit) {
   if (visit.estado_acceso === "INGRESO_REGISTRADO") {
     return "USED";
@@ -104,9 +129,12 @@ function getQrStatus(visit) {
     return "CANCELLED";
   }
 
-  const expiration = combineVisitDateTime(visit.fecha, visit.hora_fin);
+  const currentDateTime = getCurrentDateTimeInTimezone();
 
-  if (!Number.isNaN(expiration.getTime()) && new Date() > expiration) {
+  if (
+    currentDateTime.date > visit.fecha ||
+    (currentDateTime.date === visit.fecha && currentDateTime.time > `${visit.hora_fin}:00`)
+  ) {
     return "EXPIRED";
   }
 
@@ -383,6 +411,30 @@ async function getGuardShiftVisits() {
 
 async function validateQrVisit(qrToken) {
   const normalizedToken = normalizeQrToken(qrToken);
+  const mappedVisit = await findVisitByQrToken(normalizedToken);
+
+  if (mappedVisit.qr_status === "USED") {
+    const error = new Error("Este QR ya fue utilizado.");
+    error.status = 409;
+    throw error;
+  }
+
+  if (mappedVisit.qr_status === "EXPIRED") {
+    const error = new Error("QR expirado.");
+    error.status = 410;
+    throw error;
+  }
+
+  if (mappedVisit.qr_status === "CANCELLED") {
+    const error = new Error("Este QR ya no es valido.");
+    error.status = 410;
+    throw error;
+  }
+
+  return mappedVisit;
+}
+
+async function findVisitByQrToken(normalizedToken) {
   const rows = await query(
     `
       SELECT
@@ -418,31 +470,12 @@ async function validateQrVisit(qrToken) {
     throw error;
   }
 
-  const mappedVisit = mapVisit(visit);
-
-  if (mappedVisit.qr_status === "USED") {
-    const error = new Error("Este QR ya fue utilizado.");
-    error.status = 409;
-    throw error;
-  }
-
-  if (mappedVisit.qr_status === "EXPIRED") {
-    const error = new Error("QR expirado.");
-    error.status = 410;
-    throw error;
-  }
-
-  if (mappedVisit.qr_status === "CANCELLED") {
-    const error = new Error("Este QR ya no es valido.");
-    error.status = 410;
-    throw error;
-  }
-
-  return mappedVisit;
+  return mapVisit(visit);
 }
 
 async function registerQrEntry(qrToken) {
-  const visit = await validateQrVisit(qrToken);
+  const normalizedToken = normalizeQrToken(qrToken);
+  const visit = await validateQrVisit(normalizedToken);
 
   const connection = await pool.getConnection();
 
@@ -466,7 +499,7 @@ async function registerQrEntry(qrToken) {
     );
     await connection.commit();
 
-    return validateQrVisit(qrToken);
+    return findVisitByQrToken(normalizedToken);
   } catch (error) {
     await connection.rollback();
     throw error;
