@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { QrCodeCard } from "@/components/visits/QrCodeCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -88,7 +89,7 @@ export function ResidenteVisitsView() {
     async function loadData() {
       try {
         setIsLoading(true);
-        const [visitsResponse, frequentResponse] = await Promise.all([
+        const [visitsResult, frequentResult] = await Promise.allSettled([
           getVisitsRequest(),
           getFrequentVisitorsRequest(),
         ]);
@@ -97,11 +98,20 @@ export function ResidenteVisitsView() {
           return;
         }
 
-        setVisits(visitsResponse);
-        setFrequentVisitors(frequentResponse);
-      } catch (error) {
-        if (active) {
-          setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar las visitas.");
+        if (visitsResult.status === "fulfilled") {
+          setVisits(visitsResult.value);
+        } else {
+          setErrorMessage(
+            visitsResult.reason instanceof Error
+              ? visitsResult.reason.message
+              : "No fue posible cargar las visitas.",
+          );
+        }
+
+        if (frequentResult.status === "fulfilled") {
+          setFrequentVisitors(frequentResult.value);
+        } else {
+          setFrequentVisitors([]);
         }
       } finally {
         if (active) {
@@ -162,8 +172,12 @@ export function ResidenteVisitsView() {
   }
 
   async function refreshFrequentVisitors() {
-    const data = await getFrequentVisitorsRequest();
-    setFrequentVisitors(data);
+    try {
+      const data = await getFrequentVisitorsRequest();
+      setFrequentVisitors(data);
+    } catch {
+      // La visita ya fue creada; si esta recarga secundaria falla no bloqueamos el flujo.
+    }
   }
 
   async function createVisit(payload: VisitPayload, message: string) {
@@ -559,13 +573,23 @@ export function ResidenteVisitsView() {
                 key={visit.id_acceso}
                 className="border-white/70 bg-white shadow-[0_12px_28px_rgba(30,41,59,0.08)]"
               >
-                <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-start md:justify-between">
+                <CardContent className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_260px]">
                   <div className="flex gap-4">
-                    <div className="flex size-14 items-center justify-center rounded-full bg-[linear-gradient(180deg,#60a5fa_0%,#2563eb_100%)] text-white">
+                    <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#60a5fa_0%,#2563eb_100%)] text-white">
                       <UserRoundPlus className="size-7" />
                     </div>
                     <div>
-                      <p className="text-2xl font-semibold text-slate-900">{visit.nombre}</p>
+                      <div className="flex items-start justify-between gap-4">
+                        <p className="text-2xl font-semibold text-slate-900">{visit.nombre}</p>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(visit)}
+                          className="rounded-full p-2 text-rose-500 transition hover:bg-rose-50"
+                          aria-label={`Eliminar visita de ${visit.nombre}`}
+                        >
+                          <Trash2 className="size-5" />
+                        </button>
+                      </div>
                       <div className="mt-2 space-y-1 text-slate-600">
                         <p>DPI: {visit.dpi}</p>
                         <p>Placa: {visit.placa}</p>
@@ -581,16 +605,18 @@ export function ResidenteVisitsView() {
                       <span className="mt-4 inline-flex rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">
                         {visitTypeLabels[visit.tipo_visita]}
                       </span>
+                      <p className="mt-3 text-xs text-slate-400">
+                        Estado: {visit.estado_acceso === "INGRESO_REGISTRADO" ? "Ingreso registrado" : "Autorizada"}
+                      </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(visit)}
-                    className="self-end rounded-full p-2 text-rose-500 transition hover:bg-rose-50 md:self-start"
-                    aria-label={`Eliminar visita de ${visit.nombre}`}
-                  >
-                    <Trash2 className="size-5" />
-                  </button>
+                  {visit.qr_value ? (
+                    <QrCodeCard
+                      value={visit.qr_value}
+                      title={`QR ${visit.nombre}`}
+                      description={`Casa ${visit.casa} • ${visit.fecha} • ${visit.hora_inicio}`}
+                    />
+                  ) : null}
                 </CardContent>
               </Card>
             ))

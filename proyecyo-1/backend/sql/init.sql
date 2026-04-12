@@ -128,9 +128,12 @@ CREATE TABLE ACCESO (
     hora_inicio TIME,
     hora_fin TIME,
     tipo_visita VARCHAR(20),
+    token_qr VARCHAR(64) UNIQUE,
+    estado_acceso VARCHAR(30) NOT NULL DEFAULT 'AUTORIZADA',
     FOREIGN KEY (id_visitante) REFERENCES VISITANTE(id_visitante),
     FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
-    CHECK (tipo_visita IN ('VISITA', 'DELIVERY', 'PROVEEDOR'))
+    CHECK (tipo_visita IN ('VISITA', 'DELIVERY', 'PROVEEDOR')),
+    CHECK (estado_acceso IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'CANCELADA'))
 );
 
 CREATE TABLE REGISTRO_ACCESO (
@@ -249,7 +252,7 @@ VALUES
     ('Ana Lopez', '9876543210987', 'P-789GHI'),
     ('Maria Garcia', '2345678901234', 'P-123ABC');
 
-INSERT INTO ACCESO (id_visitante, id_casa, fecha, hora_inicio, hora_fin, tipo_visita)
+INSERT INTO ACCESO (id_visitante, id_casa, fecha, hora_inicio, hora_fin, tipo_visita, token_qr, estado_acceso)
 VALUES
     (
         (SELECT id_visitante FROM VISITANTE WHERE dpi = '1234567890123' LIMIT 1),
@@ -257,7 +260,9 @@ VALUES
         CURDATE(),
         '10:00:00',
         '12:00:00',
-        'VISITA'
+        'VISITA',
+        'demoqrjuanperez001',
+        'AUTORIZADA'
     ),
     (
         (SELECT id_visitante FROM VISITANTE WHERE dpi = '9876543210987' LIMIT 1),
@@ -265,7 +270,9 @@ VALUES
         CURDATE(),
         '14:00:00',
         '16:00:00',
-        'VISITA'
+        'VISITA',
+        'demoqranalopez002',
+        'AUTORIZADA'
     ),
     (
         (SELECT id_visitante FROM VISITANTE WHERE dpi = '2345678901234' LIMIT 1),
@@ -273,5 +280,7 @@ VALUES
         DATE_ADD(CURDATE(), INTERVAL 1 DAY),
         '09:00:00',
         '11:00:00',
-        'PROVEEDOR'
+        'PROVEEDOR',
+        'demoqrmariagarcia003',
+        'AUTORIZADA'
     );

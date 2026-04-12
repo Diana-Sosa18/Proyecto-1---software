@@ -1,4 +1,5 @@
 const { pool, query } = require("../database/mysql");
+const crypto = require("crypto");
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -80,8 +81,27 @@ function mapVisit(row) {
     hora_inicio: row.hora_inicio,
     hora_fin: row.hora_fin,
     tipo_visita: row.tipo_visita,
+    token_qr: row.token_qr,
+    estado_acceso: row.estado_acceso,
+    qr_value: row.token_qr ? `NEXUSVISIT:${row.token_qr}` : null,
     casa: row.casa,
   };
+}
+
+function generateQrToken() {
+  return crypto.randomBytes(18).toString("hex");
+}
+
+function normalizeQrToken(value) {
+  const normalized = normalizeString(value);
+
+  if (!normalized) {
+    const error = new Error("El codigo QR es obligatorio.");
+    error.status = 400;
+    throw error;
+  }
+
+  return normalized.startsWith("NEXUSVISIT:") ? normalized.slice("NEXUSVISIT:".length) : normalized;
 }
 
 async function listResidentVisits(userId) {
@@ -99,6 +119,8 @@ async function listResidentVisits(userId) {
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
         a.tipo_visita,
+        a.token_qr,
+        a.estado_acceso,
         CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
       FROM ACCESO a
       INNER JOIN VISITANTE v
@@ -158,6 +180,7 @@ async function createVisit(userId, payload) {
   const horaInicio = ensureValidTime(payload.hora_inicio, "hora de inicio");
   const horaFin = ensureValidTime(payload.hora_fin, "hora de fin");
   const tipoVisita = ensureVisitType(payload.tipo_visita);
+  const qrToken = generateQrToken();
 
   if (!nombre || !dpi || !placa) {
     const error = new Error("Nombre, DPI y placa son obligatorios.");
@@ -186,10 +209,10 @@ async function createVisit(userId, payload) {
 
     const [accessResult] = await connection.execute(
       `
-        INSERT INTO ACCESO (id_visitante, id_casa, fecha, hora_inicio, hora_fin, tipo_visita)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO ACCESO (id_visitante, id_casa, fecha, hora_inicio, hora_fin, tipo_visita, token_qr, estado_acceso)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'AUTORIZADA')
       `,
-      [visitorResult.insertId, house.id_casa, fecha, horaInicio, horaFin, tipoVisita],
+      [visitorResult.insertId, house.id_casa, fecha, horaInicio, horaFin, tipoVisita, qrToken],
     );
 
     await connection.commit();
@@ -207,6 +230,8 @@ async function createVisit(userId, payload) {
           TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
           TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
           a.tipo_visita,
+          a.token_qr,
+          a.estado_acceso,
           CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
         FROM ACCESO a
         INNER JOIN VISITANTE v
@@ -250,6 +275,8 @@ async function deleteVisit(userId, accessId) {
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
         a.tipo_visita,
+        a.token_qr,
+        a.estado_acceso,
         CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
       FROM ACCESO a
       INNER JOIN VISITANTE v
@@ -299,9 +326,120 @@ async function deleteVisit(userId, accessId) {
   }
 }
 
+async function getGuardShiftVisits() {
+  const rows = await query(
+    `
+      SELECT
+        a.id_acceso,
+        v.id_visitante,
+        v.nombre,
+        v.dpi,
+        v.placa,
+        NULL AS foto,
+        DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
+        TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
+        TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+        a.tipo_visita,
+        a.token_qr,
+        a.estado_acceso,
+        CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
+      FROM ACCESO a
+      INNER JOIN VISITANTE v
+        ON v.id_visitante = a.id_visitante
+      INNER JOIN CASA c
+        ON c.id_casa = a.id_casa
+      ORDER BY a.fecha DESC, a.hora_inicio DESC, a.id_acceso DESC
+      LIMIT 20
+    `,
+  );
+
+  return rows.map(mapVisit);
+}
+
+async function validateQrVisit(qrToken) {
+  const normalizedToken = normalizeQrToken(qrToken);
+  const rows = await query(
+    `
+      SELECT
+        a.id_acceso,
+        v.id_visitante,
+        v.nombre,
+        v.dpi,
+        v.placa,
+        NULL AS foto,
+        DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
+        TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
+        TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+        a.tipo_visita,
+        a.token_qr,
+        a.estado_acceso,
+        CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
+      FROM ACCESO a
+      INNER JOIN VISITANTE v
+        ON v.id_visitante = a.id_visitante
+      INNER JOIN CASA c
+        ON c.id_casa = a.id_casa
+      WHERE a.token_qr = ?
+      LIMIT 1
+    `,
+    [normalizedToken],
+  );
+
+  const visit = rows[0];
+
+  if (!visit) {
+    const error = new Error("QR no reconocido.");
+    error.status = 404;
+    throw error;
+  }
+
+  return mapVisit(visit);
+}
+
+async function registerQrEntry(qrToken) {
+  const visit = await validateQrVisit(qrToken);
+
+  if (visit.estado_acceso === "INGRESO_REGISTRADO") {
+    return visit;
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    await connection.execute(
+      `
+        UPDATE ACCESO
+        SET estado_acceso = 'INGRESO_REGISTRADO'
+        WHERE id_acceso = ?
+      `,
+      [visit.id_acceso],
+    );
+    await connection.execute(
+      `
+        INSERT INTO REGISTRO_ACCESO (id_acceso, hora_ingreso)
+        VALUES (?, CURTIME())
+        ON DUPLICATE KEY UPDATE hora_ingreso = VALUES(hora_ingreso)
+      `,
+      [visit.id_acceso],
+    );
+    await connection.commit();
+
+    return validateQrVisit(qrToken);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   listResidentVisits,
   listFrequentVisitors,
   createVisit,
   deleteVisit,
+  getGuardShiftVisits,
+  validateQrVisit,
+  registerQrEntry,
 };
