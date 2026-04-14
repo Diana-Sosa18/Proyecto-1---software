@@ -104,6 +104,7 @@ export function ResidenteVisitsView() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [photoPreview, setPhotoPreview] = useState("");
+  const [authorizingVisitorId, setAuthorizingVisitorId] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -233,6 +234,7 @@ export function ResidenteVisitsView() {
   }
 
   async function handleQuickAuthorize(visitor: FrequentVisitor) {
+    setAuthorizingVisitorId(visitor.id_visitante);
     const now = new Date();
     const finish = new Date(now.getTime() + 2 * 60 * 60 * 1000);
 
@@ -249,6 +251,7 @@ export function ResidenteVisitsView() {
       },
       `Visita rapida autorizada para ${visitor.nombre}.`,
     );
+    setAuthorizingVisitorId(null);
   }
 
   async function handleDelete(visit: VisitRecord) {
@@ -376,8 +379,17 @@ export function ResidenteVisitsView() {
                     disabled={isSubmitting}
                     className="rounded-2xl bg-[linear-gradient(90deg,#a855f7_0%,#8b2cf5_100%)] px-6 text-base text-white hover:opacity-95"
                   >
-                    <Zap className="size-4" />
-                    Autorizar
+                    {authorizingVisitorId === visitor.id_visitante ? (
+                      <>
+                        <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Autorizando...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="size-4" />
+                        Autorizar (1 click)
+                      </>
+                    )}
                   </Button>
                 </div>
               ))
