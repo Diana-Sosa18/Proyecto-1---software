@@ -478,6 +478,9 @@ export function ResidenteVisitsView() {
 
             {step === 2 ? (
               <>
+                <div className="rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                  La fecha y hora se completaron automaticamente con la hora actual. Puedes modificarlos si lo necesitas.
+                </div>
                 <div className="grid gap-5 md:grid-cols-2">
                   <label className="block space-y-2">
                     <span className="text-sm font-medium text-slate-800">Fecha de visita *</span>
