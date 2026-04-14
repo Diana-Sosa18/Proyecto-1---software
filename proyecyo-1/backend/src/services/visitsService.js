@@ -235,8 +235,8 @@ async function createVisit(userId, payload) {
   const tipoVisita = ensureVisitType(payload.tipo_visita);
   const qrToken = generateQrToken();
 
-  if (!nombre || !dpi || !placa) {
-    const error = new Error("Nombre, DPI y placa son obligatorios.");
+  if (!nombre) {
+    const error = new Error("El nombre del visitante es obligatorio.");
     error.status = 400;
     throw error;
   }

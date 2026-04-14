@@ -159,8 +159,8 @@ export function ResidenteVisitsView() {
   }
 
   function validateStep() {
-    if (step === 1 && (!form.nombre.trim() || !form.dpi.trim() || !form.placa.trim())) {
-      setErrorMessage("Completa nombre, DPI y placa antes de continuar.");
+    if (step === 1 && !form.nombre.trim()) {
+      setErrorMessage("El nombre del visitante es obligatorio.");
       return false;
     }
 
@@ -421,7 +421,7 @@ export function ResidenteVisitsView() {
                 </label>
 
                 <label className="block space-y-2">
-                  <span className="text-sm font-medium text-slate-800">DPI / Documento de Identidad</span>
+                  <span className="text-sm font-medium text-slate-800">DPI / Documento de Identidad (Opcional)</span>
                   <Input
                     value={form.dpi}
                     onChange={(event) => updateForm("dpi", event.target.value)}
@@ -431,7 +431,7 @@ export function ResidenteVisitsView() {
                 </label>
 
                 <label className="block space-y-2">
-                  <span className="text-sm font-medium text-slate-800">Placa del Vehiculo</span>
+                  <span className="text-sm font-medium text-slate-800">Placa del Vehiculo (Opcional)</span>
                   <Input
                     value={form.placa}
                     onChange={(event) => updateForm("placa", event.target.value.toUpperCase())}
