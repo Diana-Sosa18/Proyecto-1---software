@@ -363,7 +363,11 @@ export function ResidenteVisitsView() {
                     <div>
                       <p className="text-2xl font-semibold text-slate-900">{visitor.nombre}</p>
                       <p className="text-sm text-slate-500">
-                        {visitor.placa || "Sin placa"} • DPI: {visitor.dpi}
+                        {visitor.placa || "Sin placa"} {visitor.dpi ? `• DPI: ${visitor.dpi}` : ""}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {visitor.total_visitas} visita{visitor.total_visitas !== 1 ? "s" : ""}
+                        {visitor.ultima_fecha ? ` • Ultima: ${formatDate(visitor.ultima_fecha)}` : ""}
                       </p>
                     </div>
                   </div>
