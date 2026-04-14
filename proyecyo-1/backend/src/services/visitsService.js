@@ -379,6 +379,72 @@ async function deleteVisit(userId, accessId) {
   }
 }
 
+async function deleteFrequentVisitor(userId, visitorId) {
+  const house = await getResidentHouseByUserId(userId);
+  const normalizedVisitorId = Number(visitorId);
+
+  if (!Number.isInteger(normalizedVisitorId) || normalizedVisitorId <= 0) {
+    const error = new Error("El visitante es invalido.");
+    error.status = 400;
+    throw error;
+  }
+
+  const rows = await query(
+    `
+      SELECT v.id_visitante, v.nombre
+      FROM VISITANTE v
+      INNER JOIN ACCESO a ON a.id_visitante = v.id_visitante
+      WHERE v.id_visitante = ? AND a.id_casa = ?
+      LIMIT 1
+    `,
+    [normalizedVisitorId, house.id_casa],
+  );
+
+  const visitor = rows[0];
+
+  if (!visitor) {
+    const error = new Error("Visitante frecuente no encontrado.");
+    error.status = 404;
+    throw error;
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    await connection.execute(
+      `
+        DELETE ra FROM REGISTRO_ACCESO ra
+        INNER JOIN ACCESO a ON a.id_acceso = ra.id_acceso
+        WHERE a.id_visitante = ? AND a.id_casa = ?
+      `,
+      [normalizedVisitorId, house.id_casa],
+    );
+    await connection.execute(
+      "DELETE FROM ACCESO WHERE id_visitante = ? AND id_casa = ?",
+      [normalizedVisitorId, house.id_casa],
+    );
+    await connection.execute(
+      `
+        DELETE FROM VISITANTE
+        WHERE id_visitante = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM ACCESO WHERE id_visitante = ?
+          )
+      `,
+      [normalizedVisitorId, normalizedVisitorId],
+    );
+    await connection.commit();
+
+    return { id_visitante: normalizedVisitorId, nombre: visitor.nombre };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 async function getGuardShiftVisits() {
   const rows = await query(
     `
@@ -513,6 +579,7 @@ module.exports = {
   listFrequentVisitors,
   createVisit,
   deleteVisit,
+  deleteFrequentVisitor,
   getGuardShiftVisits,
   validateQrVisit,
   registerQrEntry,

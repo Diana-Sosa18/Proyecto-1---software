@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   createVisitRequest,
+  deleteFrequentVisitorRequest,
   deleteVisitRequest,
   getFrequentVisitorsRequest,
   getVisitsRequest,
@@ -271,6 +272,32 @@ export function ResidenteVisitsView() {
     }
   }
 
+  async function handleDeleteFrequentVisitor(visitor: FrequentVisitor) {
+    const confirmed = window.confirm(
+      `Deseas eliminar a ${visitor.nombre} de tus visitantes frecuentes? Se eliminaran todas sus visitas asociadas.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setErrorMessage("");
+      await deleteFrequentVisitorRequest(visitor.id_visitante);
+      setFrequentVisitors((current) =>
+        current.filter((item) => item.id_visitante !== visitor.id_visitante),
+      );
+      setVisits((current) =>
+        current.filter((item) => item.id_visitante !== visitor.id_visitante),
+      );
+      setSuccessMessage(`Visitante frecuente ${visitor.nombre} eliminado correctamente.`);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "No fue posible eliminar el visitante frecuente.",
+      );
+    }
+  }
+
   function handlePhotoUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
@@ -374,23 +401,33 @@ export function ResidenteVisitsView() {
                       </p>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => handleQuickAuthorize(visitor)}
-                    disabled={isSubmitting}
-                    className="rounded-2xl bg-[linear-gradient(90deg,#a855f7_0%,#8b2cf5_100%)] px-6 text-base text-white hover:opacity-95"
-                  >
-                    {authorizingVisitorId === visitor.id_visitante ? (
-                      <>
-                        <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Autorizando...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="size-4" />
-                        Autorizar (1 click)
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleQuickAuthorize(visitor)}
+                      disabled={isSubmitting}
+                      className="rounded-2xl bg-[linear-gradient(90deg,#a855f7_0%,#8b2cf5_100%)] px-6 text-base text-white hover:opacity-95"
+                    >
+                      {authorizingVisitorId === visitor.id_visitante ? (
+                        <>
+                          <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Autorizando...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="size-4" />
+                          Autorizar (1 click)
+                        </>
+                      )}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteFrequentVisitor(visitor)}
+                      className="rounded-2xl p-3 text-rose-500 transition hover:bg-rose-50"
+                      aria-label={`Eliminar visitante frecuente ${visitor.nombre}`}
+                    >
+                      <Trash2 className="size-5" />
+                    </button>
+                  </div>
                 </div>
               ))
             )}
