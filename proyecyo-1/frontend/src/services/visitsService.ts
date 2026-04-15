@@ -27,6 +27,12 @@ export function deleteVisitRequest(id: number) {
   });
 }
 
+export function deleteFrequentVisitorRequest(id: number) {
+  return apiRequest<{ id_visitante: number; nombre: string }>(`/visitantes-frecuentes/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export function getGuardVisitsRequest() {
   return apiRequest<VisitRecord[]>("/guardia/visitas");
 }

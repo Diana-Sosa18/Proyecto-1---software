@@ -5,6 +5,7 @@ const {
   getFrequentVisitors,
   postVisit,
   removeVisit,
+  removeFrequentVisitor,
   getGuardVisits,
   postValidateQr,
   postRegisterQrEntry,
@@ -16,6 +17,7 @@ const router = express.Router();
 
 router.get("/visitas", requireResident, getVisits);
 router.get("/visitantes-frecuentes", requireResident, getFrequentVisitors);
+router.delete("/visitantes-frecuentes/:id", requireResident, removeFrequentVisitor);
 router.post("/visitas", requireResident, postVisit);
 router.delete("/visitas/:id", requireResident, removeVisit);
 router.get("/guardia/visitas", requireGuard, getGuardVisits);

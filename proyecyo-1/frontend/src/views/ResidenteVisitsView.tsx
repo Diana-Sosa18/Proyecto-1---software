@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   createVisitRequest,
+  deleteFrequentVisitorRequest,
   deleteVisitRequest,
   getFrequentVisitorsRequest,
   getVisitsRequest,
@@ -104,6 +105,7 @@ export function ResidenteVisitsView() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [photoPreview, setPhotoPreview] = useState("");
+  const [authorizingVisitorId, setAuthorizingVisitorId] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -159,8 +161,8 @@ export function ResidenteVisitsView() {
   }
 
   function validateStep() {
-    if (step === 1 && (!form.nombre.trim() || !form.dpi.trim() || !form.placa.trim())) {
-      setErrorMessage("Completa nombre, DPI y placa antes de continuar.");
+    if (step === 1 && !form.nombre.trim()) {
+      setErrorMessage("El nombre del visitante es obligatorio.");
       return false;
     }
 
@@ -233,6 +235,7 @@ export function ResidenteVisitsView() {
   }
 
   async function handleQuickAuthorize(visitor: FrequentVisitor) {
+    setAuthorizingVisitorId(visitor.id_visitante);
     const now = new Date();
     const finish = new Date(now.getTime() + 2 * 60 * 60 * 1000);
 
@@ -249,6 +252,7 @@ export function ResidenteVisitsView() {
       },
       `Visita rapida autorizada para ${visitor.nombre}.`,
     );
+    setAuthorizingVisitorId(null);
   }
 
   async function handleDelete(visit: VisitRecord) {
@@ -265,6 +269,32 @@ export function ResidenteVisitsView() {
       setSuccessMessage("Visita eliminada correctamente.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "No fue posible eliminar la visita.");
+    }
+  }
+
+  async function handleDeleteFrequentVisitor(visitor: FrequentVisitor) {
+    const confirmed = window.confirm(
+      `Deseas eliminar a ${visitor.nombre} de tus visitantes frecuentes? Se eliminaran todas sus visitas asociadas.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setErrorMessage("");
+      await deleteFrequentVisitorRequest(visitor.id_visitante);
+      setFrequentVisitors((current) =>
+        current.filter((item) => item.id_visitante !== visitor.id_visitante),
+      );
+      setVisits((current) =>
+        current.filter((item) => item.id_visitante !== visitor.id_visitante),
+      );
+      setSuccessMessage(`Visitante frecuente ${visitor.nombre} eliminado correctamente.`);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "No fue posible eliminar el visitante frecuente.",
+      );
     }
   }
 
@@ -363,18 +393,41 @@ export function ResidenteVisitsView() {
                     <div>
                       <p className="text-2xl font-semibold text-slate-900">{visitor.nombre}</p>
                       <p className="text-sm text-slate-500">
-                        {visitor.placa || "Sin placa"} • DPI: {visitor.dpi}
+                        {visitor.placa || "Sin placa"} {visitor.dpi ? `• DPI: ${visitor.dpi}` : ""}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {visitor.total_visitas} visita{visitor.total_visitas !== 1 ? "s" : ""}
+                        {visitor.ultima_fecha ? ` • Ultima: ${formatDate(visitor.ultima_fecha)}` : ""}
                       </p>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => handleQuickAuthorize(visitor)}
-                    disabled={isSubmitting}
-                    className="rounded-2xl bg-[linear-gradient(90deg,#a855f7_0%,#8b2cf5_100%)] px-6 text-base text-white hover:opacity-95"
-                  >
-                    <Zap className="size-4" />
-                    Autorizar
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleQuickAuthorize(visitor)}
+                      disabled={isSubmitting}
+                      className="rounded-2xl bg-[linear-gradient(90deg,#a855f7_0%,#8b2cf5_100%)] px-6 text-base text-white hover:opacity-95"
+                    >
+                      {authorizingVisitorId === visitor.id_visitante ? (
+                        <>
+                          <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Autorizando...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="size-4" />
+                          Autorizar (1 click)
+                        </>
+                      )}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteFrequentVisitor(visitor)}
+                      className="rounded-2xl p-3 text-rose-500 transition hover:bg-rose-50"
+                      aria-label={`Eliminar visitante frecuente ${visitor.nombre}`}
+                    >
+                      <Trash2 className="size-5" />
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -421,7 +474,7 @@ export function ResidenteVisitsView() {
                 </label>
 
                 <label className="block space-y-2">
-                  <span className="text-sm font-medium text-slate-800">DPI / Documento de Identidad</span>
+                  <span className="text-sm font-medium text-slate-800">DPI / Documento de Identidad (Opcional)</span>
                   <Input
                     value={form.dpi}
                     onChange={(event) => updateForm("dpi", event.target.value)}
@@ -431,7 +484,7 @@ export function ResidenteVisitsView() {
                 </label>
 
                 <label className="block space-y-2">
-                  <span className="text-sm font-medium text-slate-800">Placa del Vehiculo</span>
+                  <span className="text-sm font-medium text-slate-800">Placa del Vehiculo (Opcional)</span>
                   <Input
                     value={form.placa}
                     onChange={(event) => updateForm("placa", event.target.value.toUpperCase())}
@@ -478,6 +531,9 @@ export function ResidenteVisitsView() {
 
             {step === 2 ? (
               <>
+                <div className="rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                  La fecha y hora se completaron automaticamente con la hora actual. Puedes modificarlos si lo necesitas.
+                </div>
                 <div className="grid gap-5 md:grid-cols-2">
                   <label className="block space-y-2">
                     <span className="text-sm font-medium text-slate-800">Fecha de visita *</span>
