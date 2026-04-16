@@ -61,10 +61,12 @@ export function ResidenteView() {
           {
             title: "Visitas",
             description: "Autorice ingresos temporales, recurrentes o permanentes.",
+            path: "/residente/visitas",
           },
           {
             title: "Amenidades",
             description: "Consulte disponibilidad y confirme sus reservas.",
+            path: "/residente/amenidades",
           },
           {
             title: "Comunidad",
@@ -73,8 +75,8 @@ export function ResidenteView() {
         ].map((section) => (
           <Card
             key={section.title}
-            className={section.title === "Visitas" ? "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md" : ""}
-            onClick={section.title === "Visitas" ? () => navigate("/residente/visitas") : undefined}
+            className={section.path ? "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md" : ""}
+            onClick={section.path ? () => navigate(section.path) : undefined}
           >
             <CardHeader>
               <CardTitle>{section.title}</CardTitle>
