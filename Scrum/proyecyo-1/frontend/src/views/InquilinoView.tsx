@@ -7,8 +7,7 @@ import {
   Plus,
   ShieldCheck,
   UserCheck,
-  XCircle,
-} from "lucide-react";
+XCircle,} from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { StatCard } from "@/components/layout/StatCard";
@@ -17,14 +16,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   cancelPermissionRequestRequest,
-  createPermissionRequestRequest,
-  getOwnPermissionRequestsRequest,
-} from "@/services/permissionRequestsService";
+createPermissionRequestRequest, getOwnPermissionRequestsRequest } from "@/services/permissionRequestsService";
 import type {
   CreatePermissionRequestPayload,
   PermissionRequestRecord,
   PermissionRequestStatus,
 } from "@/types/permissionRequests";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const statusStyles: Record<PermissionRequestStatus, string> = {
   PENDIENTE: "bg-amber-50 text-amber-700",

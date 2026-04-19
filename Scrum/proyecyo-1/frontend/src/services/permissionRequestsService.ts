@@ -13,7 +13,7 @@ export function createPermissionRequestRequest(payload: CreatePermissionRequestP
     method: "POST",
     body: payload,
   });
-}
+}   
 
 export function cancelPermissionRequestRequest(id: number) {
   return apiRequest<PermissionRequestRecord>(`/solicitudes-permiso/${id}/cancelar`, {

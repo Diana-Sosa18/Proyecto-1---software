@@ -6,6 +6,7 @@ const authRoutes = require("./routes/authRoutes");
 const usersRoutes = require("./routes/usersRoutes");
 const userTypesRoutes = require("./routes/userTypesRoutes");
 const permissionRequestsRoutes = require("./routes/permissionRequestsRoutes");
+const adminAccessesRoutes = require("./routes/adminAccessesRoutes");
 
 function createApp() {
   const app = express();
