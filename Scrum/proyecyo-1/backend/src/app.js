@@ -5,6 +5,7 @@ const { env } = require("./config/env");
 const authRoutes = require("./routes/authRoutes");
 const usersRoutes = require("./routes/usersRoutes");
 const userTypesRoutes = require("./routes/userTypesRoutes");
+const permissionRequestsRoutes = require("./routes/permissionRequestsRoutes");
 
 function createApp() {
   const app = express();
@@ -25,6 +26,7 @@ function createApp() {
   app.use(authRoutes);
   app.use(usersRoutes);
   app.use(userTypesRoutes);
+  app.use(permissionRequestsRoutes);
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;
