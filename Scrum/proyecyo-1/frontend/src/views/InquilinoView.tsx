@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+
 import {
   CheckCircle2,
   Clock3,
@@ -11,18 +12,27 @@ import {
 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
+
 import { StatCard } from "@/components/layout/StatCard";
+
 import { PermissionRequestModal } from "@/components/inquilino/PermissionRequestModal";
+
 import { Button } from "@/components/ui/button";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
 import {
   cancelPermissionRequestRequest,
-createPermissionRequestRequest, getOwnPermissionRequestsRequest } from "@/services/permissionRequestsService";
+  createPermissionRequestRequest,
+  getOwnPermissionRequestsRequest,
+} from "@/services/permissionRequestsService";
+
 import type {
   CreatePermissionRequestPayload,
   PermissionRequestRecord,
   PermissionRequestStatus,
 } from "@/types/permissionRequests";
+
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -49,18 +59,6 @@ export function InquilinoView() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const loadRequests = async () => {
-    try {
-      setIsLoading(true);
-      setErrorMessage("");
-      const data = await getOwnPermissionRequestsRequest();
-      setRequests(data);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No se pudieron cargar las solicitudes.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   useEffect(() => {
     void loadRequests();
@@ -82,33 +80,33 @@ export function InquilinoView() {
   );
 
   const handleCreateRequest = async (values: CreatePermissionRequestPayload) => {
-    try {
-      setIsSubmitting(true);
-      await createPermissionRequestRequest(values);
-      setIsModalOpen(false);
-      await loadRequests();
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  try {
+    setIsSubmitting(true);
+    await createPermissionRequestRequest(values);
+    setIsModalOpen(false);
+    await loadRequests();
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const handleCancelRequest = async (id: number) => {
-    const confirmed = window.confirm("¿Deseas cancelar esta solicitud?");
+  const confirmed = window.confirm("¿Deseas cancelar esta solicitud?");
 
-    if (!confirmed) {
-      return;
-    }
+  if (!confirmed) {
+    return;
+  }
 
-    try {
-      setIsCancellingId(id);
-      await cancelPermissionRequestRequest(id);
-      await loadRequests();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No se pudo cancelar la solicitud.");
-    } finally {
-      setIsCancellingId(null);
-    }
-  };
+  try {
+    setIsCancellingId(id);
+    await cancelPermissionRequestRequest(id);
+    await loadRequests();
+  } catch (error) {
+    setErrorMessage(error instanceof Error ? error.message : "No se pudo cancelar la solicitud.");
+  } finally {
+    setIsCancellingId(null);
+  }
+};
 
   return (
     <AppShell
