@@ -7,7 +7,8 @@ import {
   Plus,
   ShieldCheck,
   UserCheck,
-XCircle,} from "lucide-react";
+  XCircle,
+} from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { StatCard } from "@/components/layout/StatCard";
@@ -24,6 +25,7 @@ import type {
 } from "@/types/permissionRequests";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
 
 const statusStyles: Record<PermissionRequestStatus, string> = {
   PENDIENTE: "bg-amber-50 text-amber-700",

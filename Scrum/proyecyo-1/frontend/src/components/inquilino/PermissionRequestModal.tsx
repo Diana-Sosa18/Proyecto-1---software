@@ -87,7 +87,11 @@ export function PermissionRequestModal({
       <Card className="w-full max-w-2xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>Solicitar permiso</CardTitle>
-          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-800"
+          >
             <X className="size-5" />
           </button>
         </CardHeader>
@@ -96,7 +100,9 @@ export function PermissionRequestModal({
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">Tipo de permiso</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Tipo de permiso
+                </label>
                 <select
                   value={form.tipo_permiso}
                   onChange={(event) => handleChange("tipo_permiso", event.target.value)}
@@ -112,7 +118,9 @@ export function PermissionRequestModal({
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">Motivo</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Motivo
+                </label>
                 <Input
                   value={form.motivo}
                   onChange={(event) => handleChange("motivo", event.target.value)}
@@ -121,7 +129,9 @@ export function PermissionRequestModal({
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">Fecha de inicio</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Fecha de inicio
+                </label>
                 <Input
                   type="date"
                   value={form.fecha_inicio}
@@ -130,7 +140,9 @@ export function PermissionRequestModal({
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">Fecha de fin</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Fecha de fin
+                </label>
                 <Input
                   type="date"
                   value={form.fecha_fin}
@@ -139,7 +151,9 @@ export function PermissionRequestModal({
               </div>
 
               <div className="md:col-span-2">
-                <label className="mb-2 block text-sm font-medium text-slate-700">Observaciones</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Observaciones
+                </label>
                 <textarea
                   value={form.observaciones}
                   onChange={(event) => handleChange("observaciones", event.target.value)}
