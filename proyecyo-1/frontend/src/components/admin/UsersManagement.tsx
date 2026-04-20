@@ -156,6 +156,7 @@ export function UsersManagement() {
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nombre</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Correo</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Casa</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Telefono</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Rol</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Acciones</th>
@@ -166,6 +167,7 @@ export function UsersManagement() {
                       <tr key={user.id_usuario}>
                         <td className="px-4 py-4 text-sm text-slate-900">{user.nombre}</td>
                         <td className="px-4 py-4 text-sm text-slate-600">{user.correo}</td>
+                        <td className="px-4 py-4 text-sm text-slate-600">{user.unidad || "-"}</td>
                         <td className="px-4 py-4 text-sm text-slate-600">{user.telefono || "-"}</td>
                         <td className="px-4 py-4 text-sm">
                           <span className={`rounded-full px-3 py-1 text-xs font-medium ${roleStyles[user.rol]}`}>

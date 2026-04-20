@@ -10,6 +10,9 @@ export interface UserRecord {
   telefono: string | null;
   id_tipo_usuario: number;
   rol: "admin" | "guardia" | "residente" | "inquilino";
+  unidad: string | null;
+  numero_casa: string | null;
+  torre: string | null;
 }
 
 export interface UserFormValues {
@@ -18,4 +21,6 @@ export interface UserFormValues {
   password: string;
   telefono: string;
   id_tipo_usuario: string;
+  numero_casa: string;
+  torre: string;
 }

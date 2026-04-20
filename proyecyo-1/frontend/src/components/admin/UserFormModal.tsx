@@ -24,6 +24,8 @@ const emptyValues: UserFormValues = {
   password: "",
   telefono: "",
   id_tipo_usuario: "",
+  numero_casa: "",
+  torre: "",
 };
 
 export function UserFormModal({
@@ -53,6 +55,8 @@ export function UserFormModal({
         password: "",
         telefono: editingUser.telefono ?? "",
         id_tipo_usuario: String(editingUser.id_tipo_usuario),
+        numero_casa: editingUser.numero_casa ?? "",
+        torre: editingUser.torre ?? "",
       });
       return;
     }
@@ -64,6 +68,14 @@ export function UserFormModal({
     () => (editingUser ? "Editar usuario" : "Crear usuario"),
     [editingUser],
   );
+
+  const selectedRole = useMemo(
+    () =>
+      userTypes.find((option) => String(option.id) === values.id_tipo_usuario)?.nombre?.toLowerCase() ?? "",
+    [userTypes, values.id_tipo_usuario],
+  );
+
+  const requiresHouse = selectedRole === "residente" || selectedRole === "inquilino";
 
   if (!isOpen) {
     return null;
@@ -92,6 +104,10 @@ export function UserFormModal({
       nextErrors.id_tipo_usuario = "Seleccione un rol.";
     }
 
+    if (requiresHouse && !values.numero_casa.trim()) {
+      nextErrors.numero_casa = "La casa es obligatoria para este rol.";
+    }
+
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -115,6 +131,8 @@ export function UserFormModal({
         correo: values.correo.trim().toLowerCase(),
         telefono: values.telefono.trim(),
         password: values.password.trim(),
+        numero_casa: values.numero_casa.trim(),
+        torre: values.torre.trim(),
       });
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "No fue posible guardar el usuario.");
@@ -173,7 +191,19 @@ export function UserFormModal({
                 <label className="mb-2 block text-sm text-slate-700">Tipo de usuario</label>
                 <select
                   value={values.id_tipo_usuario}
-                  onChange={(event) => handleChange("id_tipo_usuario", event.target.value)}
+                  onChange={(event) => {
+                    const nextRoleId = event.target.value;
+                    const nextRole =
+                      userTypes.find((option) => String(option.id) === nextRoleId)?.nombre?.toLowerCase() ?? "";
+
+                    setValues((current) => ({
+                      ...current,
+                      id_tipo_usuario: nextRoleId,
+                      numero_casa:
+                        nextRole === "residente" || nextRole === "inquilino" ? current.numero_casa : "",
+                      torre: nextRole === "residente" || nextRole === "inquilino" ? current.torre : "",
+                    }));
+                  }}
                   className="flex h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400"
                 >
                   <option value="">Seleccione un rol</option>
@@ -185,6 +215,37 @@ export function UserFormModal({
                 </select>
                 {errors.id_tipo_usuario ? <p className="mt-2 text-sm text-red-600">{errors.id_tipo_usuario}</p> : null}
               </div>
+
+              {requiresHouse ? (
+                <>
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-700">Numero de casa</label>
+                    <Input
+                      value={values.numero_casa}
+                      onChange={(event) => handleChange("numero_casa", event.target.value)}
+                      placeholder={selectedRole === "inquilino" ? "Ej. 302" : "Ej. 101"}
+                    />
+                    {errors.numero_casa ? (
+                      <p className="mt-2 text-sm text-red-600">{errors.numero_casa}</p>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-700">Torre (opcional)</label>
+                    <Input
+                      value={values.torre}
+                      onChange={(event) => handleChange("torre", event.target.value)}
+                      placeholder="Ej. B"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    {selectedRole === "residente"
+                      ? "Para residentes se crea o actualiza su casa en la tabla CASA."
+                      : "Para inquilinos la casa debe existir previamente en la base de datos, porque se relaciona por INQUILINO_CASA."}
+                  </div>
+                </>
+              ) : null}
             </div>
 
             <div className="flex justify-end gap-3">
