@@ -8,26 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   createAmenitiesReservationRequest,
+  getAmenityAvailabilityRequest,
   getAmenitiesRequest,
   getAmenitiesReservationsRequest,
 } from "@/services/amenitiesService";
-import type { AmenityReservation, Amenity } from "@/types/amenities";
+import type { Amenity, AmenityAvailabilityResponse, AmenityReservation } from "@/types/amenities";
 
-const TIME_SLOTS = [
-  "08:00",
-  "09:00",
-  "10:00",
-  "11:00",
-  "12:00",
-  "13:00",
-  "14:00",
-  "15:00",
-  "16:00",
-  "17:00",
-  "18:00",
-  "19:00",
-  "20:00",
-];
+type SlotSelection = {
+  hora_inicio: string;
+  hora_fin: string;
+};
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -58,31 +48,17 @@ function getWeekDates(baseDate: Date) {
   });
 }
 
-function toMinutes(time: string) {
-  const [hours, minutes] = time.split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
-function isSlotBusy(slotStart: string, reservations: AmenityReservation[]) {
-  const startMinutes = toMinutes(slotStart);
-  const finishMinutes = startMinutes + 60;
-
-  return reservations.some((reservation) => {
-    const reservationStart = toMinutes(reservation.hora_inicio);
-    const reservationFinish = toMinutes(reservation.hora_fin);
-    return reservationStart < finishMinutes && reservationFinish > startMinutes;
-  });
-}
-
 export function ResidenteAmenitiesView() {
   const navigate = useNavigate();
   const [amenities, setAmenities] = useState<Amenity[]>([]);
   const [reservations, setReservations] = useState<AmenityReservation[]>([]);
+  const [availability, setAvailability] = useState<AmenityAvailabilityResponse | null>(null);
   const [selectedAmenityId, setSelectedAmenityId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedSlot, setSelectedSlot] = useState("");
+  const [selectedSlot, setSelectedSlot] = useState<SlotSelection | null>(null);
   const [weekReference, setWeekReference] = useState(new Date());
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -104,7 +80,10 @@ export function ResidenteAmenitiesView() {
         setErrorMessage("");
         const [amenitiesResponse, reservationsResponse] = await Promise.all([
           getAmenitiesRequest(),
-          getAmenitiesReservationsRequest(weekDates[0], weekDates[6]),
+          getAmenitiesReservationsRequest({
+            from: weekDates[0],
+            to: weekDates[6],
+          }),
         ]);
 
         if (!active) {
@@ -129,11 +108,48 @@ export function ResidenteAmenitiesView() {
       }
     }
 
-    loadData();
+    void loadData();
+
     return () => {
       active = false;
     };
   }, [weekDates]);
+
+  useEffect(() => {
+    if (!selectedAmenityId || !selectedDate) {
+      return;
+    }
+
+    let active = true;
+
+    async function loadAvailability() {
+      try {
+        setIsLoadingAvailability(true);
+        const response = await getAmenityAvailabilityRequest(selectedAmenityId, selectedDate);
+
+        if (active) {
+          setAvailability(response);
+        }
+      } catch (error) {
+        if (active) {
+          setErrorMessage(
+            error instanceof Error ? error.message : "No fue posible cargar la disponibilidad.",
+          );
+          setAvailability(null);
+        }
+      } finally {
+        if (active) {
+          setIsLoadingAvailability(false);
+        }
+      }
+    }
+
+    void loadAvailability();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedAmenityId, selectedDate]);
 
   const selectedAmenity = useMemo(
     () => amenities.find((item) => item.id_amenidad === selectedAmenityId) || null,
@@ -141,6 +157,10 @@ export function ResidenteAmenitiesView() {
   );
 
   const selectedReservations = useMemo(() => {
+    if (availability?.fecha === selectedDate && availability.amenidad.id_amenidad === selectedAmenityId) {
+      return availability.reservas;
+    }
+
     if (!selectedAmenityId || !selectedDate) {
       return [];
     }
@@ -148,15 +168,20 @@ export function ResidenteAmenitiesView() {
     return reservations.filter(
       (item) => item.id_amenidad === selectedAmenityId && item.fecha === selectedDate,
     );
-  }, [reservations, selectedAmenityId, selectedDate]);
+  }, [availability, reservations, selectedAmenityId, selectedDate]);
 
   const selectedSlotIsBusy = useMemo(() => {
     if (!selectedSlot) {
       return true;
     }
 
-    return isSlotBusy(selectedSlot, selectedReservations);
-  }, [selectedReservations, selectedSlot]);
+    const slot = availability?.slots.find(
+      (item) =>
+        item.hora_inicio === selectedSlot.hora_inicio && item.hora_fin === selectedSlot.hora_fin,
+    );
+
+    return !slot || !slot.disponible;
+  }, [availability, selectedSlot]);
 
   async function handleConfirmReservation() {
     if (!selectedAmenityId || !selectedDate || !selectedSlot) {
@@ -176,15 +201,17 @@ export function ResidenteAmenitiesView() {
       const created = await createAmenitiesReservationRequest({
         id_amenidad: selectedAmenityId,
         fecha: selectedDate,
-        hora_inicio: selectedSlot,
-        hora_fin: `${String(Number(selectedSlot.slice(0, 2)) + 1).padStart(2, "0")}:00`,
+        hora_inicio: selectedSlot.hora_inicio,
+        hora_fin: selectedSlot.hora_fin,
       });
 
       setReservations((current) => [...current, created]);
+      const nextAvailability = await getAmenityAvailabilityRequest(selectedAmenityId, selectedDate);
+      setAvailability(nextAvailability);
       setSuccessMessage(
         `Reserva confirmada para ${created.amenidad_nombre} el ${formatLongDate(created.fecha)} a las ${created.hora_inicio}.`,
       );
-      setSelectedSlot("");
+      setSelectedSlot(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "No fue posible confirmar la reserva.");
     } finally {
@@ -207,7 +234,7 @@ export function ResidenteAmenitiesView() {
           <ArrowLeft className="size-5" />
           <div>
             <h2 className="text-2xl font-semibold text-slate-900">Reservar amenidades</h2>
-            <p className="text-sm text-slate-600">Seleccion de horario y confirmacion inmediata</p>
+            <p className="text-sm text-slate-600">Disponibilidad real y confirmacion inmediata</p>
           </div>
         </button>
 
@@ -228,11 +255,15 @@ export function ResidenteAmenitiesView() {
         <Card className="border-white/70 bg-white shadow-[0_16px_40px_rgba(30,41,59,0.08)]">
           <CardHeader>
             <CardTitle className="text-xl">Amenidades disponibles</CardTitle>
-            <CardDescription>Cards horizontales para seleccionar la amenidad.</CardDescription>
+            <CardDescription>
+              Selecciona la amenidad y consulta solo horarios almacenados en la base de datos.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {isLoading ? (
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Cargando amenidades...</div>
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
+                Cargando amenidades...
+              </div>
             ) : amenities.length === 0 ? (
               <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
                 No hay amenidades configuradas.
@@ -244,7 +275,7 @@ export function ResidenteAmenitiesView() {
                   type="button"
                   onClick={() => {
                     setSelectedAmenityId(amenity.id_amenidad);
-                    setSelectedSlot("");
+                    setSelectedSlot(null);
                   }}
                   className={`flex w-full items-center justify-between rounded-2xl border px-5 py-4 text-left transition ${
                     amenity.id_amenidad === selectedAmenityId
@@ -254,9 +285,16 @@ export function ResidenteAmenitiesView() {
                 >
                   <div className="flex items-center gap-3">
                     <CalendarDays className="size-5 text-blue-600" />
-                    <span className="font-medium text-slate-900">{amenity.nombre}</span>
+                    <div>
+                      <span className="font-medium text-slate-900">{amenity.nombre}</span>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {amenity.hora_apertura} - {amenity.hora_cierre}
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-sm text-slate-500">Ver horarios</span>
+                  <span className="text-sm text-slate-500">
+                    {amenity.activo ? "Ver horarios" : "Inactiva"}
+                  </span>
                 </button>
               ))
             )}
@@ -294,7 +332,9 @@ export function ResidenteAmenitiesView() {
                 </Button>
               </div>
             </div>
-            <CardDescription>Selecciona el dia para cargar la cuadrícula de horarios.</CardDescription>
+            <CardDescription>
+              Cambia el dia para consultar la disponibilidad real de la amenidad seleccionada.
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-4 lg:grid-cols-7">
             {weekDates.map((day) => (
@@ -303,7 +343,7 @@ export function ResidenteAmenitiesView() {
                 type="button"
                 onClick={() => {
                   setSelectedDate(day);
-                  setSelectedSlot("");
+                  setSelectedSlot(null);
                 }}
                 className={`rounded-2xl border px-3 py-3 text-left transition ${
                   selectedDate === day
@@ -311,8 +351,13 @@ export function ResidenteAmenitiesView() {
                     : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300"
                 }`}
               >
-                <p className="text-xs uppercase">{new Date(`${day}T00:00:00`).toLocaleDateString("es-GT", { weekday: "short" })}</p>
+                <p className="text-xs uppercase">
+                  {new Date(`${day}T00:00:00`).toLocaleDateString("es-GT", { weekday: "short" })}
+                </p>
                 <p className="text-sm font-semibold">{formatLongDate(day)}</p>
+                <p className="mt-2 text-xs text-slate-500">
+                  {reservations.filter((item) => item.fecha === day).length} reserva(s)
+                </p>
               </button>
             ))}
           </CardContent>
@@ -320,38 +365,79 @@ export function ResidenteAmenitiesView() {
 
         <Card className="border-white/70 bg-white shadow-[0_16px_40px_rgba(30,41,59,0.08)]">
           <CardHeader>
-            <CardTitle className="text-xl">Cuadrícula de horarios</CardTitle>
+            <CardTitle className="text-xl">Cuadricula de horarios</CardTitle>
             <CardDescription>
-              {selectedAmenity ? `${selectedAmenity.nombre} • ${formatLongDate(selectedDate)}` : "Selecciona una amenidad"}
+              {selectedAmenity ? `${selectedAmenity.nombre} | ${formatLongDate(selectedDate)}` : "Selecciona una amenidad"}
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
-            {TIME_SLOTS.map((slot) => {
-              const busy = isSlotBusy(slot, selectedReservations);
-              const isSelected = slot === selectedSlot;
+          <CardContent className="space-y-4">
+            {isLoadingAvailability ? (
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
+                Cargando disponibilidad...
+              </div>
+            ) : availability && availability.slots.length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
+                {availability.slots.map((slot) => {
+                  const isSelected =
+                    selectedSlot?.hora_inicio === slot.hora_inicio &&
+                    selectedSlot?.hora_fin === slot.hora_fin;
 
-              return (
-                <button
-                  key={slot}
-                  type="button"
-                  disabled={busy || !selectedAmenity}
-                  onClick={() => setSelectedSlot(slot)}
-                  className={`rounded-2xl border px-4 py-3 text-left transition ${
-                    busy
-                      ? "cursor-not-allowed border-rose-200 bg-rose-50 text-rose-700"
-                      : isSelected
-                        ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                        : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300"
-                  }`}
-                >
-                  <p className="flex items-center gap-2 text-sm font-medium">
-                    <Clock3 className="size-4" />
-                    {slot} - {`${String(Number(slot.slice(0, 2)) + 1).padStart(2, "0")}:00`}
-                  </p>
-                  <p className="mt-1 text-xs">{busy ? "Ocupado" : "Disponible"}</p>
-                </button>
-              );
-            })}
+                  return (
+                    <button
+                      key={`${slot.hora_inicio}-${slot.hora_fin}`}
+                      type="button"
+                      disabled={!slot.disponible || !selectedAmenity}
+                      onClick={() =>
+                        setSelectedSlot({
+                          hora_inicio: slot.hora_inicio,
+                          hora_fin: slot.hora_fin,
+                        })
+                      }
+                      className={`rounded-2xl border px-4 py-3 text-left transition ${
+                        !slot.disponible
+                          ? "cursor-not-allowed border-rose-200 bg-rose-50 text-rose-700"
+                          : isSelected
+                            ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                            : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300"
+                      }`}
+                    >
+                      <p className="flex items-center gap-2 text-sm font-medium">
+                        <Clock3 className="size-4" />
+                        {slot.hora_inicio} - {slot.hora_fin}
+                      </p>
+                      <p className="mt-1 text-xs">
+                        {slot.disponible ? "Disponible" : "Ocupado"}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
+                No hay bloques configurados para esta amenidad en la fecha seleccionada.
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <p className="font-medium text-slate-900">Reservas del dia</p>
+              <div className="mt-3 space-y-2">
+                {selectedReservations.length > 0 ? (
+                  selectedReservations.map((reservation) => (
+                    <div
+                      key={reservation.reservation_key}
+                      className="flex items-center justify-between rounded-xl bg-white px-4 py-3"
+                    >
+                      <span>
+                        {reservation.hora_inicio} - {reservation.hora_fin}
+                      </span>
+                      <span className="text-xs text-slate-500">{reservation.estado_actual}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-slate-500">Sin reservas para este dia.</p>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
 

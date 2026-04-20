@@ -4,6 +4,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { PublicRoute } from "@/components/auth/PublicRoute";
 import { useAuth } from "@/hooks/useAuth";
 import { rolePaths } from "@/routes/rolePaths";
+import { AdminAmenitiesReservationsView } from "@/views/AdminAmenitiesReservationsView";
 import { AdminView } from "@/views/AdminView";
 import { GuardiaView } from "@/views/GuardiaView";
 import { InquilinoView } from "@/views/InquilinoView";
@@ -27,6 +28,7 @@ export function AppRouter() {
 
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route path="/admin" element={<AdminView />} />
+          <Route path="/admin/amenidades" element={<AdminAmenitiesReservationsView />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["guardia"]} />}>

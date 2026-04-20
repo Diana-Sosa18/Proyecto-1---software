@@ -146,7 +146,12 @@ CREATE TABLE REGISTRO_ACCESO (
 
 CREATE TABLE AMENIDAD (
     id_amenidad INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(100) NOT NULL
+    nombre VARCHAR(100) NOT NULL,
+    descripcion VARCHAR(200),
+    hora_apertura TIME NOT NULL DEFAULT '08:00:00',
+    hora_cierre TIME NOT NULL DEFAULT '22:00:00',
+    intervalo_minutos INT NOT NULL DEFAULT 60,
+    activo BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE RESERVA (
@@ -155,10 +160,15 @@ CREATE TABLE RESERVA (
     fecha DATE,
     hora_inicio TIME,
     hora_fin TIME,
+    estado VARCHAR(20) NOT NULL DEFAULT 'CONFIRMADA',
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id_usuario, id_amenidad, fecha, hora_inicio),
     FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario),
-    FOREIGN KEY (id_amenidad) REFERENCES AMENIDAD(id_amenidad)
+    FOREIGN KEY (id_amenidad) REFERENCES AMENIDAD(id_amenidad),
+    CHECK (estado IN ('PENDIENTE', 'CONFIRMADA', 'CANCELADA'))
 );
+
+CREATE INDEX idx_reserva_amenidad_fecha_horario ON RESERVA (id_amenidad, fecha, hora_inicio, hora_fin);
 
 CREATE TABLE COMUNICADO (
     id_comunicado INT PRIMARY KEY AUTO_INCREMENT,
@@ -283,4 +293,88 @@ VALUES
         'PROVEEDOR',
         'demoqrmariagarcia003',
         'AUTORIZADA'
+    );
+
+INSERT INTO AMENIDAD (nombre, descripcion, hora_apertura, hora_cierre, intervalo_minutos, activo)
+VALUES
+    ('Salon de eventos', 'Espacio para celebraciones privadas y reuniones.', '08:00:00', '22:00:00', 60, TRUE),
+    ('Cancha de tenis', 'Cancha al aire libre para entrenamientos y partidos.', '06:00:00', '21:00:00', 60, TRUE),
+    ('Piscina', 'Piscina familiar con control por bloques de uso.', '08:00:00', '20:00:00', 60, TRUE),
+    ('Gimnasio', 'Zona de entrenamiento con acceso por franjas horarias.', '05:00:00', '22:00:00', 60, TRUE),
+    ('Area de parrillas', 'Area social con estaciones de parrilla y mesas.', '09:00:00', '23:00:00', 60, TRUE),
+    ('Salon infantil', 'Salon recreativo para actividades infantiles.', '09:00:00', '19:00:00', 60, TRUE);
+
+INSERT INTO RESERVA (id_usuario, id_amenidad, fecha, hora_inicio, hora_fin, estado, creado_en)
+VALUES
+    (
+        (SELECT id_usuario FROM USUARIO WHERE correo = 'residente@test.com'),
+        (SELECT id_amenidad FROM AMENIDAD WHERE nombre = 'Salon de eventos'),
+        CURDATE(),
+        '18:00:00',
+        '22:00:00',
+        'CONFIRMADA',
+        NOW()
+    ),
+    (
+        (SELECT id_usuario FROM USUARIO WHERE correo = 'inquilino@test.com'),
+        (SELECT id_amenidad FROM AMENIDAD WHERE nombre = 'Cancha de tenis'),
+        CURDATE(),
+        '16:00:00',
+        '18:00:00',
+        'CONFIRMADA',
+        NOW()
+    ),
+    (
+        (SELECT id_usuario FROM USUARIO WHERE correo = 'residente@test.com'),
+        (SELECT id_amenidad FROM AMENIDAD WHERE nombre = 'Piscina'),
+        DATE_ADD(CURDATE(), INTERVAL 1 DAY),
+        '14:00:00',
+        '16:00:00',
+        'CONFIRMADA',
+        NOW()
+    ),
+    (
+        (SELECT id_usuario FROM USUARIO WHERE correo = 'inquilino@test.com'),
+        (SELECT id_amenidad FROM AMENIDAD WHERE nombre = 'Gimnasio'),
+        DATE_ADD(CURDATE(), INTERVAL 2 DAY),
+        '07:00:00',
+        '08:00:00',
+        'PENDIENTE',
+        NOW()
+    ),
+    (
+        (SELECT id_usuario FROM USUARIO WHERE correo = 'residente@test.com'),
+        (SELECT id_amenidad FROM AMENIDAD WHERE nombre = 'Area de parrillas'),
+        DATE_ADD(CURDATE(), INTERVAL 3 DAY),
+        '19:00:00',
+        '22:00:00',
+        'CONFIRMADA',
+        NOW()
+    ),
+    (
+        (SELECT id_usuario FROM USUARIO WHERE correo = 'inquilino@test.com'),
+        (SELECT id_amenidad FROM AMENIDAD WHERE nombre = 'Salon infantil'),
+        DATE_ADD(CURDATE(), INTERVAL 4 DAY),
+        '10:00:00',
+        '12:00:00',
+        'CONFIRMADA',
+        NOW()
+    ),
+    (
+        (SELECT id_usuario FROM USUARIO WHERE correo = 'residente@test.com'),
+        (SELECT id_amenidad FROM AMENIDAD WHERE nombre = 'Cancha de tenis'),
+        DATE_SUB(CURDATE(), INTERVAL 5 DAY),
+        '16:00:00',
+        '18:00:00',
+        'CONFIRMADA',
+        NOW()
+    ),
+    (
+        (SELECT id_usuario FROM USUARIO WHERE correo = 'inquilino@test.com'),
+        (SELECT id_amenidad FROM AMENIDAD WHERE nombre = 'Piscina'),
+        DATE_SUB(CURDATE(), INTERVAL 3 DAY),
+        '13:00:00',
+        '15:00:00',
+        'CONFIRMADA',
+        NOW()
     );

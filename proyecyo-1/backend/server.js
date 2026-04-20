@@ -1,9 +1,13 @@
 const { createApp } = require("./src/app");
 const { env } = require("./src/config/env");
-const { ensureVisitQrSchema } = require("./src/database/mysql");
+const {
+  ensureVisitQrSchema,
+  ensureAmenityReservationsSchema,
+} = require("./src/database/mysql");
 
 async function startServer() {
   await ensureVisitQrSchema();
+  await ensureAmenityReservationsSchema();
   const app = createApp();
 
   app.listen(env.PORT, () => {

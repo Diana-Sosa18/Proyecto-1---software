@@ -89,8 +89,100 @@ async function ensureVisitQrSchema() {
   }
 }
 
+async function ensureAmenityReservationsSchema() {
+  const amenityColumns = [
+    {
+      column: "descripcion",
+      ddl: `
+        ALTER TABLE AMENIDAD
+        ADD COLUMN descripcion VARCHAR(200) NULL AFTER nombre
+      `,
+    },
+    {
+      column: "hora_apertura",
+      ddl: `
+        ALTER TABLE AMENIDAD
+        ADD COLUMN hora_apertura TIME NOT NULL DEFAULT '08:00:00' AFTER descripcion
+      `,
+    },
+    {
+      column: "hora_cierre",
+      ddl: `
+        ALTER TABLE AMENIDAD
+        ADD COLUMN hora_cierre TIME NOT NULL DEFAULT '22:00:00' AFTER hora_apertura
+      `,
+    },
+    {
+      column: "intervalo_minutos",
+      ddl: `
+        ALTER TABLE AMENIDAD
+        ADD COLUMN intervalo_minutos INT NOT NULL DEFAULT 60 AFTER hora_cierre
+      `,
+    },
+    {
+      column: "activo",
+      ddl: `
+        ALTER TABLE AMENIDAD
+        ADD COLUMN activo BOOLEAN NOT NULL DEFAULT TRUE AFTER intervalo_minutos
+      `,
+    },
+  ];
+
+  for (const definition of amenityColumns) {
+    if (!(await columnExists("AMENIDAD", definition.column))) {
+      await query(definition.ddl);
+    }
+  }
+
+  const reservationColumns = [
+    {
+      column: "estado",
+      ddl: `
+        ALTER TABLE RESERVA
+        ADD COLUMN estado VARCHAR(20) NOT NULL DEFAULT 'CONFIRMADA' AFTER hora_fin
+      `,
+    },
+    {
+      column: "creado_en",
+      ddl: `
+        ALTER TABLE RESERVA
+        ADD COLUMN creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER estado
+      `,
+    },
+  ];
+
+  for (const definition of reservationColumns) {
+    if (!(await columnExists("RESERVA", definition.column))) {
+      await query(definition.ddl);
+    }
+  }
+
+  await query(`
+    UPDATE AMENIDAD
+    SET
+      hora_apertura = COALESCE(hora_apertura, '08:00:00'),
+      hora_cierre = COALESCE(hora_cierre, '22:00:00'),
+      intervalo_minutos = COALESCE(intervalo_minutos, 60),
+      activo = COALESCE(activo, 1)
+  `);
+
+  await query(`
+    UPDATE RESERVA
+    SET estado = 'CONFIRMADA'
+    WHERE estado IS NULL OR estado = ''
+  `);
+
+  if (!(await indexExists("RESERVA", "idx_reserva_amenidad_fecha_horario"))) {
+    await query(`
+      ALTER TABLE RESERVA
+      ADD INDEX idx_reserva_amenidad_fecha_horario (id_amenidad, fecha, hora_inicio, hora_fin)
+    `);
+  }
+}
+
 module.exports = {
   pool,
   query,
   ensureVisitQrSchema,
+  ensureAmenityReservationsSchema,
 };
