@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 
-import { AppShell } from "@/components/layout/AppShell";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -708,11 +708,7 @@ export function AdminAmenitiesReservationsView() {
   }
 
   return (
-    <AppShell
-      role="admin"
-      title="Amenidades"
-      subtitle="Gestion de reservas y disponibilidad."
-    >
+    <AdminLayout title="Amenidades" subtitle="Gestion de reservas y disponibilidad.">
       <div className="space-y-6">
         {errorMessage ? (
           <Alert variant="destructive">
@@ -1467,6 +1463,6 @@ export function AdminAmenitiesReservationsView() {
           </div>
         </div>
       </OverlayPanel>
-    </AppShell>
+    </AdminLayout>
   );
 }
