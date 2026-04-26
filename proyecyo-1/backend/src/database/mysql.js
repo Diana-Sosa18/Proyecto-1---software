@@ -52,6 +52,7 @@ async function indexExists(tableName, indexName) {
 async function ensureVisitQrSchema() {
   const hasTokenQr = await columnExists("ACCESO", "token_qr");
   const hasEstadoAcceso = await columnExists("ACCESO", "estado_acceso");
+  const hasAuthorizer = await columnExists("ACCESO", "id_usuario_autoriza");
 
   if (!hasTokenQr) {
     await query(`
@@ -64,6 +65,13 @@ async function ensureVisitQrSchema() {
     await query(`
       ALTER TABLE ACCESO
       ADD COLUMN estado_acceso VARCHAR(30) NOT NULL DEFAULT 'AUTORIZADA'
+    `);
+  }
+
+  if (!hasAuthorizer) {
+    await query(`
+      ALTER TABLE ACCESO
+      ADD COLUMN id_usuario_autoriza INT NULL AFTER id_casa
     `);
   }
 

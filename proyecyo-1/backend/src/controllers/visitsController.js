@@ -11,7 +11,7 @@ const {
 
 async function getVisits(req, res, next) {
   try {
-    const visits = await listResidentVisits(req.authUser.id);
+    const visits = await listResidentVisits(req.authUser.id, req.authUser.role);
     res.status(200).json(visits);
   } catch (error) {
     next(error);
@@ -20,7 +20,7 @@ async function getVisits(req, res, next) {
 
 async function getFrequentVisitors(req, res, next) {
   try {
-    const visitors = await listFrequentVisitors(req.authUser.id);
+    const visitors = await listFrequentVisitors(req.authUser.id, req.authUser.role);
     res.status(200).json(visitors);
   } catch (error) {
     next(error);
@@ -29,7 +29,7 @@ async function getFrequentVisitors(req, res, next) {
 
 async function postVisit(req, res, next) {
   try {
-    const visit = await createVisit(req.authUser.id, req.body || {});
+    const visit = await createVisit(req.authUser.id, req.authUser.role, req.body || {});
     res.status(201).json(visit);
   } catch (error) {
     next(error);
@@ -38,7 +38,7 @@ async function postVisit(req, res, next) {
 
 async function removeVisit(req, res, next) {
   try {
-    const visit = await deleteVisit(req.authUser.id, Number(req.params.id));
+    const visit = await deleteVisit(req.authUser.id, req.authUser.role, Number(req.params.id));
     res.status(200).json(visit);
   } catch (error) {
     next(error);
@@ -47,7 +47,7 @@ async function removeVisit(req, res, next) {
 
 async function removeFrequentVisitor(req, res, next) {
   try {
-    const result = await deleteFrequentVisitor(req.authUser.id, Number(req.params.id));
+    const result = await deleteFrequentVisitor(req.authUser.id, req.authUser.role, Number(req.params.id));
     res.status(200).json(result);
   } catch (error) {
     next(error);

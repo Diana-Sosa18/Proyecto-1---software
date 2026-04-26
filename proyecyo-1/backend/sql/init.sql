@@ -124,6 +124,7 @@ CREATE TABLE ACCESO (
     id_acceso INT PRIMARY KEY AUTO_INCREMENT,
     id_visitante INT NOT NULL,
     id_casa INT NOT NULL,
+    id_usuario_autoriza INT,
     fecha DATE NOT NULL,
     hora_inicio TIME,
     hora_fin TIME,
@@ -132,6 +133,7 @@ CREATE TABLE ACCESO (
     estado_acceso VARCHAR(30) NOT NULL DEFAULT 'AUTORIZADA',
     FOREIGN KEY (id_visitante) REFERENCES VISITANTE(id_visitante),
     FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
+    FOREIGN KEY (id_usuario_autoriza) REFERENCES USUARIO(id_usuario),
     CHECK (tipo_visita IN ('VISITA', 'DELIVERY', 'PROVEEDOR')),
     CHECK (estado_acceso IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'CANCELADA'))
 );

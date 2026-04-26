@@ -4,6 +4,7 @@ import {
   Home,
   KeyRound,
   LayoutDashboard,
+  LogOut,
   Settings,
   Wallet,
 } from "lucide-react";
@@ -70,7 +71,7 @@ function getInitials(email: string | undefined) {
 }
 
 export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutProps) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] text-slate-900">
@@ -79,7 +80,9 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
           <p className="text-[1.34rem] font-semibold leading-none tracking-tight text-blue-600">
             NexusResidencial
           </p>
-          <p className="mt-1.5 text-[0.78rem] text-slate-500">Panel de Administraci\u00f3n</p>
+          <p className="mt-1.5 text-[0.78rem] text-slate-500">
+            {"Panel de Administraci\u00f3n"}
+          </p>
         </div>
 
         <nav className="px-3 py-4 lg:px-3 lg:py-5">
@@ -117,6 +120,14 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
               </p>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={logout}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-[0.84rem] font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-950"
+          >
+            <LogOut className="size-4" />
+            Cerrar sesi\u00f3n
+          </button>
         </div>
       </aside>
 

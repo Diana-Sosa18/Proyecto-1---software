@@ -43,26 +43,45 @@ function ensureVisitType(value) {
   return normalized;
 }
 
-async function getResidentHouseByUserId(userId) {
-  const rows = await query(
-    `
-      SELECT
-        c.id_casa,
-        c.numero,
-        c.torre
-      FROM CASA c
-      INNER JOIN RESIDENTE r
-        ON r.id_residente = c.id_residente
-      WHERE r.id_usuario = ?
-      LIMIT 1
-    `,
-    [userId],
-  );
+async function getHouseByUserId(userId, role = "residente") {
+  const rows =
+    role === "inquilino"
+      ? await query(
+          `
+            SELECT
+              c.id_casa,
+              c.numero,
+              c.torre
+            FROM INQUILINO i
+            INNER JOIN INQUILINO_CASA ic
+              ON ic.id_inquilino = i.id_inquilino
+            INNER JOIN CASA c
+              ON c.id_casa = ic.id_casa
+            WHERE i.id_usuario = ?
+              AND i.autorizado = TRUE
+            LIMIT 1
+          `,
+          [userId],
+        )
+      : await query(
+          `
+            SELECT
+              c.id_casa,
+              c.numero,
+              c.torre
+            FROM CASA c
+            INNER JOIN RESIDENTE r
+              ON r.id_residente = c.id_residente
+            WHERE r.id_usuario = ?
+            LIMIT 1
+          `,
+          [userId],
+        );
 
   const house = rows[0];
 
   if (!house) {
-    const error = new Error("No se encontro una casa asociada al residente.");
+    const error = new Error("No se encontro una casa asociada al usuario.");
     error.status = 404;
     throw error;
   }
@@ -157,8 +176,16 @@ function normalizeQrToken(value) {
   return normalized.startsWith("NEXUSVISIT:") ? normalized.slice("NEXUSVISIT:".length) : normalized;
 }
 
-async function listResidentVisits(userId) {
-  const house = await getResidentHouseByUserId(userId);
+function getOwnerFilter(role) {
+  return role === "inquilino" ? " AND a.id_usuario_autoriza = ?" : "";
+}
+
+function getOwnerParams(userId, role) {
+  return role === "inquilino" ? [userId] : [];
+}
+
+async function listResidentVisits(userId, role = "residente") {
+  const house = await getHouseByUserId(userId, role);
   const rows = await query(
     `
       SELECT
@@ -181,16 +208,17 @@ async function listResidentVisits(userId) {
       INNER JOIN CASA c
         ON c.id_casa = a.id_casa
       WHERE a.id_casa = ?
+        ${getOwnerFilter(role)}
       ORDER BY a.fecha DESC, a.hora_inicio DESC, a.id_acceso DESC
     `,
-    [house.id_casa],
+    [house.id_casa, ...getOwnerParams(userId, role)],
   );
 
   return rows.map(mapVisit);
 }
 
-async function listFrequentVisitors(userId) {
-  const house = await getResidentHouseByUserId(userId);
+async function listFrequentVisitors(userId, role = "residente") {
+  const house = await getHouseByUserId(userId, role);
   const rows = await query(
     `
       SELECT
@@ -204,11 +232,12 @@ async function listFrequentVisitors(userId) {
       INNER JOIN VISITANTE v
         ON v.id_visitante = a.id_visitante
       WHERE a.id_casa = ?
+        ${getOwnerFilter(role)}
       GROUP BY v.nombre, v.dpi, v.placa
       ORDER BY total_visitas DESC, ultima_fecha DESC, v.nombre ASC
       LIMIT 5
     `,
-    [house.id_casa],
+    [house.id_casa, ...getOwnerParams(userId, role)],
   );
 
   return rows.map((row) => ({
@@ -223,8 +252,8 @@ async function listFrequentVisitors(userId) {
   }));
 }
 
-async function createVisit(userId, payload) {
-  const house = await getResidentHouseByUserId(userId);
+async function createVisit(userId, role = "residente", payload) {
+  const house = await getHouseByUserId(userId, role);
   const nombre = normalizeString(payload.nombre);
   const dpi = normalizeString(payload.dpi);
   const placa = normalizeString(payload.placa).toUpperCase();
@@ -262,10 +291,10 @@ async function createVisit(userId, payload) {
 
     const [accessResult] = await connection.execute(
       `
-        INSERT INTO ACCESO (id_visitante, id_casa, fecha, hora_inicio, hora_fin, tipo_visita, token_qr, estado_acceso)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'AUTORIZADA')
+        INSERT INTO ACCESO (id_visitante, id_casa, id_usuario_autoriza, fecha, hora_inicio, hora_fin, tipo_visita, token_qr, estado_acceso)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'AUTORIZADA')
       `,
-      [visitorResult.insertId, house.id_casa, fecha, horaInicio, horaFin, tipoVisita, qrToken],
+      [visitorResult.insertId, house.id_casa, userId, fecha, horaInicio, horaFin, tipoVisita, qrToken],
     );
 
     await connection.commit();
@@ -306,8 +335,8 @@ async function createVisit(userId, payload) {
   }
 }
 
-async function deleteVisit(userId, accessId) {
-  const house = await getResidentHouseByUserId(userId);
+async function deleteVisit(userId, role = "residente", accessId) {
+  const house = await getHouseByUserId(userId, role);
   const normalizedAccessId = Number(accessId);
 
   if (!Number.isInteger(normalizedAccessId) || normalizedAccessId <= 0) {
@@ -337,9 +366,10 @@ async function deleteVisit(userId, accessId) {
       INNER JOIN CASA c
         ON c.id_casa = a.id_casa
       WHERE a.id_acceso = ? AND a.id_casa = ?
+        ${getOwnerFilter(role)}
       LIMIT 1
     `,
-    [normalizedAccessId, house.id_casa],
+    [normalizedAccessId, house.id_casa, ...getOwnerParams(userId, role)],
   );
 
   const visit = rows[0];
@@ -379,8 +409,8 @@ async function deleteVisit(userId, accessId) {
   }
 }
 
-async function deleteFrequentVisitor(userId, visitorId) {
-  const house = await getResidentHouseByUserId(userId);
+async function deleteFrequentVisitor(userId, role = "residente", visitorId) {
+  const house = await getHouseByUserId(userId, role);
   const normalizedVisitorId = Number(visitorId);
 
   if (!Number.isInteger(normalizedVisitorId) || normalizedVisitorId <= 0) {
@@ -395,9 +425,10 @@ async function deleteFrequentVisitor(userId, visitorId) {
       FROM VISITANTE v
       INNER JOIN ACCESO a ON a.id_visitante = v.id_visitante
       WHERE v.id_visitante = ? AND a.id_casa = ?
+        ${getOwnerFilter(role)}
       LIMIT 1
     `,
-    [normalizedVisitorId, house.id_casa],
+    [normalizedVisitorId, house.id_casa, ...getOwnerParams(userId, role)],
   );
 
   const visitor = rows[0];
@@ -417,12 +448,13 @@ async function deleteFrequentVisitor(userId, visitorId) {
         DELETE ra FROM REGISTRO_ACCESO ra
         INNER JOIN ACCESO a ON a.id_acceso = ra.id_acceso
         WHERE a.id_visitante = ? AND a.id_casa = ?
+          ${getOwnerFilter(role)}
       `,
-      [normalizedVisitorId, house.id_casa],
+      [normalizedVisitorId, house.id_casa, ...getOwnerParams(userId, role)],
     );
     await connection.execute(
-      "DELETE FROM ACCESO WHERE id_visitante = ? AND id_casa = ?",
-      [normalizedVisitorId, house.id_casa],
+      `DELETE FROM ACCESO WHERE id_visitante = ? AND id_casa = ? ${getOwnerFilter(role)}`,
+      [normalizedVisitorId, house.id_casa, ...getOwnerParams(userId, role)],
     );
     await connection.execute(
       `
