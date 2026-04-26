@@ -58,7 +58,7 @@ type ScheduleFormState = UpdateAmenitySchedulePayload & {
 };
 
 const FIELD_CLASS_NAME =
-  "h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100";
+  "h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-[0.82rem] text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100";
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -244,18 +244,18 @@ function OverlayPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/45 px-4 py-10">
-      <div className="w-full max-w-3xl rounded-[28px] bg-white shadow-[0_40px_100px_rgba(15,23,42,0.24)]">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/45 px-4 py-7">
+      <div className="w-full max-w-[680px] rounded-[20px] bg-white shadow-[0_40px_100px_rgba(15,23,42,0.24)]">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3.5">
           <div>
-            <h2 className="text-2xl font-semibold text-slate-950">{title}</h2>
-            <p className="mt-1 text-sm text-slate-500">{description}</p>
+            <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+            <p className="mt-1 text-[0.82rem] text-slate-500">{description}</p>
           </div>
           <Button type="button" variant="ghost" size="icon" onClick={onClose}>
             <X className="size-5" />
           </Button>
         </div>
-        <div className="px-6 py-6">{children}</div>
+        <div className="px-4 py-4">{children}</div>
       </div>
     </div>
   );
@@ -709,7 +709,7 @@ export function AdminAmenitiesReservationsView() {
 
   return (
     <AdminLayout title="Amenidades" subtitle="Gestion de reservas y disponibilidad.">
-      <div className="space-y-6">
+      <div className="space-y-4">
         {errorMessage ? (
           <Alert variant="destructive">
             <AlertTitle>Error</AlertTitle>
@@ -724,7 +724,7 @@ export function AdminAmenitiesReservationsView() {
           </Alert>
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           {amenitySummaries.map((summary) => (
             <button
               key={summary.amenity.id_amenidad}
@@ -733,14 +733,14 @@ export function AdminAmenitiesReservationsView() {
                 setSelectedAmenityFilter(summary.amenity.id_amenidad);
                 setSuccessMessage("");
               }}
-              className={`rounded-[26px] border bg-white p-5 text-left shadow-[0_12px_32px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 ${
+              className={`rounded-[18px] border bg-white p-3.5 text-left shadow-[0_12px_32px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 ${
                 selectedAmenityFilter === summary.amenity.id_amenidad
                   ? "border-blue-200 ring-2 ring-blue-100"
                   : "border-slate-200"
               }`}
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="rounded-2xl bg-blue-50 p-3 text-blue-600">
+                <div className="rounded-xl bg-blue-50 p-2.5 text-blue-600">
                   <CalendarDays className="size-5" />
                 </div>
                 <span
@@ -749,9 +749,9 @@ export function AdminAmenitiesReservationsView() {
                   }`}
                 />
               </div>
-              <h3 className="mt-4 text-lg font-medium text-slate-950">{summary.amenity.nombre}</h3>
+              <h3 className="mt-2.5 text-sm font-medium text-slate-950">{summary.amenity.nombre}</h3>
               <p
-                className={`mt-2 text-sm font-medium ${
+                className={`mt-1.5 text-[0.82rem] font-medium ${
                   summary.isBusyNow ? "text-rose-600" : summary.amenity.activo ? "text-emerald-600" : "text-slate-500"
                 }`}
               >
@@ -772,26 +772,26 @@ export function AdminAmenitiesReservationsView() {
           ) : null}
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_360px]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_300px]">
           <Card className="border-slate-200 shadow-[0_20px_48px_rgba(15,23,42,0.07)]">
-            <CardHeader className="gap-4">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <CardHeader className="gap-2.5 px-4 pt-4">
+              <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <CardTitle className="text-2xl font-semibold text-slate-950">
+                  <CardTitle className="text-lg font-semibold text-slate-950">
                     Calendario de Reservas
                   </CardTitle>
                   <CardDescription>
                     Vista mensual con ocupacion real desde la base de datos.
                   </CardDescription>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2.5">
                   <select
                     value={selectedAmenityFilter === "all" ? "all" : String(selectedAmenityFilter)}
                     onChange={(event) => {
                       const value = event.target.value;
                       setSelectedAmenityFilter(value === "all" ? "all" : Number(value));
                     }}
-                    className={`${FIELD_CLASS_NAME} min-w-[220px]`}
+                    className={`${FIELD_CLASS_NAME} min-w-[190px]`}
                   >
                     <option value="all">Todas las amenidades</option>
                     {amenities.map((amenity) => (
@@ -814,7 +814,7 @@ export function AdminAmenitiesReservationsView() {
                     >
                       <ChevronLeft className="size-4" />
                     </Button>
-                    <span className="min-w-[140px] text-center text-sm font-medium capitalize text-slate-700">
+                    <span className="min-w-[124px] text-center text-sm font-medium capitalize text-slate-700">
                       {formatMonthLabel(monthReference)}
                     </span>
                     <Button
@@ -834,14 +834,14 @@ export function AdminAmenitiesReservationsView() {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-5">
-              <div className="grid grid-cols-7 gap-3 text-center text-sm text-slate-500">
+            <CardContent className="space-y-3 px-4 pb-4">
+              <div className="grid grid-cols-7 gap-2 text-center text-[0.72rem] text-slate-500">
                 {["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"].map((dayName) => (
                   <div key={dayName}>{dayName}</div>
                 ))}
               </div>
 
-              <div className="grid grid-cols-7 gap-3">
+              <div className="grid grid-cols-7 gap-2">
                 {calendarDays.map((day) => {
                   const dayReservations = reservationsByDate[day.date] || [];
                   const isToday = day.date === today;
@@ -859,7 +859,7 @@ export function AdminAmenitiesReservationsView() {
                           fecha: day.date,
                         })
                       }
-                      className={`min-h-[116px] rounded-[24px] border p-3 text-left transition ${
+                      className={`min-h-[78px] rounded-2xl border p-2 text-left transition ${
                         isToday
                           ? "border-blue-500 bg-blue-600 text-white"
                           : dayReservations.length > 0
@@ -879,7 +879,7 @@ export function AdminAmenitiesReservationsView() {
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-8 text-xs">
+                      <div className="mt-4 text-[0.72rem]">
                         {dayReservations.length > 0
                           ? `${dayReservations.length} reserva${dayReservations.length === 1 ? "" : "s"}`
                           : "Disponible"}
@@ -889,17 +889,17 @@ export function AdminAmenitiesReservationsView() {
                 })}
               </div>
 
-              <div className="flex flex-wrap gap-6 text-sm text-slate-500">
+              <div className="flex flex-wrap gap-3 text-xs text-slate-500">
                 <div className="flex items-center gap-2">
-                  <span className="size-5 rounded-md bg-emerald-500" />
+                  <span className="size-4 rounded bg-emerald-500" />
                   Disponible
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="size-5 rounded-md bg-rose-500" />
+                  <span className="size-4 rounded bg-rose-500" />
                   Ocupado
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="size-5 rounded-md bg-blue-600" />
+                  <span className="size-4 rounded bg-blue-600" />
                   Hoy
                 </div>
               </div>
@@ -907,18 +907,18 @@ export function AdminAmenitiesReservationsView() {
           </Card>
 
           <Card className="border-slate-200 shadow-[0_20px_48px_rgba(15,23,42,0.07)]">
-            <CardHeader>
-              <CardTitle className="text-2xl font-semibold text-slate-950">
+            <CardHeader className="px-4 pt-4">
+              <CardTitle className="text-lg font-semibold text-slate-950">
                 Acciones Rapidas
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-2.5 px-4 pb-4">
               <Button
                 type="button"
                 onClick={() => openReservationModal()}
-                className="h-14 w-full rounded-2xl bg-blue-600 text-base text-white hover:bg-blue-700"
+                className="h-10 w-full rounded-xl bg-blue-600 text-[0.82rem] text-white hover:bg-blue-700"
               >
-                <PlusCircle className="size-5" />
+                <PlusCircle className="size-4" />
                 Nueva Reserva
               </Button>
 
@@ -926,9 +926,9 @@ export function AdminAmenitiesReservationsView() {
                 type="button"
                 variant="outline"
                 onClick={() => openAvailabilityModal()}
-                className="h-14 w-full rounded-2xl border-slate-200 text-base"
+                className="h-10 w-full rounded-xl border-slate-200 text-[0.82rem]"
               >
-                <Eye className="size-5" />
+                <Eye className="size-4" />
                 Ver Disponibilidad
               </Button>
 
@@ -936,20 +936,20 @@ export function AdminAmenitiesReservationsView() {
                 type="button"
                 variant="outline"
                 onClick={openScheduleModal}
-                className="h-14 w-full rounded-2xl border-slate-200 text-base"
+                className="h-10 w-full rounded-xl border-slate-200 text-[0.82rem]"
               >
-                <Settings2 className="size-5" />
+                <Settings2 className="size-4" />
                 Configurar Horarios
               </Button>
 
-              <div className="border-t border-slate-100 pt-6">
-                <p className="text-sm text-slate-500">Reservas esta semana</p>
-                <div className="mt-3 flex items-end gap-3">
-                  <span className="text-5xl font-semibold text-slate-950">
+              <div className="border-t border-slate-100 pt-4">
+                <p className="text-[0.82rem] text-slate-500">Reservas esta semana</p>
+                <div className="mt-2 flex items-end gap-2.5">
+                  <span className="text-3xl font-semibold text-slate-950">
                     {weeklyStats.currentTotal}
                   </span>
                   <span
-                    className={`pb-2 text-sm font-medium ${
+                    className={`pb-1.5 text-[0.82rem] font-medium ${
                       weeklyStats.delta >= 0 ? "text-emerald-600" : "text-rose-600"
                     }`}
                   >
@@ -960,7 +960,7 @@ export function AdminAmenitiesReservationsView() {
               </div>
 
               {actionAmenity ? (
-                <div className="rounded-[22px] bg-slate-50 p-4 text-sm text-slate-600">
+                <div className="rounded-[18px] bg-slate-50 p-3.5 text-sm text-slate-600">
                   <p className="font-medium text-slate-900">{actionAmenity.nombre}</p>
                   <p className="mt-1">
                     Horario: {actionAmenity.hora_apertura} - {actionAmenity.hora_cierre}
@@ -975,8 +975,8 @@ export function AdminAmenitiesReservationsView() {
         </div>
 
         <Card className="border-slate-200 shadow-[0_20px_48px_rgba(15,23,42,0.07)]">
-          <CardHeader>
-            <CardTitle className="text-2xl font-semibold text-slate-950">
+          <CardHeader className="px-4 pt-4">
+            <CardTitle className="text-lg font-semibold text-slate-950">
               Proximas Reservas
             </CardTitle>
             <CardDescription>
@@ -985,9 +985,9 @@ export function AdminAmenitiesReservationsView() {
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="px-6 pb-6 text-sm text-slate-500">Cargando reservas...</div>
+              <div className="px-4 pb-4 text-sm text-slate-500">Cargando reservas...</div>
             ) : upcomingReservations.length === 0 ? (
-              <div className="px-6 pb-6 text-sm text-slate-500">
+              <div className="px-4 pb-4 text-sm text-slate-500">
                 No hay reservas proximas en el rango consultado.
               </div>
             ) : (
@@ -995,25 +995,25 @@ export function AdminAmenitiesReservationsView() {
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">
                         Amenidad
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">
                         Residente
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">
                         Unidad
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">
                         Fecha
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">
                         Horario
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">
                         Estado
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">
                         Accion
                       </th>
                     </tr>
@@ -1024,33 +1024,33 @@ export function AdminAmenitiesReservationsView() {
 
                       return (
                         <tr key={reservation.reservation_key}>
-                          <td className="px-6 py-5 text-sm text-slate-900">
+                          <td className="px-4 py-3 text-[0.82rem] text-slate-900">
                             {reservation.amenidad_nombre}
                           </td>
-                          <td className="px-6 py-5 text-sm text-slate-700">
+                          <td className="px-4 py-3 text-[0.82rem] text-slate-700">
                             <div className="flex items-center gap-2">
                               <Users className="size-4 text-slate-400" />
                               {reservation.usuario_nombre || "Sin dato"}
                             </div>
                           </td>
-                          <td className="px-6 py-5 text-sm text-slate-600">
+                          <td className="px-4 py-3 text-[0.82rem] text-slate-600">
                             {reservation.unidad || "Sin unidad"}
                           </td>
-                          <td className="px-6 py-5 text-sm text-slate-600">
+                          <td className="px-4 py-3 text-[0.82rem] text-slate-600">
                             {formatShortDate(reservation.fecha)}
                           </td>
-                          <td className="px-6 py-5 text-sm text-slate-600">
+                          <td className="px-4 py-3 text-[0.82rem] text-slate-600">
                             <div className="flex items-center gap-2">
                               <Clock3 className="size-4 text-slate-400" />
                               {reservation.hora_inicio} - {reservation.hora_fin}
                             </div>
                           </td>
-                          <td className="px-6 py-5 text-sm">
-                            <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusMeta.className}`}>
+                          <td className="px-4 py-3 text-[0.82rem]">
+                            <span className={`rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${statusMeta.className}`}>
                               {statusMeta.label}
                             </span>
                           </td>
-                          <td className="px-6 py-5 text-sm">
+                          <td className="px-4 py-3 text-[0.82rem]">
                             <Button
                               type="button"
                               variant="link"
@@ -1133,7 +1133,7 @@ export function AdminAmenitiesReservationsView() {
             </div>
           ) : availabilityPreview ? (
             <div className="space-y-4">
-              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-lg font-medium text-slate-950">
                   {availabilityPreview.amenidad.nombre}
                 </p>

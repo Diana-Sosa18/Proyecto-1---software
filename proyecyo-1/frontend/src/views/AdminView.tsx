@@ -123,60 +123,60 @@ const chartLabels = ["60", "45", "30", "15", "0"];
 export function AdminView() {
   return (
     <AdminLayout title="Dashboard" subtitle="Resumen general del residencial">
-      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {dashboardCards.map(({ label, value, icon: Icon, iconClassName, valueClassName }) => (
           <article
             key={label}
-            className="rounded-[24px] border border-slate-200 bg-white px-7 py-7 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[1.02rem] text-slate-500">{label}</p>
-                <p className={`mt-4 text-5xl font-medium tracking-tight ${valueClassName}`}>{value}</p>
+                <p className="text-[0.82rem] text-slate-500">{label}</p>
+                <p className={`mt-2 text-3xl font-medium tracking-tight ${valueClassName}`}>{value}</p>
               </div>
-              <div className={`rounded-2xl p-4 ${iconClassName}`}>
-                <Icon className="size-7" />
+              <div className={`rounded-xl p-2.5 ${iconClassName}`}>
+                <Icon className="size-5" />
               </div>
             </div>
           </article>
         ))}
       </section>
 
-      <section className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(360px,0.85fr)]">
-        <article className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-          <div className="border-b border-slate-200 px-8 py-8">
-            <h2 className="text-[2rem] font-semibold text-slate-950">Accesos en Tiempo Real</h2>
+      <section className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.85fr)]">
+        <article className="overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <h2 className="text-[1.24rem] font-semibold text-slate-950">Accesos en Tiempo Real</h2>
           </div>
 
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-sm uppercase tracking-[0.12em] text-slate-500">
-                  <th className="px-8 py-5 font-semibold">Hora</th>
-                  <th className="px-8 py-5 font-semibold">Tipo</th>
-                  <th className="px-8 py-5 font-semibold">Nombre</th>
-                  <th className="px-8 py-5 font-semibold">Unidad</th>
-                  <th className="px-8 py-5 font-semibold">Placa</th>
-                  <th className="px-8 py-5 font-semibold">Estado</th>
+                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-[0.1em] text-slate-500">
+                  <th className="px-5 py-3 font-semibold">Hora</th>
+                  <th className="px-5 py-3 font-semibold">Tipo</th>
+                  <th className="px-5 py-3 font-semibold">Nombre</th>
+                  <th className="px-5 py-3 font-semibold">Unidad</th>
+                  <th className="px-5 py-3 font-semibold">Placa</th>
+                  <th className="px-5 py-3 font-semibold">Estado</th>
                 </tr>
               </thead>
               <tbody>
                 {dashboardRows.map((row) => (
                   <tr key={`${row.hour}-${row.name}`} className="border-b border-slate-100 last:border-b-0">
-                    <td className="px-8 py-6 text-lg text-slate-900">{row.hour}</td>
-                    <td className="px-8 py-6">
+                    <td className="px-5 py-3 text-sm text-slate-900">{row.hour}</td>
+                    <td className="px-5 py-3">
                       <span
-                        className={`inline-flex rounded-full px-4 py-2 text-sm font-medium ${typeStyles[row.type]}`}
+                        className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${typeStyles[row.type]}`}
                       >
                         {row.type}
                       </span>
                     </td>
-                    <td className="px-8 py-6 text-lg text-slate-950">{row.name}</td>
-                    <td className="px-8 py-6 text-lg text-slate-500">{row.unit}</td>
-                    <td className="px-8 py-6 text-lg text-slate-500">{row.plate}</td>
-                    <td className="px-8 py-6">
+                    <td className="px-5 py-3 text-sm text-slate-950">{row.name}</td>
+                    <td className="px-5 py-3 text-sm text-slate-500">{row.unit}</td>
+                    <td className="px-5 py-3 text-sm text-slate-500">{row.plate}</td>
+                    <td className="px-5 py-3">
                       <span
-                        className={`inline-flex rounded-full px-4 py-2 text-sm font-medium ${statusStyles[row.status]}`}
+                        className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${statusStyles[row.status]}`}
                       >
                         {row.status}
                       </span>
@@ -188,18 +188,18 @@ export function AdminView() {
           </div>
         </article>
 
-        <article className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-          <h2 className="text-[2rem] font-semibold text-slate-950">Accesos por Hora</h2>
+        <article className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+          <h2 className="text-[1.24rem] font-semibold text-slate-950">Accesos por Hora</h2>
 
-          <div className="mt-8 flex gap-4">
-            <div className="flex h-[360px] flex-col justify-between pb-8 text-[0.95rem] text-slate-500">
+          <div className="mt-4 flex gap-2.5">
+            <div className="flex h-[250px] flex-col justify-between pb-6 text-[0.74rem] text-slate-500">
               {chartLabels.map((label) => (
                 <span key={label}>{label}</span>
               ))}
             </div>
 
             <div className="relative flex-1">
-              <div className="pointer-events-none absolute inset-0 rounded-[24px] border border-slate-200">
+              <div className="pointer-events-none absolute inset-0 rounded-[20px] border border-slate-200">
                 {[0, 1, 2, 3].map((line) => (
                   <div
                     key={line}
@@ -209,14 +209,14 @@ export function AdminView() {
                 ))}
               </div>
 
-              <div className="relative flex h-[360px] items-end gap-3 px-4 pb-10 pt-6">
+              <div className="relative flex h-[250px] items-end gap-2 px-2.5 pb-8 pt-4">
                 {hourlyAccesses.map((item) => (
                   <div key={item.label} className="flex flex-1 flex-col items-center justify-end gap-3">
                     <div
-                      className="w-full max-w-[24px] rounded-t-md bg-blue-500"
-                      style={{ height: `${(item.value / 60) * 280}px` }}
+                      className="w-full max-w-[20px] rounded-t-md bg-blue-500"
+                      style={{ height: `${(item.value / 60) * 195}px` }}
                     />
-                    <span className="text-[0.9rem] text-slate-500">
+                    <span className="text-[0.7rem] text-slate-500">
                       {Number(item.label.slice(0, 2)) % 4 === 2 ? item.label : ""}
                     </span>
                   </div>
@@ -227,7 +227,7 @@ export function AdminView() {
         </article>
       </section>
 
-      <section className="mt-8 grid gap-6 xl:grid-cols-3">
+      <section className="mt-5 grid gap-4 xl:grid-cols-3">
         {[
           {
             title: "Monitoreo de accesos",
@@ -247,18 +247,18 @@ export function AdminView() {
         ].map(({ title, text, icon: Icon }) => (
           <article
             key={title}
-            className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+            className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
           >
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-              <Icon className="size-7" />
+            <div className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <Icon className="size-5" />
             </div>
-            <h2 className="mt-6 text-[1.7rem] font-semibold text-slate-950">{title}</h2>
-            <p className="mt-3 text-base leading-7 text-slate-500">{text}</p>
+            <h2 className="mt-4 text-[1.12rem] font-semibold text-slate-950">{title}</h2>
+            <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-500">{text}</p>
           </article>
         ))}
       </section>
 
-      <section className="mt-8">
+      <section className="mt-5">
         <UsersManagement />
       </section>
     </AdminLayout>

@@ -78,7 +78,7 @@ const cardAccentStyles = {
 };
 
 const fieldClassName =
-  "h-14 rounded-2xl border border-slate-200 bg-white px-4 text-base text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
+  "h-10 rounded-xl border border-slate-200 bg-white px-3 text-[0.82rem] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
 
 function formatRefreshTime(date: Date | null) {
   if (!date) {
@@ -103,9 +103,9 @@ function SummaryCard({
   accentClassName: string;
 }) {
   return (
-    <article className="rounded-[24px] border border-slate-200 bg-white px-7 py-8 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-      <p className="text-[1.05rem] text-slate-500">{label}</p>
-      <p className={`mt-3 text-5xl font-medium tracking-tight ${accentClassName}`}>{value}</p>
+    <article className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+      <p className="text-[0.82rem] text-slate-500">{label}</p>
+      <p className={`mt-1.5 text-3xl font-medium tracking-tight ${accentClassName}`}>{value}</p>
     </article>
   );
 }
@@ -189,7 +189,7 @@ export function AdminAccessesView() {
       subtitle="Registro de ingresos y salidas del dia"
       actions={<span className="text-sm text-slate-500">Actualizado: {formatRefreshTime(lastUpdatedAt)}</span>}
     >
-      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           label="Total del dia"
           value={summary.total_dia}
@@ -212,22 +212,22 @@ export function AdminAccessesView() {
         />
       </section>
 
-      <section className="mt-10 rounded-[28px] border border-slate-200 bg-white px-6 py-7 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+      <section className="mt-5 rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-5 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar por casa, nombre o placa..."
-              className={`${fieldClassName} w-full pl-14`}
+              className={`${fieldClassName} w-full pl-11`}
             />
           </div>
 
           <select
             value={selectedType}
             onChange={(event) => setSelectedType(event.target.value as AdminAccessFilterType)}
-            className={`${fieldClassName} min-w-[220px]`}
+            className={`${fieldClassName} min-w-[190px]`}
           >
             {typeOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -239,7 +239,7 @@ export function AdminAccessesView() {
           <select
             value={selectedStatus}
             onChange={(event) => setSelectedStatus(event.target.value as AdminAccessFilterStatus)}
-            className={`${fieldClassName} min-w-[220px]`}
+            className={`${fieldClassName} min-w-[190px]`}
           >
             {statusOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -251,17 +251,17 @@ export function AdminAccessesView() {
           <button
             type="button"
             onClick={() => window.print()}
-            className="inline-flex h-14 min-w-[196px] items-center justify-center gap-3 rounded-2xl bg-blue-600 px-6 text-lg font-medium text-white transition hover:bg-blue-700"
+            className="inline-flex h-10 min-w-[150px] items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-medium text-white transition hover:bg-blue-700"
           >
-            <Download className="size-5" />
+            <Download className="size-4" />
             Exportar PDF
           </button>
         </div>
       </section>
 
-      <section className="mt-8 rounded-[28px] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+      <section className="mt-5 rounded-[20px] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
         {errorMessage ? (
-          <div className="border-b border-rose-100 bg-rose-50 px-6 py-4 text-sm text-rose-700">
+          <div className="border-b border-rose-100 bg-rose-50 px-5 py-3 text-sm text-rose-700">
             {errorMessage}
           </div>
         ) : null}
@@ -269,26 +269,26 @@ export function AdminAccessesView() {
         <div className="overflow-x-auto">
           <table className="min-w-[980px] w-full">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-sm uppercase tracking-[0.12em] text-slate-500">
-                <th className="px-8 py-6 font-semibold">Hora</th>
-                <th className="px-8 py-6 font-semibold">Tipo</th>
-                <th className="px-8 py-6 font-semibold">Nombre</th>
-                <th className="px-8 py-6 font-semibold">Casa / Unidad</th>
-                <th className="px-8 py-6 font-semibold">Placa</th>
-                <th className="px-8 py-6 font-semibold">Estado</th>
-                <th className="px-8 py-6 font-semibold">Autorizado por</th>
+              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-[0.1em] text-slate-500">
+                <th className="px-5 py-3 font-semibold">Hora</th>
+                <th className="px-5 py-3 font-semibold">Tipo</th>
+                <th className="px-5 py-3 font-semibold">Nombre</th>
+                <th className="px-5 py-3 font-semibold">Casa / Unidad</th>
+                <th className="px-5 py-3 font-semibold">Placa</th>
+                <th className="px-5 py-3 font-semibold">Estado</th>
+                <th className="px-5 py-3 font-semibold">Autorizado por</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-8 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
                     Cargando accesos del dia...
                   </td>
                 </tr>
               ) : accesses.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-8 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
                     No hay accesos que coincidan con los filtros actuales.
                   </td>
                 </tr>
@@ -299,33 +299,33 @@ export function AdminAccessesView() {
 
                   return (
                     <tr key={access.id_acceso} className="border-b border-slate-100 last:border-b-0">
-                      <td className="px-8 py-6 text-lg text-slate-900">
-                        <div className="flex items-center gap-3">
-                          <Clock3 className="size-5 text-slate-400" />
+                      <td className="px-5 py-3 text-sm text-slate-900">
+                        <div className="flex items-center gap-2">
+                          <Clock3 className="size-4 text-slate-400" />
                           <span>{access.hora}</span>
                         </div>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-5 py-3">
                         <span
-                          className={`inline-flex rounded-full px-4 py-2 text-sm font-medium ${typeBadgeStyles[access.tipo]}`}
+                          className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${typeBadgeStyles[access.tipo]}`}
                         >
                           {typeLabels[access.tipo]}
                         </span>
                       </td>
-                      <td className="px-8 py-6 text-lg text-slate-950">{access.nombre}</td>
-                      <td className="px-8 py-6 text-lg text-slate-500">{access.casa_unidad}</td>
-                      <td className="px-8 py-6 text-lg text-slate-500">{access.placa}</td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-3">
-                          <StatusIcon className={`size-5 ${statusMeta.iconClassName}`} />
+                      <td className="px-5 py-3 text-sm text-slate-950">{access.nombre}</td>
+                      <td className="px-5 py-3 text-sm text-slate-500">{access.casa_unidad}</td>
+                      <td className="px-5 py-3 text-sm text-slate-500">{access.placa}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <StatusIcon className={`size-4 ${statusMeta.iconClassName}`} />
                           <span
-                            className={`inline-flex rounded-full px-4 py-2 text-sm font-medium ${statusMeta.className}`}
+                            className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${statusMeta.className}`}
                           >
                             {statusMeta.label}
                           </span>
                         </div>
                       </td>
-                      <td className="px-8 py-6 text-lg text-slate-500">{access.autorizado_por}</td>
+                      <td className="px-5 py-3 text-sm text-slate-500">{access.autorizado_por}</td>
                     </tr>
                   );
                 })

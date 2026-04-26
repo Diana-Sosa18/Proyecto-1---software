@@ -74,16 +74,16 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] text-slate-900">
-      <aside className="flex w-full flex-col border-b border-slate-200 bg-white lg:fixed lg:inset-y-0 lg:left-0 lg:w-[320px] lg:border-b-0 lg:border-r">
-        <div className="border-b border-slate-200 px-8 py-10">
-          <p className="text-[2.05rem] font-semibold leading-none tracking-tight text-blue-600">
+      <aside className="flex w-full flex-col border-b border-slate-200 bg-white lg:fixed lg:inset-y-0 lg:left-0 lg:w-[232px] lg:border-b-0 lg:border-r">
+        <div className="border-b border-slate-200 px-5 py-5">
+          <p className="text-[1.34rem] font-semibold leading-none tracking-tight text-blue-600">
             NexusResidencial
           </p>
-          <p className="mt-3 text-[1.1rem] text-slate-500">Panel de Administraci\u00f3n</p>
+          <p className="mt-1.5 text-[0.78rem] text-slate-500">Panel de Administraci\u00f3n</p>
         </div>
 
-        <nav className="px-5 py-6 lg:px-5 lg:py-8">
-          <div className="grid gap-2">
+        <nav className="px-3 py-4 lg:px-3 lg:py-5">
+          <div className="grid gap-1">
             {adminMenuItems.map(({ label, icon: Icon, to, end }) => (
               <NavLink
                 key={to}
@@ -91,28 +91,28 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
                 end={end}
                 className={({ isActive }) =>
                   cn(
-                    "flex items-center gap-4 rounded-2xl px-5 py-4 text-[1.05rem] font-medium transition",
+                    "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[0.84rem] font-medium transition",
                     isActive
                       ? "bg-blue-50 text-blue-600"
                       : "text-slate-700 hover:bg-slate-50 hover:text-slate-950",
                   )
                 }
               >
-                <Icon className="size-6 shrink-0" />
+                <Icon className="size-4 shrink-0" />
                 <span>{label}</span>
               </NavLink>
             ))}
           </div>
         </nav>
 
-        <div className="mt-auto border-t border-slate-200 px-8 py-8">
-          <div className="flex items-center gap-4">
-            <div className="flex size-14 items-center justify-center rounded-full bg-blue-100 text-xl font-semibold text-blue-600">
+        <div className="mt-auto border-t border-slate-200 px-5 py-5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-9 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600">
               {getInitials(user?.email)}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-[1.05rem] font-medium text-slate-950">Administrador</p>
-              <p className="truncate text-sm text-slate-500">
+              <p className="truncate text-[0.84rem] font-medium text-slate-950">Administrador</p>
+              <p className="truncate text-[0.72rem] text-slate-500">
                 {user?.email || "admin@residencial.com"}
               </p>
             </div>
@@ -120,20 +120,20 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
         </div>
       </aside>
 
-      <main className="lg:pl-[320px]">
-        <div className="px-4 py-6 sm:px-8 lg:px-10 lg:py-12">
-          <div className="mx-auto max-w-[1540px]">
-            <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <main className="lg:pl-[232px]">
+        <div className="px-4 py-4 sm:px-5 lg:px-6 lg:py-6">
+          <div className="mx-auto max-w-[1240px]">
+            <header className="flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h1 className="text-4xl font-semibold tracking-tight text-slate-950 md:text-[3.15rem]">
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-950 md:text-[2.05rem]">
                   {title}
                 </h1>
-                <p className="mt-3 text-lg text-slate-500">{subtitle}</p>
+                <p className="mt-1.5 text-sm text-slate-500">{subtitle}</p>
               </div>
               {actions ? <div className="shrink-0">{actions}</div> : null}
             </header>
 
-            <div className="mt-10">{children}</div>
+            <div className="mt-5">{children}</div>
           </div>
         </div>
       </main>

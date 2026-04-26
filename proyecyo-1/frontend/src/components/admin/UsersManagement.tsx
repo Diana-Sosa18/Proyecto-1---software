@@ -114,7 +114,7 @@ export function UsersManagement() {
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <CardHeader className="flex flex-col gap-2.5 px-4 pt-4 md:flex-row md:items-center md:justify-between">
           <div>
             <CardTitle>Gestion de Usuarios</CardTitle>
             <CardDescription>Administre altas, ediciones y bajas de usuarios del sistema.</CardDescription>
@@ -124,7 +124,7 @@ export function UsersManagement() {
             Crear usuario
           </Button>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-2.5 px-4 pb-4">
           {error ? (
             <Alert variant="destructive">
               <AlertTitle>Error</AlertTitle>
@@ -140,13 +140,13 @@ export function UsersManagement() {
           ) : null}
 
           {isLoading ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center text-sm text-slate-500">
               Cargando usuarios...
             </div>
           ) : users.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-              <Users className="mx-auto size-10 text-slate-400" />
-              <p className="mt-4 text-slate-600">No hay usuarios registrados.</p>
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
+              <Users className="mx-auto size-7 text-slate-400" />
+              <p className="mt-2.5 text-sm text-slate-600">No hay usuarios registrados.</p>
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -154,27 +154,27 @@ export function UsersManagement() {
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nombre</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Correo</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Casa</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Telefono</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Rol</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Acciones</th>
+                      <th className="px-3.5 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">Nombre</th>
+                      <th className="px-3.5 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">Correo</th>
+                      <th className="px-3.5 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">Casa</th>
+                      <th className="px-3.5 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">Telefono</th>
+                      <th className="px-3.5 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">Rol</th>
+                      <th className="px-3.5 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {users.map((user) => (
                       <tr key={user.id_usuario}>
-                        <td className="px-4 py-4 text-sm text-slate-900">{user.nombre}</td>
-                        <td className="px-4 py-4 text-sm text-slate-600">{user.correo}</td>
-                        <td className="px-4 py-4 text-sm text-slate-600">{user.unidad || "-"}</td>
-                        <td className="px-4 py-4 text-sm text-slate-600">{user.telefono || "-"}</td>
-                        <td className="px-4 py-4 text-sm">
-                          <span className={`rounded-full px-3 py-1 text-xs font-medium ${roleStyles[user.rol]}`}>
+                        <td className="px-3.5 py-2.5 text-[0.82rem] text-slate-900">{user.nombre}</td>
+                        <td className="px-3.5 py-2.5 text-[0.82rem] text-slate-600">{user.correo}</td>
+                        <td className="px-3.5 py-2.5 text-[0.82rem] text-slate-600">{user.unidad || "-"}</td>
+                        <td className="px-3.5 py-2.5 text-[0.82rem] text-slate-600">{user.telefono || "-"}</td>
+                        <td className="px-3.5 py-2.5 text-[0.82rem]">
+                          <span className={`rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${roleStyles[user.rol]}`}>
                             {user.rol}
                           </span>
                         </td>
-                        <td className="px-4 py-4">
+                        <td className="px-3.5 py-2.5">
                           <div className="flex justify-end gap-2">
                             <Button variant="outline" size="sm" onClick={() => handleEdit(user)} disabled={isSubmitting}>
                               <Pencil className="size-4" />
