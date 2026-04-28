@@ -305,6 +305,7 @@ export function InquilinoView() {
     try {
       setIsCancelling(true);
       setErrorMessage("");
+      setSuccessMessage("");
       const updated = await cancelVisitRequest(visitToCancel.id_acceso);
 
       // Actualiza la lista en su sitio (estado cambia a CANCELADA, no se elimina)
@@ -325,9 +326,25 @@ export function InquilinoView() {
       setSuccessMessage(`Acceso de ${visitToCancel.nombre} cancelado correctamente.`);
       setVisitToCancel(null);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "No fue posible cancelar el acceso.",
-      );
+      const apiError = error as { status?: number; message?: string } | undefined;
+      let friendlyMessage = "No fue posible cancelar el acceso. Intenta de nuevo.";
+
+      if (apiError?.status === 404) {
+        friendlyMessage = "Esta visita ya no existe. La lista se actualizara automaticamente.";
+        // Sincroniza la lista quitando la visita huerfana
+        setVisits((current) => current.filter((item) => item.id_acceso !== visitToCancel.id_acceso));
+        setVisitToCancel(null);
+      } else if (apiError?.status === 409) {
+        friendlyMessage =
+          apiError.message ||
+          "No se puede cancelar este acceso porque ya tiene un ingreso registrado.";
+      } else if (apiError?.status === 401 || apiError?.status === 403) {
+        friendlyMessage = "Tu sesion expiro o no tienes permiso para cancelar este acceso.";
+      } else if (apiError?.message) {
+        friendlyMessage = apiError.message;
+      }
+
+      setErrorMessage(friendlyMessage);
     } finally {
       setIsCancelling(false);
     }
