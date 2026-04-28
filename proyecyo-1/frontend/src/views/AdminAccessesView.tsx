@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock3, Download, Search, XCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Clock3, Download, RefreshCw, Search, XCircle } from "lucide-react";
 
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
@@ -110,6 +110,8 @@ function SummaryCard({
   );
 }
 
+const REFRESH_INTERVAL_MS = 10000;
+
 export function AdminAccessesView() {
   const [summary, setSummary] = useState<AdminAccessSummary>({
     total_dia: 0,
@@ -122,6 +124,7 @@ export function AdminAccessesView() {
   const [selectedType, setSelectedType] = useState<AdminAccessFilterType>("TODOS");
   const [selectedStatus, setSelectedStatus] = useState<AdminAccessFilterStatus>("APROBADO");
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
@@ -134,60 +137,81 @@ export function AdminAccessesView() {
     [search, selectedStatus, selectedType],
   );
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadAccessModule = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      const { silent = false } = options;
 
-    async function loadAccessModule() {
       try {
-        if (!cancelled) {
+        if (silent) {
+          setIsRefreshing(true);
+        } else {
           setIsLoading(true);
-          setErrorMessage("");
         }
+        setErrorMessage("");
 
         const [summaryResponse, accessesResponse] = await Promise.all([
           getAdminAccessSummaryRequest(),
           getAdminAccessesRequest(filters),
         ]);
 
-        if (cancelled) {
-          return;
-        }
-
         setSummary(summaryResponse);
         setAccesses(accessesResponse);
         setLastUpdatedAt(new Date());
       } catch (error) {
-        if (!cancelled) {
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "No fue posible cargar el Control de Accesos.",
-          );
-        }
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "No fue posible cargar el Control de Accesos.",
+        );
       } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
+        setIsRefreshing(false);
       }
-    }
+    },
+    [filters],
+  );
 
+  useEffect(() => {
     void loadAccessModule();
 
     const intervalId = window.setInterval(() => {
-      void loadAccessModule();
-    }, 15000);
+      void loadAccessModule({ silent: true });
+    }, REFRESH_INTERVAL_MS);
 
     return () => {
-      cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [filters]);
+  }, [loadAccessModule]);
+
+  const handleManualRefresh = useCallback(() => {
+    void loadAccessModule({ silent: true });
+  }, [loadAccessModule]);
 
   return (
     <AdminLayout
       title="Control de Accesos"
       subtitle="Registro de ingresos y salidas del dia"
-      actions={<span className="text-sm text-slate-500">Actualizado: {formatRefreshTime(lastUpdatedAt)}</span>}
+      actions={
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700">
+            <span className="size-2 animate-pulse rounded-full bg-emerald-500" />
+            En vivo
+          </span>
+          <span className="text-sm text-slate-500">
+            Actualizado: {formatRefreshTime(lastUpdatedAt)}
+          </span>
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing || isLoading}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+            aria-label="Actualizar ahora"
+          >
+            <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Actualizando..." : "Actualizar"}
+          </button>
+        </div>
+      }
     >
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
