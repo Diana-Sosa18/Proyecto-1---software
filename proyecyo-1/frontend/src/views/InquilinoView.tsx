@@ -297,6 +297,29 @@ export function InquilinoView() {
     setAuthorizingVisitorId(null);
   }
 
+  async function handleConfirmCancel() {
+    if (!visitToCancel) {
+      return;
+    }
+
+    try {
+      setIsCancelling(true);
+      setErrorMessage("");
+      const updated = await cancelVisitRequest(visitToCancel.id_acceso);
+      setVisits((current) =>
+        current.map((item) => (item.id_acceso === updated.id_acceso ? updated : item)),
+      );
+      setSuccessMessage(`Acceso de ${visitToCancel.nombre} cancelado correctamente.`);
+      setVisitToCancel(null);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "No fue posible cancelar el acceso.",
+      );
+    } finally {
+      setIsCancelling(false);
+    }
+  }
+
   async function handleDelete(visit: VisitRecord) {
     const confirmed = window.confirm(`Deseas eliminar la visita autorizada de ${visit.nombre}?`);
 
@@ -704,6 +727,73 @@ export function InquilinoView() {
           )}
         </CardContent>
       </Card>
+
+      {visitToCancel ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-visit-title"
+        >
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+            <div className="flex items-start gap-4">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <AlertTriangle className="size-6" />
+              </div>
+              <div className="flex-1">
+                <h3 id="cancel-visit-title" className="text-lg font-semibold text-slate-900">
+                  Confirmar cancelacion
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Estas a punto de cancelar el acceso de{" "}
+                  <span className="font-semibold text-slate-900">{visitToCancel.nombre}</span>{" "}
+                  programado para el {formatDate(visitToCancel.fecha)} a las{" "}
+                  {visitToCancel.hora_inicio}. El QR dejara de ser valido.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => (isCancelling ? null : setVisitToCancel(null))}
+                className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Cerrar"
+                disabled={isCancelling}
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setVisitToCancel(null)}
+                disabled={isCancelling}
+                className="rounded-xl"
+              >
+                Volver
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={isCancelling}
+                className="rounded-xl bg-amber-600 text-white hover:bg-amber-700"
+              >
+                {isCancelling ? (
+                  <>
+                    <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Cancelando...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="size-4" />
+                    Si, cancelar
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </AppShell>
   );
 }
