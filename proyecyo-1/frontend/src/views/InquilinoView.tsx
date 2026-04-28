@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   CalendarClock,
   CalendarDays,
   ChevronLeft,
@@ -11,6 +12,8 @@ import {
   Trash2,
   UserCheck,
   UserRoundPlus,
+  X,
+  XCircle,
   Zap,
 } from "lucide-react";
 
@@ -22,6 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { QrCodeCard } from "@/components/visits/QrCodeCard";
 import {
+  cancelVisitRequest,
   createVisitRequest,
   deleteVisitRequest,
   getFrequentVisitorsRequest,
@@ -131,6 +135,8 @@ export function InquilinoView() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [authorizingVisitorId, setAuthorizingVisitorId] = useState<number | null>(null);
+  const [visitToCancel, setVisitToCancel] = useState<VisitRecord | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -629,14 +635,27 @@ export function InquilinoView() {
                         <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusStyles[accessStatus]}`}>
                           {statusLabels[accessStatus]}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(visit)}
-                          className="ml-auto rounded-full p-2 text-rose-500 transition hover:bg-rose-50"
-                          aria-label={`Eliminar visita de ${visit.nombre}`}
-                        >
-                          <Trash2 className="size-5" />
-                        </button>
+                        <div className="ml-auto flex items-center gap-1">
+                          {accessStatus === "APROBADO" ? (
+                            <button
+                              type="button"
+                              onClick={() => setVisitToCancel(visit)}
+                              className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100"
+                              aria-label={`Cancelar acceso de ${visit.nombre}`}
+                            >
+                              <XCircle className="size-3.5" />
+                              Cancelar
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(visit)}
+                            className="rounded-full p-2 text-rose-500 transition hover:bg-rose-50"
+                            aria-label={`Eliminar visita de ${visit.nombre}`}
+                          >
+                            <Trash2 className="size-5" />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
