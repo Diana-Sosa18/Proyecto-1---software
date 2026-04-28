@@ -46,25 +46,29 @@ const statusStyles: Record<
   {
     className: string;
     iconClassName: string;
+    dotClassName: string;
     icon: typeof CheckCircle2;
     label: string;
   }
 > = {
   APROBADO: {
-    className: "bg-emerald-100 text-emerald-700",
+    className: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200",
     iconClassName: "text-emerald-600",
+    dotClassName: "bg-emerald-500",
     icon: CheckCircle2,
     label: "Aprobado",
   },
   PENDIENTE: {
-    className: "bg-amber-100 text-amber-700",
+    className: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200",
     iconClassName: "text-amber-500",
+    dotClassName: "bg-amber-500 animate-pulse",
     icon: Clock3,
     label: "Pendiente",
   },
   RECHAZADO: {
-    className: "bg-rose-100 text-rose-700",
+    className: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200",
     iconClassName: "text-rose-600",
+    dotClassName: "bg-rose-500",
     icon: XCircle,
     label: "Rechazado",
   },
@@ -344,14 +348,13 @@ export function AdminAccessesView() {
                       <td className="px-5 py-3 text-sm text-slate-500">{access.casa_unidad}</td>
                       <td className="px-5 py-3 text-sm text-slate-500">{access.placa}</td>
                       <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <StatusIcon className={`size-4 ${statusMeta.iconClassName}`} />
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${statusMeta.className}`}
-                          >
-                            {statusMeta.label}
-                          </span>
-                        </div>
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${statusMeta.className}`}
+                        >
+                          <span className={`size-1.5 rounded-full ${statusMeta.dotClassName}`} />
+                          <StatusIcon className={`size-3.5 ${statusMeta.iconClassName}`} />
+                          {statusMeta.label}
+                        </span>
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-500">{access.autorizado_por}</td>
                     </tr>
