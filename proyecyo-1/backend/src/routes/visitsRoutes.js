@@ -5,6 +5,7 @@ const {
   getFrequentVisitors,
   postVisit,
   removeVisit,
+  patchCancelVisit,
   removeFrequentVisitor,
   getGuardVisits,
   postValidateQr,
@@ -20,6 +21,7 @@ router.get("/visitantes-frecuentes", requireResidentOrTenant, getFrequentVisitor
 router.delete("/visitantes-frecuentes/:id", requireResidentOrTenant, removeFrequentVisitor);
 router.post("/visitas", requireResidentOrTenant, postVisit);
 router.delete("/visitas/:id", requireResidentOrTenant, removeVisit);
+router.patch("/visitas/:id/cancelar", requireResidentOrTenant, patchCancelVisit);
 router.get("/guardia/visitas", requireGuard, getGuardVisits);
 router.post("/guardia/validar-qr", requireGuard, postValidateQr);
 router.post("/guardia/registrar-ingreso", requireGuard, postRegisterQrEntry);

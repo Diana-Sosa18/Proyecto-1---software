@@ -409,6 +409,81 @@ async function deleteVisit(userId, role = "residente", accessId) {
   }
 }
 
+async function cancelVisit(userId, role = "residente", accessId) {
+  const house = await getHouseByUserId(userId, role);
+  const normalizedAccessId = Number(accessId);
+
+  if (!Number.isInteger(normalizedAccessId) || normalizedAccessId <= 0) {
+    const error = new Error("La visita es invalida.");
+    error.status = 400;
+    throw error;
+  }
+
+  const rows = await query(
+    `
+      SELECT a.id_acceso, a.estado_acceso
+      FROM ACCESO a
+      INNER JOIN CASA c ON c.id_casa = a.id_casa
+      WHERE a.id_acceso = ? AND a.id_casa = ?
+        ${getOwnerFilter(role)}
+      LIMIT 1
+    `,
+    [normalizedAccessId, house.id_casa, ...getOwnerParams(userId, role)],
+  );
+
+  const existing = rows[0];
+
+  if (!existing) {
+    const error = new Error("Visita no encontrada.");
+    error.status = 404;
+    throw error;
+  }
+
+  if (String(existing.estado_acceso).toUpperCase() === "INGRESO_REGISTRADO") {
+    const error = new Error("No se puede cancelar una visita que ya tiene ingreso registrado.");
+    error.status = 409;
+    throw error;
+  }
+
+  if (String(existing.estado_acceso).toUpperCase() === "CANCELADA") {
+    const error = new Error("La visita ya fue cancelada previamente.");
+    error.status = 409;
+    throw error;
+  }
+
+  await query(
+    "UPDATE ACCESO SET estado_acceso = 'CANCELADA' WHERE id_acceso = ?",
+    [normalizedAccessId],
+  );
+
+  const updatedRows = await query(
+    `
+      SELECT
+        a.id_acceso,
+        v.id_visitante,
+        v.nombre,
+        v.dpi,
+        v.placa,
+        NULL AS foto,
+        DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
+        TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
+        TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+        a.tipo_visita,
+        a.token_qr,
+        a.estado_acceso,
+        CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
+      FROM ACCESO a
+      INNER JOIN VISITANTE v ON v.id_visitante = a.id_visitante
+      INNER JOIN CASA c ON c.id_casa = a.id_casa
+      WHERE a.id_acceso = ?
+      LIMIT 1
+    `,
+    [normalizedAccessId],
+  );
+
+  return mapVisit(updatedRows[0]);
+}
+
 async function deleteFrequentVisitor(userId, role = "residente", visitorId) {
   const house = await getHouseByUserId(userId, role);
   const normalizedVisitorId = Number(visitorId);
@@ -611,6 +686,7 @@ module.exports = {
   listFrequentVisitors,
   createVisit,
   deleteVisit,
+  cancelVisit,
   deleteFrequentVisitor,
   getGuardShiftVisits,
   validateQrVisit,
