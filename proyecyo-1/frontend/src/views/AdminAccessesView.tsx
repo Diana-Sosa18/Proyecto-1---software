@@ -270,7 +270,8 @@ export function AdminAccessesView() {
           <table className="min-w-[980px] w-full">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-[0.1em] text-slate-500">
-                <th className="px-5 py-3 font-semibold">Hora</th>
+                <th className="px-5 py-3 font-semibold" title="Hora de ingreso">Hora ingreso</th>
+                <th className="px-5 py-3 font-semibold" title="Hora de salida si fue registrada">Hora salida</th>
                 <th className="px-5 py-3 font-semibold">Tipo</th>
                 <th className="px-5 py-3 font-semibold">Nombre</th>
                 <th className="px-5 py-3 font-semibold">Casa / Unidad</th>
@@ -282,13 +283,13 @@ export function AdminAccessesView() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
+                  <td colSpan={8} className="px-5 py-8 text-center text-slate-500">
                     Cargando accesos del dia...
                   </td>
                 </tr>
               ) : accesses.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
+                  <td colSpan={8} className="px-5 py-8 text-center text-slate-500">
                     No hay accesos que coincidan con los filtros actuales.
                   </td>
                 </tr>
@@ -304,6 +305,9 @@ export function AdminAccessesView() {
                           <Clock3 className="size-4 text-slate-400" />
                           <span>{access.hora}</span>
                         </div>
+                      </td>
+                      <td className="px-5 py-3 text-sm text-slate-500">
+                        {access.hora_salida ? access.hora_salida : <span className="text-slate-300">--:--</span>}
                       </td>
                       <td className="px-5 py-3">
                         <span

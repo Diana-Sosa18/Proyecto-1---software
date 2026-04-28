@@ -107,6 +107,7 @@ function mapAdminAccess(row) {
     id_acceso: row.id_acceso,
     fecha: row.fecha,
     hora: row.hora || "--:--",
+    hora_salida: row.hora_salida || null,
     tipo: mapAccessType(row.tipo_visita),
     nombre: row.nombre,
     casa_unidad: buildHouseLabel(row),
@@ -246,6 +247,7 @@ async function listAdminAccesses(filters = {}) {
           TIME_FORMAT(a.hora_inicio, '%H:%i'),
           '--:--'
         ) AS hora,
+        TIME_FORMAT(ra.hora_salida, '%H:%i') AS hora_salida,
         a.tipo_visita,
         a.estado_acceso,
         v.nombre,
