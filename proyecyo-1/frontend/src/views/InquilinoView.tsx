@@ -306,9 +306,22 @@ export function InquilinoView() {
       setIsCancelling(true);
       setErrorMessage("");
       const updated = await cancelVisitRequest(visitToCancel.id_acceso);
+
+      // Actualiza la lista en su sitio (estado cambia a CANCELADA, no se elimina)
       setVisits((current) =>
-        current.map((item) => (item.id_acceso === updated.id_acceso ? updated : item)),
+        current.map((item) =>
+          item.id_acceso === updated.id_acceso
+            ? { ...item, ...updated, estado_acceso: "CANCELADA", qr_status: "CANCELLED" }
+            : item,
+        ),
       );
+
+      // Si el filtro actual es APROBADO, cambia a TODOS para que el usuario vea
+      // que el cambio se aplico.
+      if (selectedStatus === "APROBADO") {
+        setSelectedStatus("TODOS");
+      }
+
       setSuccessMessage(`Acceso de ${visitToCancel.nombre} cancelado correctamente.`);
       setVisitToCancel(null);
     } catch (error) {
