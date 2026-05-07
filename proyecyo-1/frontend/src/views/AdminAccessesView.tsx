@@ -119,19 +119,30 @@ export function AdminAccessesView() {
   });
   const [accesses, setAccesses] = useState<AdminAccessRecord[]>([]);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedType, setSelectedType] = useState<AdminAccessFilterType>("TODOS");
-  const [selectedStatus, setSelectedStatus] = useState<AdminAccessFilterStatus>("APROBADO");
+  const [selectedStatus, setSelectedStatus] = useState<AdminAccessFilterStatus>("TODOS");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [search]);
+
   const filters = useMemo(
     () => ({
-      search,
+      search: debouncedSearch,
       type: selectedType,
       status: selectedStatus,
     }),
-    [search, selectedStatus, selectedType],
+    [debouncedSearch, selectedStatus, selectedType],
   );
 
   useEffect(() => {
@@ -212,14 +223,24 @@ export function AdminAccessesView() {
         />
       </section>
 
-      <section className="mt-5 rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+      <section
+        className="mt-5 rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+        aria-labelledby="admin-accesses-filters-heading"
+      >
+        <h2
+          id="admin-accesses-filters-heading"
+          className="mb-3 text-[0.92rem] font-semibold text-slate-800"
+        >
+          Filtros de accesos
+        </h2>
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar por casa, nombre o placa..."
+              placeholder="Buscar por nombre, casa o placa..."
+              aria-label="Buscar accesos por nombre, unidad o placa"
               className={`${fieldClassName} w-full pl-11`}
             />
           </div>
