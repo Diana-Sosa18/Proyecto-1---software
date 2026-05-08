@@ -140,6 +140,36 @@ function appendSearchFilter(filters, params, search) {
   params.push(normalizedSearch, normalizedSearch, normalizedSearch);
 }
 
+function appendHouseFilter(filters, params, house) {
+  if (!house) {
+    return;
+  }
+
+  const normalized = `%${house.toLowerCase()}%`;
+
+  filters.push(`
+    LOWER(
+      CONCAT(
+        COALESCE(c.torre, ''),
+        CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END,
+        c.numero
+      )
+    ) LIKE ?
+  `);
+
+  params.push(normalized);
+}
+
+function appendPlateFilter(filters, params, plate) {
+  if (!plate) {
+    return;
+  }
+
+  const normalized = `%${plate.toLowerCase()}%`;
+  filters.push("LOWER(COALESCE(v.placa, '')) LIKE ?");
+  params.push(normalized);
+}
+
 function appendTypeFilter(filters, accessType) {
   if (!accessType) {
     return;
@@ -227,12 +257,16 @@ async function getAdminAccessSummary() {
 async function listAdminAccesses(filters = {}) {
   const currentDate = getCurrentDateInTimezone();
   const search = normalizeString(filters.search).toLowerCase();
+  const house = normalizeString(filters.house).toLowerCase();
+  const plate = normalizeString(filters.plate).toLowerCase();
   const accessType = normalizeAccessType(filters.type);
   const accessStatus = normalizeAccessStatus(filters.status);
   const sqlFilters = ["a.fecha = ?"];
   const params = [currentDate];
 
   appendSearchFilter(sqlFilters, params, search);
+  appendHouseFilter(sqlFilters, params, house);
+  appendPlateFilter(sqlFilters, params, plate);
   appendTypeFilter(sqlFilters, accessType);
   appendStatusFilter(sqlFilters, accessStatus);
 

@@ -120,6 +120,10 @@ export function AdminAccessesView() {
   const [accesses, setAccesses] = useState<AdminAccessRecord[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [house, setHouse] = useState("");
+  const [debouncedHouse, setDebouncedHouse] = useState("");
+  const [plate, setPlate] = useState("");
+  const [debouncedPlate, setDebouncedPlate] = useState("");
   const [selectedType, setSelectedType] = useState<AdminAccessFilterType>("TODOS");
   const [selectedStatus, setSelectedStatus] = useState<AdminAccessFilterStatus>("TODOS");
   const [isLoading, setIsLoading] = useState(true);
@@ -129,44 +133,83 @@ export function AdminAccessesView() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedSearch(search);
+      setDebouncedHouse(house);
+      setDebouncedPlate(plate);
     }, 350);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [search]);
+  }, [house, plate, search]);
 
   const filters = useMemo(
     () => ({
       search: debouncedSearch,
+      house: debouncedHouse,
+      plate: debouncedPlate,
       type: selectedType,
       status: selectedStatus,
     }),
-    [debouncedSearch, selectedStatus, selectedType],
+    [debouncedHouse, debouncedPlate, debouncedSearch, selectedStatus, selectedType],
   );
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadAccessModule() {
+    async function loadSummary() {
       try {
         if (!cancelled) {
-          setIsLoading(true);
           setErrorMessage("");
         }
 
-        const [summaryResponse, accessesResponse] = await Promise.all([
-          getAdminAccessSummaryRequest(),
-          getAdminAccessesRequest(filters),
-        ]);
+        const summaryResponse = await getAdminAccessSummaryRequest();
 
         if (cancelled) {
           return;
         }
 
         setSummary(summaryResponse);
-        setAccesses(accessesResponse);
         setLastUpdatedAt(new Date());
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "No fue posible cargar el Control de Accesos.",
+          );
+        }
+      }
+    }
+
+    void loadSummary();
+
+    const intervalId = window.setInterval(() => {
+      void loadSummary();
+    }, 15000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAccesses() {
+      try {
+        if (!cancelled) {
+          setIsLoading(true);
+          setErrorMessage("");
+        }
+
+        const accessesResponse = await getAdminAccessesRequest(filters);
+
+        if (cancelled) {
+          return;
+        }
+
+        setAccesses(accessesResponse);
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(
@@ -182,15 +225,10 @@ export function AdminAccessesView() {
       }
     }
 
-    void loadAccessModule();
-
-    const intervalId = window.setInterval(() => {
-      void loadAccessModule();
-    }, 15000);
+    void loadAccesses();
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
     };
   }, [filters]);
 
@@ -239,11 +277,27 @@ export function AdminAccessesView() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar por nombre, casa o placa..."
-              aria-label="Buscar accesos por nombre, unidad o placa"
+              placeholder="Buscar por nombre..."
+              aria-label="Buscar accesos por nombre"
               className={`${fieldClassName} w-full pl-11`}
             />
           </div>
+
+          <input
+            value={house}
+            onChange={(event) => setHouse(event.target.value)}
+            placeholder="Filtrar por casa/unidad..."
+            aria-label="Filtrar accesos por casa o unidad"
+            className={`${fieldClassName} min-w-[210px]`}
+          />
+
+          <input
+            value={plate}
+            onChange={(event) => setPlate(event.target.value)}
+            placeholder="Filtrar por placa..."
+            aria-label="Filtrar accesos por placa"
+            className={`${fieldClassName} min-w-[200px]`}
+          />
 
           <select
             value={selectedType}
