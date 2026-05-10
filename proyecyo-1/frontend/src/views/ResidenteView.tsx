@@ -113,7 +113,7 @@ export function ResidenteView() {
       ) : null}
 
       {unreadNotifications.length > 0 ? (
-        <Alert className="border-blue-200 bg-blue-50 text-blue-800">
+        <Alert className="border-green-200 bg-green-50 text-green-800">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <AlertTitle className="flex items-center gap-2 text-lg">
@@ -122,11 +122,11 @@ export function ResidenteView() {
                 {unreadNotifications.length === 1 ? "" : "es"} de llegada
               </AlertTitle>
 
-              <AlertDescription className="mt-3 space-y-3 text-blue-900">
+              <AlertDescription className="mt-3 space-y-3 text-green-900">
                 {unreadNotifications.slice(0, 3).map((notification) => (
                   <div
                     key={notification.id_notificacion}
-                    className="rounded-2xl border border-blue-100 bg-white/80 p-3"
+                    className="rounded-2xl border border-green-100 bg-white/80 p-3"
                   >
                     <p className="font-semibold">{notification.titulo}</p>
                     <p className="text-sm">{notification.mensaje}</p>
@@ -134,7 +134,7 @@ export function ResidenteView() {
                     <button
                       type="button"
                       onClick={() => void markNotificationAsRead(notification.id_notificacion)}
-                      className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-950"
+                      className="mt-2 text-xs font-semibold text-green-700 hover:text-green-950"
                     >
                       Marcar como leida
                     </button>
@@ -147,7 +147,7 @@ export function ResidenteView() {
               type="button"
               variant="outline"
               onClick={() => void markAllAsRead()}
-              className="rounded-2xl border-blue-200 bg-white text-blue-700 hover:bg-blue-100"
+              className="rounded-2xl border-green-200 bg-white text-green-700 hover:bg-green-100"
             >
               <CheckCheck className="size-4" />
               Marcar todas
