@@ -571,6 +571,59 @@ async function findVisitByQrToken(normalizedToken) {
   return mapVisit(visit);
 }
 
+async function createArrivalNotification(connection, accessId) {
+  const [rows] = await connection.execute(
+    `
+      SELECT
+        a.id_acceso,
+        v.nombre AS visitante,
+        c.numero,
+        c.torre,
+        u.id_usuario AS id_residente_usuario
+      FROM ACCESO a
+      INNER JOIN VISITANTE v ON v.id_visitante = a.id_visitante
+      INNER JOIN CASA c ON c.id_casa = a.id_casa
+      INNER JOIN RESIDENTE r ON r.id_residente = c.id_residente
+      INNER JOIN USUARIO u ON u.id_usuario = r.id_usuario
+      WHERE a.id_acceso = ?
+      LIMIT 1
+    `,
+    [accessId],
+  );
+
+  const data = rows[0];
+
+  if (!data) {
+    return;
+  }
+
+  const casa = `${data.torre ? `${data.torre}-` : ""}${data.numero}`;
+  const titulo = "Tu visita ya llegó";
+  const mensaje = `${data.visitante} llegó a la garita y su ingreso fue registrado para la casa ${casa}.`;
+
+  await connection.execute(
+    `
+      INSERT INTO NOTIFICACION (id_usuario, id_acceso, tipo, titulo, mensaje, leido)
+      SELECT ?, ?, 'LLEGADA_VISITA', ?, ?, FALSE
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM NOTIFICACION
+        WHERE id_usuario = ?
+          AND id_acceso = ?
+          AND tipo = 'LLEGADA_VISITA'
+      )
+    `,
+    [
+      data.id_residente_usuario,
+      accessId,
+      titulo,
+      mensaje,
+      data.id_residente_usuario,
+      accessId,
+    ],
+  );
+}
+
 async function registerQrEntry(qrToken) {
   const normalizedToken = normalizeQrToken(qrToken);
   const visit = await validateQrVisit(normalizedToken);
@@ -595,6 +648,7 @@ async function registerQrEntry(qrToken) {
       `,
       [visit.id_acceso],
     );
+    await createArrivalNotification(connection, visit.id_acceso);
     await connection.commit();
 
     return findVisitByQrToken(normalizedToken);

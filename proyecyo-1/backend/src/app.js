@@ -8,6 +8,7 @@ const userTypesRoutes = require("./routes/userTypesRoutes");
 const visitsRoutes = require("./routes/visitsRoutes");
 const amenitiesReservationsRoutes = require("./routes/amenitiesReservationsRoutes");
 const adminAccessesRoutes = require("./routes/adminAccessesRoutes");
+const notificationsRoutes = require("./routes/notificationsRoutes");
 
 function createApp() {
   const app = express();
@@ -31,6 +32,7 @@ function createApp() {
   app.use(visitsRoutes);
   app.use(amenitiesReservationsRoutes);
   app.use(adminAccessesRoutes);
+  app.use(notificationsRoutes);
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;
