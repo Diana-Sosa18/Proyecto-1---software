@@ -4,6 +4,10 @@ function normalizeBoolean(value) {
   return value === true || value === "true" || value === 1 || value === "1";
 }
 
+function normalizeString(value) {
+  return String(value || "").trim();
+}
+
 async function getTenantHouse(userId) {
   const rows = await query(
     `
@@ -116,7 +120,63 @@ async function updateTenantProvider(userId, serviceId, payload = {}) {
   return providers.find((provider) => provider.id_servicio === normalizedServiceId);
 }
 
+async function createTenantProvider(userId, payload = {}) {
+  const house = await getTenantHouse(userId);
+  const nombre = normalizeString(payload.nombre);
+  const tipoServicio = normalizeString(payload.tipo_servicio) || "General";
+  const descripcion =
+    normalizeString(payload.descripcion) || "Proveedor registrado por el inquilino para esta unidad.";
+
+  if (!nombre) {
+    const error = new Error("El nombre del proveedor es obligatorio.");
+    error.status = 400;
+    throw error;
+  }
+
+  const existingRows = await query(
+    `
+      SELECT id_servicio
+      FROM SERVICIO
+      WHERE LOWER(nombre) = LOWER(?)
+        AND LOWER(tipo_servicio) = LOWER(?)
+      LIMIT 1
+    `,
+    [nombre, tipoServicio],
+  );
+
+  let serviceId = existingRows[0]?.id_servicio;
+
+  if (!serviceId) {
+    const result = await query(
+      `
+        INSERT INTO SERVICIO (nombre, tipo_servicio, descripcion)
+        VALUES (?, ?, ?)
+      `,
+      [nombre, tipoServicio, descripcion],
+    );
+    serviceId = result.insertId;
+  }
+
+  await query(
+    `
+      INSERT INTO CASA_SERVICIO (id_casa, id_servicio, activo, estado_validacion)
+      VALUES (?, ?, TRUE, 'PENDIENTE')
+      ON DUPLICATE KEY UPDATE
+        activo = TRUE,
+        estado_validacion = CASE
+          WHEN estado_validacion = 'VALIDADO' THEN estado_validacion
+          ELSE 'PENDIENTE'
+        END
+    `,
+    [house.id_casa, serviceId],
+  );
+
+  const providers = await listTenantProviders(userId);
+  return providers.find((provider) => provider.id_servicio === Number(serviceId));
+}
+
 module.exports = {
   listTenantProviders,
+  createTenantProvider,
   updateTenantProvider,
 };

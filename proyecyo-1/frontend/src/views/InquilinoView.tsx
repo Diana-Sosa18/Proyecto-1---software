@@ -39,6 +39,7 @@ import {
   updateVisitRequest,
 } from "@/services/visitsService";
 import {
+  createTenantProviderRequest,
   getTenantProvidersRequest,
   updateTenantProviderRequest,
 } from "@/services/providersService";
@@ -406,15 +407,32 @@ export function InquilinoView() {
     try {
       setIsRegisteringProvider(true);
       setErrorMessage("");
-      const createdProviderAccess = await createVisitRequest({
-        ...providerForm,
-        tipo_visita: "PROVEEDOR",
-        foto: null,
-      });
+      const [registeredProvider, createdProviderAccess] = await Promise.all([
+        createTenantProviderRequest({
+          nombre: providerForm.nombre,
+          tipo_servicio: providerForm.motivo_servicio || "General",
+          descripcion: providerForm.observaciones,
+        }),
+        createVisitRequest({
+          ...providerForm,
+          tipo_visita: "PROVEEDOR",
+          foto: null,
+        }),
+      ]);
       setVisits((current) => [createdProviderAccess, ...current]);
+      setProviders((current) => {
+        const exists = current.some((provider) => provider.id_servicio === registeredProvider.id_servicio);
+        return exists
+          ? current.map((provider) =>
+              provider.id_servicio === registeredProvider.id_servicio ? registeredProvider : provider,
+            )
+          : [...current, registeredProvider].sort((first, second) =>
+              first.nombre.localeCompare(second.nombre),
+            );
+      });
       setProviderForm(createInitialProviderForm());
       setSelectedStatus("TODOS");
-      setSuccessMessage("Proveedor registrado correctamente. Ya aparece en tus accesos.");
+      setSuccessMessage("Proveedor registrado correctamente. Ya aparece en gestion y en tus accesos.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "No fue posible registrar el proveedor.");
     } finally {

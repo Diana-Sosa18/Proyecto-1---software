@@ -1,5 +1,6 @@
 const {
   listTenantProviders,
+  createTenantProvider,
   updateTenantProvider,
 } = require("../services/tenantProvidersService");
 
@@ -21,7 +22,17 @@ async function patchTenantProvider(req, res, next) {
   }
 }
 
+async function postTenantProvider(req, res, next) {
+  try {
+    const provider = await createTenantProvider(req.authUser.id, req.body || {});
+    res.status(201).json(provider);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getTenantProviders,
+  postTenantProvider,
   patchTenantProvider,
 };
