@@ -27,6 +27,12 @@ export function deleteVisitRequest(id: number) {
   });
 }
 
+export function cancelVisitRequest(id: number) {
+  return apiRequest<VisitRecord>(`/visitas/${id}/cancelar`, {
+    method: "PATCH",
+  });
+}
+
 export function deleteFrequentVisitorRequest(id: number) {
   return apiRequest<{ id_visitante: number; nombre: string }>(`/visitantes-frecuentes/${id}`, {
     method: "DELETE",

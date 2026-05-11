@@ -25,6 +25,7 @@ export interface AdminAccessRecord {
   id_acceso: number;
   fecha: string;
   hora: string;
+  hora_salida?: string | null;
   tipo: AdminAccessType;
   nombre: string;
   casa_unidad: string;
