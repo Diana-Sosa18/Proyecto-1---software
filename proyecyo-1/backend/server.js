@@ -4,6 +4,7 @@ const {
   ensureVisitQrSchema,
   ensureAmenityReservationsSchema,
   ensureNotificationsSchema,
+  ensureTenantProvidersSchema,
   query,
 } = require("./src/database/mysql");
 
@@ -41,6 +42,7 @@ async function startServer() {
   await ensureVisitQrSchema();
   await ensureAmenityReservationsSchema();
   await ensureNotificationsSchema();
+  await ensureTenantProvidersSchema();
 
   const app = createApp();
 
