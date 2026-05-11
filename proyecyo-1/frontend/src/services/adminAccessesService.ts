@@ -1,6 +1,7 @@
 import { apiRequest } from "@/services/api";
 import type {
   AdminAccessFilters,
+  AdminAccessHourlyPoint,
   AdminAccessRecord,
   AdminAccessSummary,
 } from "@/types/accesses";
@@ -33,6 +34,10 @@ function buildAccessQuery(filters: AdminAccessFilters) {
 
 export function getAdminAccessSummaryRequest() {
   return apiRequest<AdminAccessSummary>("/admin/accesos/resumen");
+}
+
+export function getAdminAccessHourlyChartRequest() {
+  return apiRequest<AdminAccessHourlyPoint[]>("/admin/accesos/grafica-horas");
 }
 
 export function getAdminAccessesRequest(filters: AdminAccessFilters) {

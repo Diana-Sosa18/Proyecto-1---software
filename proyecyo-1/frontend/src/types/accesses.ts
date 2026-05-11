@@ -13,6 +13,14 @@ export interface AdminAccessSummary {
   rechazados: number;
 }
 
+export interface AdminAccessHourlyPoint {
+  hora: string;
+  total: number;
+  aprobados: number;
+  pendientes: number;
+  rechazados: number;
+}
+
 export interface AdminAccessRecord {
   id_acceso: number;
   fecha: string;

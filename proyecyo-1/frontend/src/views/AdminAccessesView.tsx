@@ -1,14 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock3, Download, Search, XCircle } from "lucide-react";
+import { BarChart3, CheckCircle2, Clock3, Download, Search, XCircle } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
+  getAdminAccessHourlyChartRequest,
   getAdminAccessesRequest,
   getAdminAccessSummaryRequest,
 } from "@/services/adminAccessesService";
 import type {
   AdminAccessFilterStatus,
   AdminAccessFilterType,
+  AdminAccessHourlyPoint,
   AdminAccessRecord,
   AdminAccessStatus,
   AdminAccessSummary,
@@ -110,6 +121,117 @@ function SummaryCard({
   );
 }
 
+function AccessHourlyTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: AdminAccessHourlyPoint }>;
+  label?: string;
+}) {
+  if (!active || !payload?.length) {
+    return null;
+  }
+
+  const point = payload[0].payload;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
+      <p className="font-semibold text-slate-900">{label}</p>
+      <p className="mt-1 text-slate-600">Total: {point.total}</p>
+      <div className="mt-1.5 grid gap-1 text-[0.72rem]">
+        <span className="text-emerald-600">Aprobados: {point.aprobados}</span>
+        <span className="text-amber-600">Pendientes: {point.pendientes}</span>
+        <span className="text-rose-600">Rechazados: {point.rechazados}</span>
+      </div>
+    </div>
+  );
+}
+
+function AdminAccessHourlyChart({
+  data,
+  isLoading,
+}: {
+  data: AdminAccessHourlyPoint[];
+  isLoading: boolean;
+}) {
+  const visibleData = useMemo(() => data.filter((point) => point.total > 0), [data]);
+  const chartData = visibleData.length > 0 ? visibleData : data;
+  const busiestHour = useMemo(
+    () =>
+      data.reduce<AdminAccessHourlyPoint>(
+        (current, point) => (point.total > current.total ? point : current),
+        { hora: "--:--", total: 0, aprobados: 0, pendientes: 0, rechazados: 0 },
+      ),
+    [data],
+  );
+
+  return (
+    <section
+      className="mt-5 rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+      aria-labelledby="admin-accesses-hourly-chart-heading"
+    >
+      <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+            <BarChart3 className="size-5" />
+          </div>
+          <div>
+            <h2
+              id="admin-accesses-hourly-chart-heading"
+              className="text-[0.98rem] font-semibold text-slate-900"
+            >
+              Accesos por hora
+            </h2>
+            <p className="mt-1 text-[0.8rem] text-slate-500">
+              Distribucion de ingresos registrados durante el dia.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-slate-50 px-3 py-2 text-right">
+          <p className="text-[0.72rem] font-medium uppercase tracking-[0.08em] text-slate-500">
+            Hora con mayor movimiento
+          </p>
+          <p className="mt-1 text-sm font-semibold text-slate-950">
+            {busiestHour.total ? `${busiestHour.hora} - ${busiestHour.total} accesos` : "Sin accesos"}
+          </p>
+        </div>
+      </div>
+
+      <div className="h-[290px] pt-4">
+        {isLoading ? (
+          <div className="flex h-full items-center justify-center text-sm text-slate-500">
+            Cargando grafica de accesos...
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
+              <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="hora"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: "#64748b", fontSize: 12 }}
+                interval={chartData.length > 12 ? 1 : 0}
+              />
+              <YAxis
+                allowDecimals={false}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: "#64748b", fontSize: 12 }}
+              />
+              <Tooltip content={<AccessHourlyTooltip />} cursor={{ fill: "#eff6ff" }} />
+              <Bar dataKey="total" name="Accesos" fill="#2563eb" radius={[8, 8, 0, 0]} maxBarSize={42} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function AdminAccessesView() {
   const [summary, setSummary] = useState<AdminAccessSummary>({
     total_dia: 0,
@@ -117,6 +239,15 @@ export function AdminAccessesView() {
     pendientes: 0,
     rechazados: 0,
   });
+  const [hourlyChartData, setHourlyChartData] = useState<AdminAccessHourlyPoint[]>(
+    Array.from({ length: 24 }, (_unused, hour) => ({
+      hora: `${String(hour).padStart(2, "0")}:00`,
+      total: 0,
+      aprobados: 0,
+      pendientes: 0,
+      rechazados: 0,
+    })),
+  );
   const [accesses, setAccesses] = useState<AdminAccessRecord[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -127,6 +258,7 @@ export function AdminAccessesView() {
   const [selectedType, setSelectedType] = useState<AdminAccessFilterType>("TODOS");
   const [selectedStatus, setSelectedStatus] = useState<AdminAccessFilterStatus>("TODOS");
   const [isLoading, setIsLoading] = useState(true);
+  const [isChartLoading, setIsChartLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
@@ -156,19 +288,24 @@ export function AdminAccessesView() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadSummary() {
+    async function loadDashboardData() {
       try {
         if (!cancelled) {
           setErrorMessage("");
+          setIsChartLoading(true);
         }
 
-        const summaryResponse = await getAdminAccessSummaryRequest();
+        const [summaryResponse, hourlyChartResponse] = await Promise.all([
+          getAdminAccessSummaryRequest(),
+          getAdminAccessHourlyChartRequest(),
+        ]);
 
         if (cancelled) {
           return;
         }
 
         setSummary(summaryResponse);
+        setHourlyChartData(hourlyChartResponse);
         setLastUpdatedAt(new Date());
       } catch (error) {
         if (!cancelled) {
@@ -178,13 +315,17 @@ export function AdminAccessesView() {
               : "No fue posible cargar el Control de Accesos.",
           );
         }
+      } finally {
+        if (!cancelled) {
+          setIsChartLoading(false);
+        }
       }
     }
 
-    void loadSummary();
+    void loadDashboardData();
 
     const intervalId = window.setInterval(() => {
-      void loadSummary();
+      void loadDashboardData();
     }, 15000);
 
     return () => {
@@ -260,6 +401,8 @@ export function AdminAccessesView() {
           accentClassName={cardAccentStyles.rejected}
         />
       </section>
+
+      <AdminAccessHourlyChart data={hourlyChartData} isLoading={isChartLoading} />
 
       <section
         className="mt-5 rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
