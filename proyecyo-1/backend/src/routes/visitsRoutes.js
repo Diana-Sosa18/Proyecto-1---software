@@ -4,6 +4,7 @@ const {
   getVisits,
   getFrequentVisitors,
   postVisit,
+  patchVisit,
   removeVisit,
   patchCancelVisit,
   removeFrequentVisitor,
@@ -20,6 +21,7 @@ router.get("/visitas", requireResidentOrTenant, getVisits);
 router.get("/visitantes-frecuentes", requireResidentOrTenant, getFrequentVisitors);
 router.delete("/visitantes-frecuentes/:id", requireResidentOrTenant, removeFrequentVisitor);
 router.post("/visitas", requireResidentOrTenant, postVisit);
+router.patch("/visitas/:id", requireResidentOrTenant, patchVisit);
 router.delete("/visitas/:id", requireResidentOrTenant, removeVisit);
 router.patch("/visitas/:id/cancelar", requireResidentOrTenant, patchCancelVisit);
 router.get("/guardia/visitas", requireGuard, getGuardVisits);

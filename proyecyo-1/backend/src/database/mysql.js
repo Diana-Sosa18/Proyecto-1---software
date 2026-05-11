@@ -68,6 +68,8 @@ async function ensureVisitQrSchema() {
   const hasTokenQr = await columnExists("ACCESO", "token_qr");
   const hasEstadoAcceso = await columnExists("ACCESO", "estado_acceso");
   const hasAuthorizer = await columnExists("ACCESO", "id_usuario_autoriza");
+  const hasServiceReason = await columnExists("ACCESO", "motivo_servicio");
+  const hasObservations = await columnExists("ACCESO", "observaciones");
 
   if (!hasTokenQr) {
     await query(`
@@ -87,6 +89,20 @@ async function ensureVisitQrSchema() {
     await query(`
       ALTER TABLE ACCESO
       ADD COLUMN id_usuario_autoriza INT NULL AFTER id_casa
+    `);
+  }
+
+  if (!hasServiceReason) {
+    await query(`
+      ALTER TABLE ACCESO
+      ADD COLUMN motivo_servicio VARCHAR(120) NULL AFTER tipo_visita
+    `);
+  }
+
+  if (!hasObservations) {
+    await query(`
+      ALTER TABLE ACCESO
+      ADD COLUMN observaciones VARCHAR(255) NULL AFTER motivo_servicio
     `);
   }
 

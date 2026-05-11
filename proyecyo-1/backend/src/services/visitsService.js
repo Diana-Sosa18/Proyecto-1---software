@@ -103,6 +103,8 @@ function mapVisit(row) {
     hora_inicio: row.hora_inicio,
     hora_fin: row.hora_fin,
     tipo_visita: row.tipo_visita,
+    motivo_servicio: row.motivo_servicio || "",
+    observaciones: row.observaciones || "",
     token_qr: row.token_qr,
     estado_acceso: row.estado_acceso,
     qr_status: qrStatus,
@@ -199,6 +201,8 @@ async function listResidentVisits(userId, role = "residente") {
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
         a.tipo_visita,
+        a.motivo_servicio,
+        a.observaciones,
         a.token_qr,
         a.estado_acceso,
         CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
@@ -262,6 +266,8 @@ async function createVisit(userId, role = "residente", payload) {
   const horaInicio = ensureValidTime(payload.hora_inicio, "hora de inicio");
   const horaFin = ensureValidTime(payload.hora_fin, "hora de fin");
   const tipoVisita = ensureVisitType(payload.tipo_visita);
+  const motivoServicio = normalizeString(payload.motivo_servicio);
+  const observaciones = normalizeString(payload.observaciones);
   const qrToken = generateQrToken();
 
   if (!nombre) {
@@ -291,10 +297,21 @@ async function createVisit(userId, role = "residente", payload) {
 
     const [accessResult] = await connection.execute(
       `
-        INSERT INTO ACCESO (id_visitante, id_casa, id_usuario_autoriza, fecha, hora_inicio, hora_fin, tipo_visita, token_qr, estado_acceso)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'AUTORIZADA')
+        INSERT INTO ACCESO (id_visitante, id_casa, id_usuario_autoriza, fecha, hora_inicio, hora_fin, tipo_visita, motivo_servicio, observaciones, token_qr, estado_acceso)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTORIZADA')
       `,
-      [visitorResult.insertId, house.id_casa, userId, fecha, horaInicio, horaFin, tipoVisita, qrToken],
+      [
+        visitorResult.insertId,
+        house.id_casa,
+        userId,
+        fecha,
+        horaInicio,
+        horaFin,
+        tipoVisita,
+        motivoServicio || null,
+        observaciones || null,
+        qrToken,
+      ],
     );
 
     await connection.commit();
@@ -312,6 +329,8 @@ async function createVisit(userId, role = "residente", payload) {
           TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
           TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
           a.tipo_visita,
+          a.motivo_servicio,
+          a.observaciones,
           a.token_qr,
           a.estado_acceso,
           CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
@@ -357,6 +376,8 @@ async function deleteVisit(userId, role = "residente", accessId) {
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
         a.tipo_visita,
+        a.motivo_servicio,
+        a.observaciones,
         a.token_qr,
         a.estado_acceso,
         CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
@@ -407,6 +428,155 @@ async function deleteVisit(userId, role = "residente", accessId) {
   } finally {
     connection.release();
   }
+}
+
+async function updateVisit(userId, role = "residente", accessId, payload = {}) {
+  const house = await getHouseByUserId(userId, role);
+  const normalizedAccessId = Number(accessId);
+
+  if (!Number.isInteger(normalizedAccessId) || normalizedAccessId <= 0) {
+    const error = new Error("La visita es invalida.");
+    error.status = 400;
+    throw error;
+  }
+
+  const rows = await query(
+    `
+      SELECT
+        a.id_acceso,
+        a.id_visitante,
+        v.nombre,
+        v.dpi,
+        v.placa,
+        DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
+        TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
+        TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+        a.tipo_visita,
+        a.motivo_servicio,
+        a.observaciones,
+        a.token_qr,
+        a.estado_acceso,
+        CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
+      FROM ACCESO a
+      INNER JOIN VISITANTE v
+        ON v.id_visitante = a.id_visitante
+      INNER JOIN CASA c
+        ON c.id_casa = a.id_casa
+      WHERE a.id_acceso = ? AND a.id_casa = ?
+        ${getOwnerFilter(role)}
+      LIMIT 1
+    `,
+    [normalizedAccessId, house.id_casa, ...getOwnerParams(userId, role)],
+  );
+
+  const visit = rows[0];
+
+  if (!visit) {
+    const error = new Error("Visita no encontrada.");
+    error.status = 404;
+    throw error;
+  }
+
+  const mappedVisit = mapVisit(visit);
+  const status = String(visit.estado_acceso || "").toUpperCase();
+
+  if (status !== "AUTORIZADA" || mappedVisit.qr_status !== "VALID") {
+    const error = new Error("Este acceso ya no puede modificarse por su estado actual.");
+    error.status = 409;
+    throw error;
+  }
+
+  const nombre = normalizeString(payload.nombre);
+  const dpi = normalizeString(payload.dpi);
+  const placa = normalizeString(payload.placa).toUpperCase();
+  const fecha = ensureValidDate(payload.fecha);
+  const horaInicio = ensureValidTime(payload.hora_inicio, "hora de inicio");
+  const horaFin = ensureValidTime(payload.hora_fin, "hora de fin");
+  const tipoVisita = ensureVisitType(payload.tipo_visita);
+  const motivoServicio = normalizeString(payload.motivo_servicio);
+  const observaciones = normalizeString(payload.observaciones);
+
+  if (!nombre) {
+    const error = new Error("El nombre del visitante es obligatorio.");
+    error.status = 400;
+    throw error;
+  }
+
+  if (horaInicio >= horaFin) {
+    const error = new Error("La hora de fin debe ser mayor a la hora de inicio.");
+    error.status = 400;
+    throw error;
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    await connection.execute(
+      `
+        UPDATE VISITANTE
+        SET nombre = ?, dpi = ?, placa = ?
+        WHERE id_visitante = ?
+      `,
+      [nombre, dpi, placa, visit.id_visitante],
+    );
+    await connection.execute(
+      `
+        UPDATE ACCESO
+        SET fecha = ?,
+            hora_inicio = ?,
+            hora_fin = ?,
+            tipo_visita = ?,
+            motivo_servicio = ?,
+            observaciones = ?
+        WHERE id_acceso = ?
+      `,
+      [
+        fecha,
+        horaInicio,
+        horaFin,
+        tipoVisita,
+        motivoServicio || null,
+        observaciones || null,
+        normalizedAccessId,
+      ],
+    );
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  const updatedRows = await query(
+    `
+      SELECT
+        a.id_acceso,
+        v.id_visitante,
+        v.nombre,
+        v.dpi,
+        v.placa,
+        NULL AS foto,
+        DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
+        TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
+        TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+        a.tipo_visita,
+        a.motivo_servicio,
+        a.observaciones,
+        a.token_qr,
+        a.estado_acceso,
+        CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
+      FROM ACCESO a
+      INNER JOIN VISITANTE v ON v.id_visitante = a.id_visitante
+      INNER JOIN CASA c ON c.id_casa = a.id_casa
+      WHERE a.id_acceso = ?
+      LIMIT 1
+    `,
+    [normalizedAccessId],
+  );
+
+  return mapVisit(updatedRows[0]);
 }
 
 async function cancelVisit(userId, role = "residente", accessId) {
@@ -469,6 +639,8 @@ async function cancelVisit(userId, role = "residente", accessId) {
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
         a.tipo_visita,
+        a.motivo_servicio,
+        a.observaciones,
         a.token_qr,
         a.estado_acceso,
         CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
@@ -566,6 +738,8 @@ async function getGuardShiftVisits() {
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
         a.tipo_visita,
+        a.motivo_servicio,
+        a.observaciones,
         a.token_qr,
         a.estado_acceso,
         CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
@@ -621,6 +795,8 @@ async function findVisitByQrToken(normalizedToken) {
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
         a.tipo_visita,
+        a.motivo_servicio,
+        a.observaciones,
         a.token_qr,
         a.estado_acceso,
         CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
@@ -739,6 +915,7 @@ module.exports = {
   listResidentVisits,
   listFrequentVisitors,
   createVisit,
+  updateVisit,
   deleteVisit,
   cancelVisit,
   deleteFrequentVisitor,

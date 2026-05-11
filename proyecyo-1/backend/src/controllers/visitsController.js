@@ -2,6 +2,7 @@ const {
   listResidentVisits,
   listFrequentVisitors,
   createVisit,
+  updateVisit,
   deleteVisit,
   cancelVisit,
   deleteFrequentVisitor,
@@ -32,6 +33,15 @@ async function postVisit(req, res, next) {
   try {
     const visit = await createVisit(req.authUser.id, req.authUser.role, req.body || {});
     res.status(201).json(visit);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function patchVisit(req, res, next) {
+  try {
+    const visit = await updateVisit(req.authUser.id, req.authUser.role, Number(req.params.id), req.body || {});
+    res.status(200).json(visit);
   } catch (error) {
     next(error);
   }
@@ -95,6 +105,7 @@ module.exports = {
   getVisits,
   getFrequentVisitors,
   postVisit,
+  patchVisit,
   removeVisit,
   patchCancelVisit,
   removeFrequentVisitor,

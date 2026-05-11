@@ -94,6 +94,22 @@ function countTodayVisits(visits: VisitRecord[]) {
   return visits.filter((visit) => visit.fecha === today).length;
 }
 
+function getVisitStatusLabel(visit: VisitRecord) {
+  if (visit.estado_acceso === "INGRESO_REGISTRADO" || visit.qr_status === "USED") {
+    return "Ingreso registrado";
+  }
+
+  if (visit.estado_acceso === "CANCELADA" || visit.qr_status === "CANCELLED") {
+    return "Cancelada";
+  }
+
+  if (visit.qr_status === "EXPIRED") {
+    return "Vencida";
+  }
+
+  return "Autorizada";
+}
+
 export function ResidenteVisitsView() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -152,6 +168,15 @@ export function ResidenteVisitsView() {
   }, []);
 
   const todayVisits = useMemo(() => countTodayVisits(visits), [visits]);
+  const visitHistory = useMemo(
+    () =>
+      [...visits].sort((first, second) => {
+        const secondDate = `${second.fecha}T${second.hora_inicio || "00:00"}`;
+        const firstDate = `${first.fecha}T${first.hora_inicio || "00:00"}`;
+        return secondDate.localeCompare(firstDate) || second.id_acceso - first.id_acceso;
+      }),
+    [visits],
+  );
 
   function updateForm<K extends keyof VisitFormState>(field: K, value: VisitFormState[K]) {
     setForm((current) => ({
@@ -628,25 +653,26 @@ export function ResidenteVisitsView() {
         <div className="space-y-4">
           <div>
             <h3 className="text-3xl font-semibold text-slate-900">
-              Visitas Autorizadas Hoy ({todayVisits})
+              Historial de visitas ({visitHistory.length})
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              Se muestran todas las visitas del residente con actualizacion dinamica.
+              Visitas registradas por el residente, ordenadas de la mas reciente a la mas antigua.
             </p>
+            <p className="mt-1 text-xs text-slate-400">Autorizadas hoy: {todayVisits}</p>
           </div>
 
           {isLoading ? (
             <Card>
               <CardContent className="p-6 text-sm text-slate-500">Cargando visitas autorizadas...</CardContent>
             </Card>
-          ) : visits.length === 0 ? (
+          ) : visitHistory.length === 0 ? (
             <Card>
               <CardContent className="p-6 text-sm text-slate-500">
-                No hay visitas autorizadas para esta residencia.
+                No hay visitas registradas para esta residencia.
               </CardContent>
             </Card>
           ) : (
-            visits.map((visit) => (
+            visitHistory.map((visit) => (
               <Card
                 key={visit.id_acceso}
                 className="border-white/70 bg-white shadow-[0_12px_28px_rgba(30,41,59,0.08)]"
@@ -670,7 +696,7 @@ export function ResidenteVisitsView() {
                       </div>
                       <div className="mt-2 space-y-1 text-slate-600">
                         <p>DPI: {visit.dpi}</p>
-                        <p>Placa: {visit.placa}</p>
+                        <p>Placa: {visit.placa || "Sin placa"}</p>
                         <p className="flex items-center gap-2">
                           <CalendarDays className="size-4" />
                           Fecha: {formatDate(visit.fecha)}
@@ -679,12 +705,13 @@ export function ResidenteVisitsView() {
                           <Clock3 className="size-4" />
                           Hora: {visit.hora_inicio} - {visit.hora_fin}
                         </p>
+                        <p>Tipo de acceso: {visitTypeLabels[visit.tipo_visita]}</p>
                       </div>
                       <span className="mt-4 inline-flex rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">
                         {visitTypeLabels[visit.tipo_visita]}
                       </span>
                       <p className="mt-3 text-xs text-slate-400">
-                        Estado: {visit.estado_acceso === "INGRESO_REGISTRADO" ? "Ingreso registrado" : "Autorizada"}
+                        Estado: {getVisitStatusLabel(visit)}
                       </p>
                     </div>
                   </div>

@@ -12,6 +12,7 @@ import {
   Clock3,
   CreditCard,
   KeyRound,
+  Pencil,
   Power,
   ShieldCheck,
   Trash2,
@@ -35,6 +36,7 @@ import {
   deleteVisitRequest,
   getFrequentVisitorsRequest,
   getVisitsRequest,
+  updateVisitRequest,
 } from "@/services/visitsService";
 import {
   getTenantProvidersRequest,
@@ -131,6 +133,15 @@ function createInitialForm(): VisitFormState {
     hora_inicio: getTimeInTimezone(now),
     hora_fin: getTimeInTimezone(finish),
     tipo_visita: "VISITA",
+    motivo_servicio: "",
+    observaciones: "",
+  };
+}
+
+function createInitialProviderForm(): VisitFormState {
+  return {
+    ...createInitialForm(),
+    tipo_visita: "PROVEEDOR",
   };
 }
 
@@ -163,15 +174,24 @@ function countActiveProviders(providers: TenantProvider[]) {
   return providers.filter((provider) => provider.activo).length;
 }
 
+function isAccessEditable(visit: VisitRecord) {
+  return visit.estado_acceso === "AUTORIZADA" && visit.qr_status === "VALID";
+}
+
 export function InquilinoView() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<VisitFormState>(createInitialForm);
+  const [providerForm, setProviderForm] = useState<VisitFormState>(createInitialProviderForm);
+  const [editingVisit, setEditingVisit] = useState<VisitRecord | null>(null);
+  const [editForm, setEditForm] = useState<VisitFormState>(createInitialForm);
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [frequentVisitors, setFrequentVisitors] = useState<FrequentVisitor[]>([]);
   const [providers, setProviders] = useState<TenantProvider[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<AccessFilter>("TODOS");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRegisteringProvider, setIsRegisteringProvider] = useState(false);
+  const [isUpdatingAccess, setIsUpdatingAccess] = useState(false);
   const [updatingProviderId, setUpdatingProviderId] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -280,6 +300,7 @@ export function InquilinoView() {
         : visits.filter((visit) => getAccessStatus(visit) === selectedStatus),
     [selectedStatus, visits],
   );
+  const tenantHouseLabel = providers[0]?.casa_unidad || visits[0]?.casa || "Asignada a tu usuario";
 
   function updateForm<K extends keyof VisitFormState>(field: K, value: VisitFormState[K]) {
     setForm((current) => ({
@@ -304,6 +325,31 @@ export function InquilinoView() {
         setErrorMessage("La hora de fin debe ser mayor a la hora de inicio.");
         return false;
       }
+    }
+
+    setErrorMessage("");
+    return true;
+  }
+
+  function validateVisitPayload(payload: VisitFormState, nameMessage: string) {
+    if (!payload.nombre.trim()) {
+      setErrorMessage(nameMessage);
+      return false;
+    }
+
+    if (!payload.fecha || !payload.hora_inicio || !payload.hora_fin) {
+      setErrorMessage("Completa fecha y horario antes de guardar.");
+      return false;
+    }
+
+    if (payload.hora_inicio >= payload.hora_fin) {
+      setErrorMessage("La hora de fin debe ser mayor a la hora de inicio.");
+      return false;
+    }
+
+    if (payload.tipo_visita === "PROVEEDOR" && !payload.motivo_servicio?.trim()) {
+      setErrorMessage("Indica el servicio que realizara el proveedor.");
+      return false;
     }
 
     setErrorMessage("");
@@ -349,6 +395,83 @@ export function InquilinoView() {
       setErrorMessage(error instanceof Error ? error.message : "No fue posible autorizar la visita.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleProviderSubmit() {
+    if (!validateVisitPayload(providerForm, "El nombre del proveedor es obligatorio.")) {
+      return;
+    }
+
+    try {
+      setIsRegisteringProvider(true);
+      setErrorMessage("");
+      const createdProviderAccess = await createVisitRequest({
+        ...providerForm,
+        tipo_visita: "PROVEEDOR",
+        foto: null,
+      });
+      setVisits((current) => [createdProviderAccess, ...current]);
+      setProviderForm(createInitialProviderForm());
+      setSelectedStatus("TODOS");
+      setSuccessMessage("Proveedor registrado correctamente. Ya aparece en tus accesos.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible registrar el proveedor.");
+    } finally {
+      setIsRegisteringProvider(false);
+    }
+  }
+
+  function startEditingVisit(visit: VisitRecord) {
+    if (!isAccessEditable(visit)) {
+      setErrorMessage("Este acceso ya no puede modificarse por su estado actual.");
+      return;
+    }
+
+    setEditingVisit(visit);
+    setEditForm({
+      nombre: visit.nombre,
+      dpi: visit.dpi || "",
+      placa: visit.placa || "",
+      foto: "",
+      fecha: visit.fecha,
+      hora_inicio: visit.hora_inicio,
+      hora_fin: visit.hora_fin,
+      tipo_visita: visit.tipo_visita,
+      motivo_servicio: visit.motivo_servicio || "",
+      observaciones: visit.observaciones || "",
+    });
+    setErrorMessage("");
+  }
+
+  async function handleUpdateAccess() {
+    if (!editingVisit) {
+      return;
+    }
+
+    if (!validateVisitPayload(editForm, "El nombre del acceso es obligatorio.")) {
+      return;
+    }
+
+    try {
+      setIsUpdatingAccess(true);
+      setErrorMessage("");
+      const updatedVisit = await updateVisitRequest(editingVisit.id_acceso, {
+        ...editForm,
+        foto: null,
+      });
+      setVisits((current) =>
+        current.map((item) => (item.id_acceso === updatedVisit.id_acceso ? updatedVisit : item)),
+      );
+      setEditingVisit(null);
+      setSuccessMessage(`Acceso de ${updatedVisit.nombre} actualizado correctamente.`);
+    } catch (error) {
+      const apiError = error as { status?: number; message?: string } | undefined;
+      setErrorMessage(
+        apiError?.message || "No fue posible actualizar el acceso. Revisa los datos e intenta de nuevo.",
+      );
+    } finally {
+      setIsUpdatingAccess(false);
     }
   }
 
@@ -408,6 +531,20 @@ export function InquilinoView() {
     } finally {
       setUpdatingProviderId(null);
     }
+  }
+
+  function updateProviderForm<K extends keyof VisitFormState>(field: K, value: VisitFormState[K]) {
+    setProviderForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  function updateEditForm<K extends keyof VisitFormState>(field: K, value: VisitFormState[K]) {
+    setEditForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
   }
 
   async function handleConfirmCancel() {
@@ -671,6 +808,116 @@ export function InquilinoView() {
               );
             })
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-2xl text-slate-900">
+            <BriefcaseBusiness className="size-6 text-blue-600" />
+            Registrar proveedor
+          </CardTitle>
+          <CardDescription className="mt-2">
+            Autoriza un proveedor para ingresar a tu unidad con fecha y horario definidos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-5 md:grid-cols-2">
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-800">Nombre del proveedor *</span>
+              <Input
+                value={providerForm.nombre}
+                onChange={(event) => updateProviderForm("nombre", event.target.value)}
+                placeholder="Ej. Mantenimiento Lopez"
+                className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-800">Servicio que realizara *</span>
+              <Input
+                value={providerForm.motivo_servicio || ""}
+                onChange={(event) => updateProviderForm("motivo_servicio", event.target.value)}
+                placeholder="Ej. Reparacion electrica"
+                className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-800">Fecha *</span>
+              <Input
+                type="date"
+                value={providerForm.fecha}
+                onChange={(event) => updateProviderForm("fecha", event.target.value)}
+                className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-800">Casa / unidad</span>
+              <Input
+                value={tenantHouseLabel}
+                readOnly
+                className="h-14 rounded-2xl border-slate-100 bg-slate-100 px-4 text-slate-500"
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-800">Hora de inicio *</span>
+              <Input
+                type="time"
+                value={providerForm.hora_inicio}
+                onChange={(event) => updateProviderForm("hora_inicio", event.target.value)}
+                className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-800">Hora de fin *</span>
+              <Input
+                type="time"
+                value={providerForm.hora_fin}
+                onChange={(event) => updateProviderForm("hora_fin", event.target.value)}
+                className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-800">Placa si aplica</span>
+              <Input
+                value={providerForm.placa}
+                onChange={(event) => updateProviderForm("placa", event.target.value.toUpperCase())}
+                placeholder="P-123ABC"
+                className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-800">Observaciones</span>
+              <Input
+                value={providerForm.observaciones || ""}
+                onChange={(event) => updateProviderForm("observaciones", event.target.value)}
+                placeholder="Ej. Trae herramientas grandes"
+                className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
+              />
+            </label>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              onClick={handleProviderSubmit}
+              disabled={isRegisteringProvider}
+              className="h-12 rounded-2xl bg-blue-600 px-6 text-white hover:bg-blue-700"
+            >
+              {isRegisteringProvider ? (
+                <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <BriefcaseBusiness className="size-4" />
+              )}
+              Registrar proveedor
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -949,6 +1196,17 @@ export function InquilinoView() {
                           {statusLabels[accessStatus]}
                         </span>
                         <div className="ml-auto flex items-center gap-1">
+                          {isAccessEditable(visit) ? (
+                            <button
+                              type="button"
+                              onClick={() => startEditingVisit(visit)}
+                              className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-200 transition hover:bg-blue-100"
+                              aria-label={`Editar acceso de ${visit.nombre}`}
+                            >
+                              <Pencil className="size-3.5" />
+                              Editar
+                            </button>
+                          ) : null}
                           {accessStatus === "APROBADO" ? (
                             <button
                               type="button"
@@ -997,6 +1255,16 @@ export function InquilinoView() {
                           <CalendarDays className="size-4" />
                           Casa/unidad: {visit.casa || "Asignada al inquilino"}
                         </p>
+                        {visit.motivo_servicio ? (
+                          <p className="mt-1 text-sm text-slate-500">
+                            Servicio/motivo: {visit.motivo_servicio}
+                          </p>
+                        ) : null}
+                        {visit.observaciones ? (
+                          <p className="mt-1 text-sm text-slate-500">
+                            Observaciones: {visit.observaciones}
+                          </p>
+                        ) : null}
                         <p className="mt-1 text-sm text-slate-500">
                           Referencia QR: {visit.token_qr || "Sin token disponible"}
                         </p>
@@ -1017,6 +1285,143 @@ export function InquilinoView() {
           )}
         </CardContent>
       </Card>
+
+      {editingVisit ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 px-4 py-8"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-access-title"
+        >
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 id="edit-access-title" className="text-xl font-semibold text-slate-900">
+                  Editar acceso
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Solo se pueden modificar accesos autorizados y vigentes.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => (isUpdatingAccess ? null : setEditingVisit(null))}
+                className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Cerrar"
+                disabled={isUpdatingAccess}
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-800">Nombre *</span>
+                <Input
+                  value={editForm.nombre}
+                  onChange={(event) => updateEditForm("nombre", event.target.value)}
+                  className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-800">Tipo *</span>
+                <select
+                  value={editForm.tipo_visita}
+                  onChange={(event) => updateEditForm("tipo_visita", event.target.value as VisitType)}
+                  className="h-12 w-full rounded-2xl border border-slate-100 bg-slate-50 px-4 text-sm outline-none focus:border-blue-300"
+                >
+                  <option value="VISITA">Visita personal</option>
+                  <option value="DELIVERY">Delivery</option>
+                  <option value="PROVEEDOR">Proveedor</option>
+                </select>
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-800">Fecha *</span>
+                <Input
+                  type="date"
+                  value={editForm.fecha}
+                  onChange={(event) => updateEditForm("fecha", event.target.value)}
+                  className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-800">Placa</span>
+                <Input
+                  value={editForm.placa}
+                  onChange={(event) => updateEditForm("placa", event.target.value.toUpperCase())}
+                  className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-800">Hora de inicio *</span>
+                <Input
+                  type="time"
+                  value={editForm.hora_inicio}
+                  onChange={(event) => updateEditForm("hora_inicio", event.target.value)}
+                  className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-800">Hora de fin *</span>
+                <Input
+                  type="time"
+                  value={editForm.hora_fin}
+                  onChange={(event) => updateEditForm("hora_fin", event.target.value)}
+                  className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-800">Servicio / motivo</span>
+                <Input
+                  value={editForm.motivo_servicio || ""}
+                  onChange={(event) => updateEditForm("motivo_servicio", event.target.value)}
+                  className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-800">Observaciones</span>
+                <Input
+                  value={editForm.observaciones || ""}
+                  onChange={(event) => updateEditForm("observaciones", event.target.value)}
+                  className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+                />
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditingVisit(null)}
+                disabled={isUpdatingAccess}
+                className="rounded-xl"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleUpdateAccess}
+                disabled={isUpdatingAccess}
+                className="rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+              >
+                {isUpdatingAccess ? (
+                  <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Pencil className="size-4" />
+                )}
+                Guardar cambios
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {visitToCancel ? (
         <div

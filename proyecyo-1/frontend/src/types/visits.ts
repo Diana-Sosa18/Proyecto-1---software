@@ -11,6 +11,8 @@ export interface VisitRecord {
   hora_inicio: string;
   hora_fin: string;
   tipo_visita: VisitType;
+  motivo_servicio?: string;
+  observaciones?: string;
   token_qr?: string | null;
   qr_value?: string | null;
   estado_acceso?: "AUTORIZADA" | "INGRESO_REGISTRADO" | "CANCELADA";
@@ -36,6 +38,8 @@ export interface VisitPayload {
   hora_inicio: string;
   hora_fin: string;
   tipo_visita: VisitType;
+  motivo_servicio?: string;
+  observaciones?: string;
 }
 
 export interface GuardQrValidationPayload {

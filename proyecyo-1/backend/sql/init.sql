@@ -136,6 +136,8 @@ CREATE TABLE ACCESO (
     hora_inicio TIME,
     hora_fin TIME,
     tipo_visita VARCHAR(20),
+    motivo_servicio VARCHAR(120),
+    observaciones VARCHAR(255),
     token_qr VARCHAR(64) UNIQUE,
     estado_acceso VARCHAR(30) NOT NULL DEFAULT 'AUTORIZADA',
     FOREIGN KEY (id_visitante) REFERENCES VISITANTE(id_visitante),

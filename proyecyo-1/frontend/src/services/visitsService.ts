@@ -21,6 +21,13 @@ export function createVisitRequest(payload: VisitPayload) {
   });
 }
 
+export function updateVisitRequest(id: number, payload: VisitPayload) {
+  return apiRequest<VisitRecord>(`/visitas/${id}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
 export function deleteVisitRequest(id: number) {
   return apiRequest<VisitRecord>(`/visitas/${id}`, {
     method: "DELETE",
