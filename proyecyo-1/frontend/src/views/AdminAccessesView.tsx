@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CheckCircle2, Clock3, Download, Search, XCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { BarChart3, CheckCircle2, Clock3, Download, RefreshCw, Search, XCircle } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -9,8 +9,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock3, Download, RefreshCw, Search, XCircle } from "lucide-react";
 
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
@@ -297,27 +295,24 @@ export function AdminAccessesView() {
     async (options: { silent?: boolean } = {}) => {
       const { silent = false } = options;
 
-    async function loadDashboardData() {
       try {
         if (silent) {
           setIsRefreshing(true);
         } else {
           setIsLoading(true);
-    async function loadSummary() {
-      try {
-        if (!cancelled) {
-          setErrorMessage("");
           setIsChartLoading(true);
         }
         setErrorMessage("");
 
-        const [summaryResponse, hourlyChartResponse] = await Promise.all([
+        const [summaryResponse, hourlyChartResponse, accessesResponse] = await Promise.all([
           getAdminAccessSummaryRequest(),
           getAdminAccessHourlyChartRequest(),
+          getAdminAccessesRequest(filters),
         ]);
 
         setSummary(summaryResponse);
         setHourlyChartData(hourlyChartResponse);
+        setAccesses(accessesResponse);
         setLastUpdatedAt(new Date());
       } catch (error) {
         setErrorMessage(
@@ -328,34 +323,18 @@ export function AdminAccessesView() {
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
-        if (!cancelled) {
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "No fue posible cargar el Control de Accesos.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setIsChartLoading(false);
-        }
+        setIsChartLoading(false);
       }
     },
     [filters],
   );
 
-    void loadDashboardData();
   useEffect(() => {
     void loadAccessModule();
 
     const intervalId = window.setInterval(() => {
       void loadAccessModule({ silent: true });
     }, REFRESH_INTERVAL_MS);
-    void loadSummary();
-
-    const intervalId = window.setInterval(() => {
-      void loadDashboardData();
-    }, 15000);
 
     return () => {
       window.clearInterval(intervalId);
@@ -365,46 +344,6 @@ export function AdminAccessesView() {
   const handleManualRefresh = useCallback(() => {
     void loadAccessModule({ silent: true });
   }, [loadAccessModule]);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadAccesses() {
-      try {
-        if (!cancelled) {
-          setIsLoading(true);
-          setErrorMessage("");
-        }
-
-        const accessesResponse = await getAdminAccessesRequest(filters);
-
-        if (cancelled) {
-          return;
-        }
-
-        setAccesses(accessesResponse);
-      } catch (error) {
-        if (!cancelled) {
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "No fue posible cargar el Control de Accesos.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void loadAccesses();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [filters]);
 
   return (
     <AdminLayout

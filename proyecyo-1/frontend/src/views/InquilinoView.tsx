@@ -233,45 +233,45 @@ export function InquilinoView() {
   );
   const activeProvidersCount = useMemo(() => countActiveProviders(providers), [providers]);
   const nextVisit = useMemo(
-  () => visits.find((visit) => getAccessStatus(visit) === "APROBADO"),
-  [visits],
-);
+    () => visits.find((visit) => getAccessStatus(visit) === "APROBADO"),
+    [visits],
+  );
 
-const tenantAlerts = useMemo<TenantAlert[]>(() => {
-  const alerts: TenantAlert[] = [];
+  const tenantAlerts = useMemo<TenantAlert[]>(() => {
+    const alerts: TenantAlert[] = [];
 
-  if (nextVisit) {
+    if (nextVisit) {
+      alerts.push({
+        id: `visita-${nextVisit.id_acceso}`,
+        tipo: "VISITA",
+        titulo: "Visita por llegar",
+        descripcion: `${nextVisit.nombre} tiene una visita autorizada para ${formatDate(
+          nextVisit.fecha,
+        )} de ${nextVisit.hora_inicio} a ${nextVisit.hora_fin}.`,
+        tiempo: "Reciente",
+      });
+    }
+
     alerts.push({
-      id: `visita-${nextVisit.id_acceso}`,
-      tipo: "VISITA",
-      titulo: "Visita por llegar",
-      descripcion: `${nextVisit.nombre} tiene una visita autorizada para ${formatDate(
-        nextVisit.fecha,
-      )} de ${nextVisit.hora_inicio} a ${nextVisit.hora_fin}.`,
-      tiempo: "Reciente",
+      id: "solicitud-aprobada",
+      tipo: "SOLICITUD",
+      titulo: "Solicitud aprobada",
+      descripcion:
+        "Tu permiso para gestionar visitas y accesos asociados a la unidad se encuentra aprobado.",
+      tiempo: "Hoy",
     });
-  }
 
-  alerts.push({
-    id: "solicitud-aprobada",
-    tipo: "SOLICITUD",
-    titulo: "Solicitud aprobada",
-    descripcion:
-      "Tu permiso para gestionar visitas y accesos asociados a la unidad se encuentra aprobado.",
-    tiempo: "Hoy",
-  });
+    alerts.push({
+      id: "recordatorio-pago",
+      tipo: "PAGO",
+      titulo: "Recordatorio de pago",
+      descripcion:
+        "Recuerda revisar tu estado de cuenta para evitar bloqueos o restricciones en tus accesos.",
+      tiempo: "Pendiente",
+    });
 
-  alerts.push({
-    id: "recordatorio-pago",
-    tipo: "PAGO",
-    titulo: "Recordatorio de pago",
-    descripcion:
-      "Recuerda revisar tu estado de cuenta para evitar bloqueos o restricciones en tus accesos.",
-    tiempo: "Pendiente",
-  });
-
-  return alerts;
-}, [nextVisit]);
+    return alerts;
+  }, [nextVisit]);
 
   const filteredVisits = useMemo(
     () =>
@@ -407,6 +407,9 @@ const tenantAlerts = useMemo<TenantAlert[]>(() => {
       );
     } finally {
       setUpdatingProviderId(null);
+    }
+  }
+
   async function handleConfirmCancel() {
     if (!visitToCancel) {
       return;
