@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   Bell,
   CalendarClock,
   CalendarDays,
@@ -13,6 +14,8 @@ import {
   Trash2,
   UserCheck,
   UserRoundPlus,
+  X,
+  XCircle,
   Zap,
 } from "lucide-react";
 
@@ -24,6 +27,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { QrCodeCard } from "@/components/visits/QrCodeCard";
 import {
+  cancelVisitRequest,
   createVisitRequest,
   deleteVisitRequest,
   getFrequentVisitorsRequest,
@@ -148,6 +152,8 @@ export function InquilinoView() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [authorizingVisitorId, setAuthorizingVisitorId] = useState<number | null>(null);
+  const [visitToCancel, setVisitToCancel] = useState<VisitRecord | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -347,6 +353,59 @@ const tenantAlerts = useMemo<TenantAlert[]>(() => {
       `Visita rapida autorizada para ${visitor.nombre}.`,
     );
     setAuthorizingVisitorId(null);
+  }
+
+  async function handleConfirmCancel() {
+    if (!visitToCancel) {
+      return;
+    }
+
+    try {
+      setIsCancelling(true);
+      setErrorMessage("");
+      setSuccessMessage("");
+      const updated = await cancelVisitRequest(visitToCancel.id_acceso);
+
+      // Actualiza la lista en su sitio (estado cambia a CANCELADA, no se elimina)
+      setVisits((current) =>
+        current.map((item) =>
+          item.id_acceso === updated.id_acceso
+            ? { ...item, ...updated, estado_acceso: "CANCELADA", qr_status: "CANCELLED" }
+            : item,
+        ),
+      );
+
+      // Si el filtro actual es APROBADO, cambia a TODOS para que el usuario vea
+      // que el cambio se aplico.
+      if (selectedStatus === "APROBADO") {
+        setSelectedStatus("TODOS");
+      }
+
+      setSuccessMessage(`Acceso de ${visitToCancel.nombre} cancelado correctamente.`);
+      setVisitToCancel(null);
+    } catch (error) {
+      const apiError = error as { status?: number; message?: string } | undefined;
+      let friendlyMessage = "No fue posible cancelar el acceso. Intenta de nuevo.";
+
+      if (apiError?.status === 404) {
+        friendlyMessage = "Esta visita ya no existe. La lista se actualizara automaticamente.";
+        // Sincroniza la lista quitando la visita huerfana
+        setVisits((current) => current.filter((item) => item.id_acceso !== visitToCancel.id_acceso));
+        setVisitToCancel(null);
+      } else if (apiError?.status === 409) {
+        friendlyMessage =
+          apiError.message ||
+          "No se puede cancelar este acceso porque ya tiene un ingreso registrado.";
+      } else if (apiError?.status === 401 || apiError?.status === 403) {
+        friendlyMessage = "Tu sesion expiro o no tienes permiso para cancelar este acceso.";
+      } else if (apiError?.message) {
+        friendlyMessage = apiError.message;
+      }
+
+      setErrorMessage(friendlyMessage);
+    } finally {
+      setIsCancelling(false);
+    }
   }
 
   async function handleDelete(visit: VisitRecord) {
@@ -734,14 +793,27 @@ const tenantAlerts = useMemo<TenantAlert[]>(() => {
                         <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusStyles[accessStatus]}`}>
                           {statusLabels[accessStatus]}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(visit)}
-                          className="ml-auto rounded-full p-2 text-rose-500 transition hover:bg-rose-50"
-                          aria-label={`Eliminar visita de ${visit.nombre}`}
-                        >
-                          <Trash2 className="size-5" />
-                        </button>
+                        <div className="ml-auto flex items-center gap-1">
+                          {accessStatus === "APROBADO" ? (
+                            <button
+                              type="button"
+                              onClick={() => setVisitToCancel(visit)}
+                              className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100"
+                              aria-label={`Cancelar acceso de ${visit.nombre}`}
+                            >
+                              <XCircle className="size-3.5" />
+                              Cancelar
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(visit)}
+                            className="rounded-full p-2 text-rose-500 transition hover:bg-rose-50"
+                            aria-label={`Eliminar visita de ${visit.nombre}`}
+                          >
+                            <Trash2 className="size-5" />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -790,6 +862,73 @@ const tenantAlerts = useMemo<TenantAlert[]>(() => {
           )}
         </CardContent>
       </Card>
+
+      {visitToCancel ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-visit-title"
+        >
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+            <div className="flex items-start gap-4">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <AlertTriangle className="size-6" />
+              </div>
+              <div className="flex-1">
+                <h3 id="cancel-visit-title" className="text-lg font-semibold text-slate-900">
+                  Confirmar cancelacion
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Estas a punto de cancelar el acceso de{" "}
+                  <span className="font-semibold text-slate-900">{visitToCancel.nombre}</span>{" "}
+                  programado para el {formatDate(visitToCancel.fecha)} a las{" "}
+                  {visitToCancel.hora_inicio}. El QR dejara de ser valido.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => (isCancelling ? null : setVisitToCancel(null))}
+                className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Cerrar"
+                disabled={isCancelling}
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setVisitToCancel(null)}
+                disabled={isCancelling}
+                className="rounded-xl"
+              >
+                Volver
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={isCancelling}
+                className="rounded-xl bg-amber-600 text-white hover:bg-amber-700"
+              >
+                {isCancelling ? (
+                  <>
+                    <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Cancelando...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="size-4" />
+                    Si, cancelar
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </AppShell>
   );
 }

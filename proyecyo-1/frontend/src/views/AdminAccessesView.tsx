@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock3, Download, Search, XCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Clock3, Download, RefreshCw, Search, XCircle } from "lucide-react";
 
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
@@ -46,25 +46,29 @@ const statusStyles: Record<
   {
     className: string;
     iconClassName: string;
+    dotClassName: string;
     icon: typeof CheckCircle2;
     label: string;
   }
 > = {
   APROBADO: {
-    className: "bg-emerald-100 text-emerald-700",
+    className: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200",
     iconClassName: "text-emerald-600",
+    dotClassName: "bg-emerald-500",
     icon: CheckCircle2,
     label: "Aprobado",
   },
   PENDIENTE: {
-    className: "bg-amber-100 text-amber-700",
+    className: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200",
     iconClassName: "text-amber-500",
+    dotClassName: "bg-amber-500 animate-pulse",
     icon: Clock3,
     label: "Pendiente",
   },
   RECHAZADO: {
-    className: "bg-rose-100 text-rose-700",
+    className: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200",
     iconClassName: "text-rose-600",
+    dotClassName: "bg-rose-500",
     icon: XCircle,
     label: "Rechazado",
   },
@@ -110,6 +114,8 @@ function SummaryCard({
   );
 }
 
+const REFRESH_INTERVAL_MS = 10000;
+
 export function AdminAccessesView() {
   const [summary, setSummary] = useState<AdminAccessSummary>({
     total_dia: 0,
@@ -127,6 +133,7 @@ export function AdminAccessesView() {
   const [selectedType, setSelectedType] = useState<AdminAccessFilterType>("TODOS");
   const [selectedStatus, setSelectedStatus] = useState<AdminAccessFilterStatus>("TODOS");
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
@@ -153,24 +160,35 @@ export function AdminAccessesView() {
     [debouncedHouse, debouncedPlate, debouncedSearch, selectedStatus, selectedType],
   );
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadAccessModule = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      const { silent = false } = options;
 
+      try {
+        if (silent) {
+          setIsRefreshing(true);
+        } else {
+          setIsLoading(true);
     async function loadSummary() {
       try {
         if (!cancelled) {
           setErrorMessage("");
         }
+        setErrorMessage("");
 
         const summaryResponse = await getAdminAccessSummaryRequest();
-
-        if (cancelled) {
-          return;
-        }
 
         setSummary(summaryResponse);
         setLastUpdatedAt(new Date());
       } catch (error) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "No fue posible cargar el Control de Accesos.",
+        );
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
         if (!cancelled) {
           setErrorMessage(
             error instanceof Error
@@ -179,8 +197,16 @@ export function AdminAccessesView() {
           );
         }
       }
-    }
+    },
+    [filters],
+  );
 
+  useEffect(() => {
+    void loadAccessModule();
+
+    const intervalId = window.setInterval(() => {
+      void loadAccessModule({ silent: true });
+    }, REFRESH_INTERVAL_MS);
     void loadSummary();
 
     const intervalId = window.setInterval(() => {
@@ -188,9 +214,13 @@ export function AdminAccessesView() {
     }, 15000);
 
     return () => {
-      cancelled = true;
       window.clearInterval(intervalId);
     };
+  }, [loadAccessModule]);
+
+  const handleManualRefresh = useCallback(() => {
+    void loadAccessModule({ silent: true });
+  }, [loadAccessModule]);
   }, []);
 
   useEffect(() => {
@@ -236,7 +266,27 @@ export function AdminAccessesView() {
     <AdminLayout
       title="Control de Accesos"
       subtitle="Registro de ingresos y salidas del dia"
-      actions={<span className="text-sm text-slate-500">Actualizado: {formatRefreshTime(lastUpdatedAt)}</span>}
+      actions={
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700">
+            <span className="size-2 animate-pulse rounded-full bg-emerald-500" />
+            En vivo
+          </span>
+          <span className="text-sm text-slate-500">
+            Actualizado: {formatRefreshTime(lastUpdatedAt)}
+          </span>
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing || isLoading}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+            aria-label="Actualizar ahora"
+          >
+            <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Actualizando..." : "Actualizar"}
+          </button>
+        </div>
+      }
     >
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
@@ -345,7 +395,8 @@ export function AdminAccessesView() {
           <table className="min-w-[980px] w-full">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-[0.1em] text-slate-500">
-                <th className="px-5 py-3 font-semibold">Hora</th>
+                <th className="px-5 py-3 font-semibold" title="Hora de ingreso">Hora ingreso</th>
+                <th className="px-5 py-3 font-semibold" title="Hora de salida si fue registrada">Hora salida</th>
                 <th className="px-5 py-3 font-semibold">Tipo</th>
                 <th className="px-5 py-3 font-semibold">Nombre</th>
                 <th className="px-5 py-3 font-semibold">Casa / Unidad</th>
@@ -357,13 +408,13 @@ export function AdminAccessesView() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
+                  <td colSpan={8} className="px-5 py-8 text-center text-slate-500">
                     Cargando accesos del dia...
                   </td>
                 </tr>
               ) : accesses.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
+                  <td colSpan={8} className="px-5 py-8 text-center text-slate-500">
                     No hay accesos que coincidan con los filtros actuales.
                   </td>
                 </tr>
@@ -380,6 +431,9 @@ export function AdminAccessesView() {
                           <span>{access.hora}</span>
                         </div>
                       </td>
+                      <td className="px-5 py-3 text-sm text-slate-500">
+                        {access.hora_salida ? access.hora_salida : <span className="text-slate-300">--:--</span>}
+                      </td>
                       <td className="px-5 py-3">
                         <span
                           className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${typeBadgeStyles[access.tipo]}`}
@@ -391,14 +445,13 @@ export function AdminAccessesView() {
                       <td className="px-5 py-3 text-sm text-slate-500">{access.casa_unidad}</td>
                       <td className="px-5 py-3 text-sm text-slate-500">{access.placa}</td>
                       <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <StatusIcon className={`size-4 ${statusMeta.iconClassName}`} />
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${statusMeta.className}`}
-                          >
-                            {statusMeta.label}
-                          </span>
-                        </div>
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${statusMeta.className}`}
+                        >
+                          <span className={`size-1.5 rounded-full ${statusMeta.dotClassName}`} />
+                          <StatusIcon className={`size-3.5 ${statusMeta.iconClassName}`} />
+                          {statusMeta.label}
+                        </span>
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-500">{access.autorizado_por}</td>
                     </tr>
