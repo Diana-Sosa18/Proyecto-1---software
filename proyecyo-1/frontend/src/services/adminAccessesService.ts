@@ -1,6 +1,7 @@
 import { apiRequest } from "@/services/api";
 import type {
   AdminAccessFilters,
+  AdminAccessHourlyPoint,
   AdminAccessRecord,
   AdminAccessSummary,
 } from "@/types/accesses";
@@ -50,6 +51,10 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 800): P
 
 export function getAdminAccessSummaryRequest() {
   return withRetry(() => apiRequest<AdminAccessSummary>("/admin/accesos/resumen"));
+}
+
+export function getAdminAccessHourlyChartRequest() {
+  return apiRequest<AdminAccessHourlyPoint[]>("/admin/accesos/grafica-horas");
 }
 
 export function getAdminAccessesRequest(filters: AdminAccessFilters) {

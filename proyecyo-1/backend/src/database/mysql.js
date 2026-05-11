@@ -230,10 +230,87 @@ async function ensureNotificationsSchema() {
   }
 }
 
+async function ensureTenantProvidersSchema() {
+  const serviceColumns = [
+    {
+      column: "tipo_servicio",
+      ddl: `
+        ALTER TABLE SERVICIO
+        ADD COLUMN tipo_servicio VARCHAR(60) NOT NULL DEFAULT 'General' AFTER nombre
+      `,
+    },
+    {
+      column: "descripcion",
+      ddl: `
+        ALTER TABLE SERVICIO
+        ADD COLUMN descripcion VARCHAR(200) NULL AFTER tipo_servicio
+      `,
+    },
+  ];
+
+  for (const definition of serviceColumns) {
+    if (!(await columnExists("SERVICIO", definition.column))) {
+      await query(definition.ddl);
+    }
+  }
+
+  const houseServiceColumns = [
+    {
+      column: "activo",
+      ddl: `
+        ALTER TABLE CASA_SERVICIO
+        ADD COLUMN activo BOOLEAN NOT NULL DEFAULT TRUE
+      `,
+    },
+    {
+      column: "estado_validacion",
+      ddl: `
+        ALTER TABLE CASA_SERVICIO
+        ADD COLUMN estado_validacion VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE'
+      `,
+    },
+  ];
+
+  for (const definition of houseServiceColumns) {
+    if (!(await columnExists("CASA_SERVICIO", definition.column))) {
+      await query(definition.ddl);
+    }
+  }
+
+  await query(`
+    UPDATE CASA_SERVICIO
+    SET estado_validacion = 'PENDIENTE'
+    WHERE estado_validacion IS NULL OR estado_validacion = ''
+  `);
+
+  const serviceRows = await query("SELECT COUNT(*) AS total FROM SERVICIO");
+
+  if (Number(serviceRows[0]?.total || 0) === 0) {
+    await query(`
+      INSERT INTO SERVICIO (nombre, tipo_servicio, descripcion)
+      VALUES
+        ('Energia electrica', 'Basico', 'Suministro electrico asociado a la unidad residencial.'),
+        ('Agua potable', 'Basico', 'Servicio de agua potable y control de consumo mensual.'),
+        ('Internet residencial', 'Telecomunicaciones', 'Proveedor de conectividad para la vivienda.'),
+        ('Limpieza y mantenimiento', 'Mantenimiento', 'Servicio programado de limpieza para areas de apoyo.'),
+        ('Seguridad privada', 'Seguridad', 'Servicio adicional de control y monitoreo residencial.')
+    `);
+  }
+
+  await query(`
+    INSERT IGNORE INTO CASA_SERVICIO (id_casa, id_servicio, activo, estado_validacion)
+    SELECT c.id_casa, s.id_servicio, TRUE, 'VALIDADO'
+    FROM CASA c
+    INNER JOIN SERVICIO s
+      ON s.nombre IN ('Energia electrica', 'Agua potable', 'Seguridad privada')
+  `);
+}
+
 module.exports = {
   pool,
   query,
   ensureVisitQrSchema,
   ensureAmenityReservationsSchema,
   ensureNotificationsSchema,
+  ensureTenantProvidersSchema,
 };

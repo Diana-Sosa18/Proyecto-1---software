@@ -86,15 +86,20 @@ CREATE TABLE INQUILINO_CASA (
 
 CREATE TABLE SERVICIO (
     id_servicio INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(100) NOT NULL
+    nombre VARCHAR(100) NOT NULL,
+    tipo_servicio VARCHAR(60) NOT NULL DEFAULT 'General',
+    descripcion VARCHAR(200)
 );
 
 CREATE TABLE CASA_SERVICIO (
     id_casa INT,
     id_servicio INT,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    estado_validacion VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
     PRIMARY KEY (id_casa, id_servicio),
     FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
-    FOREIGN KEY (id_servicio) REFERENCES SERVICIO(id_servicio)
+    FOREIGN KEY (id_servicio) REFERENCES SERVICIO(id_servicio),
+    CHECK (estado_validacion IN ('VALIDADO', 'PENDIENTE'))
 );
 
 CREATE TABLE CUOTA (
@@ -276,6 +281,23 @@ VALUES (
     (SELECT id_inquilino FROM INQUILINO WHERE id_usuario = (SELECT id_usuario FROM USUARIO WHERE correo = 'inquilino@test.com')),
     (SELECT id_casa FROM CASA WHERE numero = '302' AND torre = 'B')
 );
+
+INSERT INTO SERVICIO (nombre, tipo_servicio, descripcion)
+VALUES
+    ('Energia electrica', 'Basico', 'Suministro electrico asociado a la unidad residencial.'),
+    ('Agua potable', 'Basico', 'Servicio de agua potable y control de consumo mensual.'),
+    ('Internet residencial', 'Telecomunicaciones', 'Proveedor de conectividad para la vivienda.'),
+    ('Limpieza y mantenimiento', 'Mantenimiento', 'Servicio programado de limpieza para areas de apoyo.'),
+    ('Seguridad privada', 'Seguridad', 'Servicio adicional de control y monitoreo residencial.');
+
+INSERT INTO CASA_SERVICIO (id_casa, id_servicio, activo, estado_validacion)
+SELECT
+    (SELECT id_casa FROM CASA WHERE numero = '302' AND torre = 'B'),
+    id_servicio,
+    TRUE,
+    'VALIDADO'
+FROM SERVICIO
+WHERE nombre IN ('Energia electrica', 'Agua potable', 'Seguridad privada');
 
 INSERT INTO VISITANTE (nombre, dpi, placa)
 VALUES

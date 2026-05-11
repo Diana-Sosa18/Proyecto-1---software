@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  BadgeCheck,
   AlertTriangle,
   Bell,
+  BriefcaseBusiness,
   CalendarClock,
   CalendarDays,
   CheckCircle2,
@@ -10,6 +12,7 @@ import {
   Clock3,
   CreditCard,
   KeyRound,
+  Power,
   ShieldCheck,
   Trash2,
   UserCheck,
@@ -33,6 +36,11 @@ import {
   getFrequentVisitorsRequest,
   getVisitsRequest,
 } from "@/services/visitsService";
+import {
+  getTenantProvidersRequest,
+  updateTenantProviderRequest,
+} from "@/services/providersService";
+import type { TenantProvider, TenantProviderStatus } from "@/types/providers";
 import type { FrequentVisitor, VisitPayload, VisitRecord, VisitType } from "@/types/visits";
 
 type VisitFormState = VisitPayload;
@@ -80,6 +88,16 @@ const statusStyles: Record<Exclude<AccessFilter, "TODOS">, string> = {
   PENDIENTE: "bg-amber-50 text-amber-700",
   RECHAZADO: "bg-rose-50 text-rose-700",
   UTILIZADO: "bg-blue-50 text-blue-700",
+};
+
+const providerStatusStyles: Record<TenantProviderStatus, string> = {
+  VALIDADO: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  PENDIENTE: "bg-amber-50 text-amber-700 ring-amber-200",
+};
+
+const providerStatusLabels: Record<TenantProviderStatus, string> = {
+  VALIDADO: "Validado",
+  PENDIENTE: "Pendiente",
 };
 
 function getDateInTimezone(date: Date) {
@@ -141,14 +159,20 @@ function countTodayVisits(visits: VisitRecord[]) {
   return visits.filter((visit) => visit.fecha === today).length;
 }
 
+function countActiveProviders(providers: TenantProvider[]) {
+  return providers.filter((provider) => provider.activo).length;
+}
+
 export function InquilinoView() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<VisitFormState>(createInitialForm);
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [frequentVisitors, setFrequentVisitors] = useState<FrequentVisitor[]>([]);
+  const [providers, setProviders] = useState<TenantProvider[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<AccessFilter>("TODOS");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [updatingProviderId, setUpdatingProviderId] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [authorizingVisitorId, setAuthorizingVisitorId] = useState<number | null>(null);
@@ -162,9 +186,10 @@ export function InquilinoView() {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const [visitsResult, frequentResult] = await Promise.allSettled([
+        const [visitsResult, frequentResult, providersResult] = await Promise.allSettled([
           getVisitsRequest(),
           getFrequentVisitorsRequest(),
+          getTenantProvidersRequest(),
         ]);
 
         if (!active) {
@@ -182,6 +207,7 @@ export function InquilinoView() {
         }
 
         setFrequentVisitors(frequentResult.status === "fulfilled" ? frequentResult.value : []);
+        setProviders(providersResult.status === "fulfilled" ? providersResult.value : []);
       } finally {
         if (active) {
           setIsLoading(false);
@@ -205,6 +231,7 @@ export function InquilinoView() {
     () => visits.filter((visit) => getAccessStatus(visit) === "APROBADO").length,
     [visits],
   );
+  const activeProvidersCount = useMemo(() => countActiveProviders(providers), [providers]);
   const nextVisit = useMemo(
   () => visits.find((visit) => getAccessStatus(visit) === "APROBADO"),
   [visits],
@@ -355,6 +382,31 @@ const tenantAlerts = useMemo<TenantAlert[]>(() => {
     setAuthorizingVisitorId(null);
   }
 
+  async function handleProviderToggle(provider: TenantProvider) {
+    const nextActive = !provider.activo;
+
+    try {
+      setUpdatingProviderId(provider.id_servicio);
+      setErrorMessage("");
+
+      const updatedProvider = await updateTenantProviderRequest(provider.id_servicio, nextActive);
+
+      setProviders((current) =>
+        current.map((item) =>
+          item.id_servicio === updatedProvider.id_servicio ? updatedProvider : item,
+        ),
+      );
+      setSuccessMessage(
+        nextActive
+          ? `${provider.nombre} fue activado y quedo pendiente de validacion.`
+          : `${provider.nombre} fue desactivado correctamente.`,
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "No fue posible guardar el cambio del proveedor.",
+      );
+    } finally {
+      setUpdatingProviderId(null);
   async function handleConfirmCancel() {
     if (!visitToCancel) {
       return;
@@ -498,10 +550,10 @@ const tenantAlerts = useMemo<TenantAlert[]>(() => {
           icon={ShieldCheck}
         />
         <StatCard
-          label="Estado de cuenta"
-          value="Al dia"
-          helper="Sin bloqueos por pagos pendientes"
-          icon={CreditCard}
+          label="Proveedores activos"
+          value={String(activeProvidersCount)}
+          helper="Servicios habilitados para tu unidad"
+          icon={BriefcaseBusiness}
         />
       </div>
 
@@ -518,6 +570,106 @@ const tenantAlerts = useMemo<TenantAlert[]>(() => {
           <AlertDescription>{successMessage}</AlertDescription>
         </Alert>
       ) : null}
+
+      <Card className="border-0 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+        <CardHeader>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-2xl text-slate-900">
+                <BriefcaseBusiness className="size-6 text-blue-600" />
+                Gestion de proveedores
+              </CardTitle>
+              <CardDescription className="mt-2">
+                Administra los servicios asociados a tu unidad y revisa su estado de validacion.
+              </CardDescription>
+            </div>
+
+            <div className="rounded-2xl bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+              {activeProvidersCount} de {providers.length} activos
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-3">
+          {isLoading ? (
+            <div className="rounded-3xl bg-slate-50 p-6 text-sm text-slate-500">
+              Cargando proveedores de tu unidad...
+            </div>
+          ) : providers.length === 0 ? (
+            <div className="rounded-3xl bg-slate-50 p-6 text-sm text-slate-500">
+              No hay proveedores disponibles para gestionar.
+            </div>
+          ) : (
+            providers.map((provider) => {
+              const isUpdating = updatingProviderId === provider.id_servicio;
+
+              return (
+                <article
+                  key={provider.id_servicio}
+                  className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_180px]"
+                >
+                  <div className="flex gap-4">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-blue-600">
+                      <BriefcaseBusiness className="size-5" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-lg font-semibold text-slate-900">{provider.nombre}</h3>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ring-1 ${providerStatusStyles[provider.estado]}`}
+                        >
+                          <BadgeCheck className="size-3.5" />
+                          {providerStatusLabels[provider.estado]}
+                        </span>
+                      </div>
+
+                      <p className="mt-1 text-sm leading-6 text-slate-500">{provider.descripcion}</p>
+
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+                          Tipo: {provider.tipo_servicio}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+                          Unidad: {provider.casa_unidad}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 lg:flex-col lg:items-stretch lg:justify-center">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Estado</p>
+                      <p className={`mt-1 text-sm font-semibold ${provider.activo ? "text-emerald-700" : "text-slate-500"}`}>
+                        {provider.activo ? "ON" : "OFF"}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleProviderToggle(provider)}
+                      disabled={isUpdating}
+                      aria-pressed={provider.activo}
+                      className={`inline-flex h-11 min-w-[98px] items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold text-white transition ${
+                        provider.activo
+                          ? "bg-emerald-600 hover:bg-emerald-700"
+                          : "bg-slate-400 hover:bg-slate-500"
+                      } disabled:cursor-not-allowed disabled:opacity-70`}
+                    >
+                      {isUpdating ? (
+                        <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      ) : (
+                        <Power className="size-4" />
+                      )}
+                      {provider.activo ? "ON" : "OFF"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="overflow-hidden border-0 shadow-[0_18px_40px_rgba(30,41,59,0.12)]">
         <div className="bg-[linear-gradient(90deg,#a855f7_0%,#9333ea_45%,#9d00ff_100%)] px-5 py-6 text-white">

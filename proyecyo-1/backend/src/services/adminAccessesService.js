@@ -255,6 +255,76 @@ async function getAdminAccessSummary() {
   };
 }
 
+function createHourlyAccessBuckets() {
+  return Array.from({ length: 24 }, (_unused, hour) => ({
+    hora: `${String(hour).padStart(2, "0")}:00`,
+    total: 0,
+    aprobados: 0,
+    pendientes: 0,
+    rechazados: 0,
+  }));
+}
+
+async function getAdminAccessHourlyChart() {
+  const currentDate = getCurrentDateInTimezone();
+  const rows = await query(
+    `
+      SELECT
+        HOUR(COALESCE(ra.hora_ingreso, a.hora_inicio)) AS hora,
+        COUNT(*) AS total,
+        SUM(
+          CASE
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'APROBADA')
+              THEN 1
+            ELSE 0
+          END
+        ) AS aprobados,
+        SUM(
+          CASE
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) = 'PENDIENTE'
+              THEN 1
+            ELSE 0
+          END
+        ) AS pendientes,
+        SUM(
+          CASE
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('CANCELADA', 'RECHAZADA')
+              THEN 1
+            ELSE 0
+          END
+        ) AS rechazados
+      FROM ACCESO a
+      LEFT JOIN REGISTRO_ACCESO ra
+        ON ra.id_acceso = a.id_acceso
+      WHERE a.fecha = ?
+        AND COALESCE(ra.hora_ingreso, a.hora_inicio) IS NOT NULL
+      GROUP BY HOUR(COALESCE(ra.hora_ingreso, a.hora_inicio))
+      ORDER BY hora ASC
+    `,
+    [currentDate],
+  );
+
+  const buckets = createHourlyAccessBuckets();
+
+  rows.forEach((row) => {
+    const hour = Number(row.hora);
+
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+      return;
+    }
+
+    buckets[hour] = {
+      hora: `${String(hour).padStart(2, "0")}:00`,
+      total: Number(row.total || 0),
+      aprobados: Number(row.aprobados || 0),
+      pendientes: Number(row.pendientes || 0),
+      rechazados: Number(row.rechazados || 0),
+    };
+  });
+
+  return buckets;
+}
+
 async function listAdminAccesses(filters = {}) {
   const currentDate = getCurrentDateInTimezone();
   const search = normalizeString(filters.search).toLowerCase();
@@ -313,5 +383,6 @@ async function listAdminAccesses(filters = {}) {
 
 module.exports = {
   getAdminAccessSummary,
+  getAdminAccessHourlyChart,
   listAdminAccesses,
 };
