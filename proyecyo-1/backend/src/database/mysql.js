@@ -17,6 +17,21 @@ async function query(sql, params = []) {
   return rows;
 }
 
+async function tableExists(tableName) {
+  const rows = await query(
+    `
+      SELECT 1
+      FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_SCHEMA = ?
+        AND TABLE_NAME = ?
+      LIMIT 1
+    `,
+    [env.DB_NAME, tableName],
+  );
+
+  return rows.length > 0;
+}
+
 async function columnExists(tableName, columnName) {
   const rows = await query(
     `
@@ -188,9 +203,37 @@ async function ensureAmenityReservationsSchema() {
   }
 }
 
+async function ensureNotificationsSchema() {
+  if (!(await tableExists("NOTIFICACION"))) {
+    await query(`
+      CREATE TABLE NOTIFICACION (
+        id_notificacion INT PRIMARY KEY AUTO_INCREMENT,
+        id_usuario INT NOT NULL,
+        id_acceso INT NULL,
+        tipo VARCHAR(50) NOT NULL DEFAULT 'LLEGADA_VISITA',
+        titulo VARCHAR(150) NOT NULL,
+        mensaje VARCHAR(255) NOT NULL,
+        leido BOOLEAN NOT NULL DEFAULT FALSE,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        leido_en DATETIME NULL,
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario),
+        FOREIGN KEY (id_acceso) REFERENCES ACCESO(id_acceso) ON DELETE SET NULL
+      )
+    `);
+  }
+
+  if (!(await indexExists("NOTIFICACION", "idx_notificacion_usuario_leido"))) {
+    await query(`
+      ALTER TABLE NOTIFICACION
+      ADD INDEX idx_notificacion_usuario_leido (id_usuario, leido, creado_en)
+    `);
+  }
+}
+
 module.exports = {
   pool,
   query,
   ensureVisitQrSchema,
   ensureAmenityReservationsSchema,
+  ensureNotificationsSchema,
 };

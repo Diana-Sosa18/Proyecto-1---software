@@ -12,6 +12,14 @@ function buildAccessQuery(filters: AdminAccessFilters) {
     query.set("search", filters.search.trim());
   }
 
+  if (filters.house?.trim()) {
+    query.set("house", filters.house.trim());
+  }
+
+  if (filters.plate?.trim()) {
+    query.set("plate", filters.plate.trim());
+  }
+
   if (filters.type && filters.type !== "TODOS") {
     query.set("type", filters.type);
   }

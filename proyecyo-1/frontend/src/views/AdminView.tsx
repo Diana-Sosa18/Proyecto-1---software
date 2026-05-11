@@ -6,6 +6,7 @@ import {
   UserRound,
   Wrench,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { UsersManagement } from "@/components/admin/UsersManagement";
 import { AdminLayout } from "@/components/admin/AdminLayout";
@@ -231,7 +232,7 @@ export function AdminView() {
         {[
           {
             title: "Monitoreo de accesos",
-            text: "Base visual preparada para conectar resumenes, tablas y estados del modulo.",
+            text: "Registro del dia con busqueda por nombre, unidad o placa y filtros por tipo y estado.",
             icon: UserRound,
           },
           {
@@ -244,18 +245,41 @@ export function AdminView() {
             text: "El dashboard mantiene el mismo lenguaje visual para cada seccion administrativa.",
             icon: CalendarDays,
           },
-        ].map(({ title, text, icon: Icon }) => (
-          <article
-            key={title}
-            className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
-          >
-            <div className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <Icon className="size-5" />
-            </div>
-            <h2 className="mt-4 text-[1.12rem] font-semibold text-slate-950">{title}</h2>
-            <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-500">{text}</p>
-          </article>
-        ))}
+        ].map(({ title, text, icon: Icon }) => {
+          const body = (
+            <>
+              <div className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <Icon className="size-5" />
+              </div>
+              <h2 className="mt-4 text-[1.12rem] font-semibold text-slate-950">{title}</h2>
+              <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-500">{text}</p>
+            </>
+          );
+
+          if (title === "Monitoreo de accesos") {
+            return (
+              <Link
+                key={title}
+                to="/admin/accesos"
+                className="block rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition hover:border-blue-200 hover:shadow-[0_12px_36px_rgba(37,99,235,0.08)]"
+              >
+                {body}
+                <p className="mt-3 text-[0.78rem] font-medium text-blue-600">
+                  Ir a control con filtros
+                </p>
+              </Link>
+            );
+          }
+
+          return (
+            <article
+              key={title}
+              className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+            >
+              {body}
+            </article>
+          );
+        })}
       </section>
 
       <section className="mt-5">

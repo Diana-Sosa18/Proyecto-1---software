@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Bell,
   CalendarClock,
   CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -35,6 +37,21 @@ import type { FrequentVisitor, VisitPayload, VisitRecord, VisitType } from "@/ty
 
 type VisitFormState = VisitPayload;
 type AccessFilter = "TODOS" | "APROBADO" | "UTILIZADO" | "RECHAZADO" | "PENDIENTE";
+type TenantAlertType = "VISITA" | "SOLICITUD" | "PAGO";
+
+type TenantAlert = {
+  id: string;
+  tipo: TenantAlertType;
+  titulo: string;
+  descripcion: string;
+  tiempo: string;
+};
+
+const tenantAlertStyles: Record<TenantAlertType, string> = {
+  VISITA: "border-blue-200 bg-blue-50 text-blue-800",
+  SOLICITUD: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  PAGO: "border-amber-200 bg-amber-50 text-amber-800",
+};
 
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 
@@ -188,6 +205,47 @@ export function InquilinoView() {
     () => visits.filter((visit) => getAccessStatus(visit) === "APROBADO").length,
     [visits],
   );
+  const nextVisit = useMemo(
+  () => visits.find((visit) => getAccessStatus(visit) === "APROBADO"),
+  [visits],
+);
+
+const tenantAlerts = useMemo<TenantAlert[]>(() => {
+  const alerts: TenantAlert[] = [];
+
+  if (nextVisit) {
+    alerts.push({
+      id: `visita-${nextVisit.id_acceso}`,
+      tipo: "VISITA",
+      titulo: "Visita por llegar",
+      descripcion: `${nextVisit.nombre} tiene una visita autorizada para ${formatDate(
+        nextVisit.fecha,
+      )} de ${nextVisit.hora_inicio} a ${nextVisit.hora_fin}.`,
+      tiempo: "Reciente",
+    });
+  }
+
+  alerts.push({
+    id: "solicitud-aprobada",
+    tipo: "SOLICITUD",
+    titulo: "Solicitud aprobada",
+    descripcion:
+      "Tu permiso para gestionar visitas y accesos asociados a la unidad se encuentra aprobado.",
+    tiempo: "Hoy",
+  });
+
+  alerts.push({
+    id: "recordatorio-pago",
+    tipo: "PAGO",
+    titulo: "Recordatorio de pago",
+    descripcion:
+      "Recuerda revisar tu estado de cuenta para evitar bloqueos o restricciones en tus accesos.",
+    tiempo: "Pendiente",
+  });
+
+  return alerts;
+}, [nextVisit]);
+
   const filteredVisits = useMemo(
     () =>
       selectedStatus === "TODOS"
@@ -373,6 +431,53 @@ export function InquilinoView() {
       title="Panel de Inquilino"
       subtitle="Autoriza visitas y da seguimiento a los accesos asociados a tu unidad."
     >
+      
+      <Card className="border-0 shadow-[0_16px_40px_rgba(30,41,59,0.08)]">
+  <CardHeader>
+    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div>
+        <CardTitle className="flex items-center gap-2 text-2xl text-slate-900">
+          <Bell className="size-6 text-blue-600" />
+          Alertas del sistema
+        </CardTitle>
+        <CardDescription>
+          Avisos recientes para mantenerte informado sobre visitas, permisos y pagos.
+        </CardDescription>
+      </div>
+
+      <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600">
+        {tenantAlerts.length} alerta{tenantAlerts.length === 1 ? "" : "s"}
+      </span>
+    </div>
+  </CardHeader>
+
+  <CardContent className="grid gap-4 md:grid-cols-3">
+    {tenantAlerts.map((alert) => (
+      <div
+        key={alert.id}
+        className={`rounded-3xl border p-5 shadow-sm ${tenantAlertStyles[alert.tipo]}`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex size-11 items-center justify-center rounded-2xl bg-white/70">
+              {alert.tipo === "VISITA" ? <Clock3 className="size-5" /> : null}
+              {alert.tipo === "SOLICITUD" ? <CheckCircle2 className="size-5" /> : null}
+              {alert.tipo === "PAGO" ? <CreditCard className="size-5" /> : null}
+            </div>
+
+            <div>
+              <p className="text-base font-semibold">{alert.titulo}</p>
+              <p className="text-xs opacity-80">{alert.tiempo}</p>
+            </div>
+          </div>
+        </div>
+
+        <p className="mt-4 text-sm leading-relaxed">{alert.descripcion}</p>
+      </div>
+    ))}
+  </CardContent>
+</Card>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Accesos activos"

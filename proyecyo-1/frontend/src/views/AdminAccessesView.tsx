@@ -125,20 +125,39 @@ export function AdminAccessesView() {
   });
   const [accesses, setAccesses] = useState<AdminAccessRecord[]>([]);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [house, setHouse] = useState("");
+  const [debouncedHouse, setDebouncedHouse] = useState("");
+  const [plate, setPlate] = useState("");
+  const [debouncedPlate, setDebouncedPlate] = useState("");
   const [selectedType, setSelectedType] = useState<AdminAccessFilterType>("TODOS");
-  const [selectedStatus, setSelectedStatus] = useState<AdminAccessFilterStatus>("APROBADO");
+  const [selectedStatus, setSelectedStatus] = useState<AdminAccessFilterStatus>("TODOS");
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(search);
+      setDebouncedHouse(house);
+      setDebouncedPlate(plate);
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [house, plate, search]);
+
   const filters = useMemo(
     () => ({
-      search,
+      search: debouncedSearch,
+      house: debouncedHouse,
+      plate: debouncedPlate,
       type: selectedType,
       status: selectedStatus,
     }),
-    [search, selectedStatus, selectedType],
+    [debouncedHouse, debouncedPlate, debouncedSearch, selectedStatus, selectedType],
   );
 
   const loadAccessModule = useCallback(
@@ -150,16 +169,16 @@ export function AdminAccessesView() {
           setIsRefreshing(true);
         } else {
           setIsLoading(true);
+    async function loadSummary() {
+      try {
+        if (!cancelled) {
+          setErrorMessage("");
         }
         setErrorMessage("");
 
-        const [summaryResponse, accessesResponse] = await Promise.all([
-          getAdminAccessSummaryRequest(),
-          getAdminAccessesRequest(filters),
-        ]);
+        const summaryResponse = await getAdminAccessSummaryRequest();
 
         setSummary(summaryResponse);
-        setAccesses(accessesResponse);
         setLastUpdatedAt(new Date());
       } catch (error) {
         setErrorMessage(
@@ -170,6 +189,13 @@ export function AdminAccessesView() {
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
+        if (!cancelled) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "No fue posible cargar el Control de Accesos.",
+          );
+        }
       }
     },
     [filters],
@@ -181,6 +207,11 @@ export function AdminAccessesView() {
     const intervalId = window.setInterval(() => {
       void loadAccessModule({ silent: true });
     }, REFRESH_INTERVAL_MS);
+    void loadSummary();
+
+    const intervalId = window.setInterval(() => {
+      void loadSummary();
+    }, 15000);
 
     return () => {
       window.clearInterval(intervalId);
@@ -190,6 +221,46 @@ export function AdminAccessesView() {
   const handleManualRefresh = useCallback(() => {
     void loadAccessModule({ silent: true });
   }, [loadAccessModule]);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAccesses() {
+      try {
+        if (!cancelled) {
+          setIsLoading(true);
+          setErrorMessage("");
+        }
+
+        const accessesResponse = await getAdminAccessesRequest(filters);
+
+        if (cancelled) {
+          return;
+        }
+
+        setAccesses(accessesResponse);
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "No fue posible cargar el Control de Accesos.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadAccesses();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filters]);
 
   return (
     <AdminLayout
@@ -240,17 +311,43 @@ export function AdminAccessesView() {
         />
       </section>
 
-      <section className="mt-5 rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+      <section
+        className="mt-5 rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+        aria-labelledby="admin-accesses-filters-heading"
+      >
+        <h2
+          id="admin-accesses-filters-heading"
+          className="mb-3 text-[0.92rem] font-semibold text-slate-800"
+        >
+          Filtros de accesos
+        </h2>
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar por casa, nombre o placa..."
+              placeholder="Buscar por nombre..."
+              aria-label="Buscar accesos por nombre"
               className={`${fieldClassName} w-full pl-11`}
             />
           </div>
+
+          <input
+            value={house}
+            onChange={(event) => setHouse(event.target.value)}
+            placeholder="Filtrar por casa/unidad..."
+            aria-label="Filtrar accesos por casa o unidad"
+            className={`${fieldClassName} min-w-[210px]`}
+          />
+
+          <input
+            value={plate}
+            onChange={(event) => setPlate(event.target.value)}
+            placeholder="Filtrar por placa..."
+            aria-label="Filtrar accesos por placa"
+            className={`${fieldClassName} min-w-[200px]`}
+          />
 
           <select
             value={selectedType}

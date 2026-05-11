@@ -28,6 +28,8 @@ export interface AdminAccessRecord {
 
 export interface AdminAccessFilters {
   search?: string;
+  house?: string;
+  plate?: string;
   type?: AdminAccessFilterType;
   status?: AdminAccessFilterStatus;
 }
