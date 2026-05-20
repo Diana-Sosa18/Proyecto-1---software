@@ -265,6 +265,9 @@ function createHourlyAccessBuckets() {
   }));
 }
 
+// SCRUM-172: Agrupar accesos por hora del dia actual.
+// La hora de referencia es: hora_ingreso del registro si existe, sino hora_inicio del acceso.
+// Esto representa la ventana en que se espera/registra el acceso.
 async function getAdminAccessHourlyChart() {
   const currentDate = getCurrentDateInTimezone();
   const rows = await query(
@@ -323,6 +326,14 @@ async function getAdminAccessHourlyChart() {
   });
 
   return buckets;
+}
+
+// SCRUM-172: Helper - obtiene la hora con mayor afluencia del dia
+function getBusiestHourFromBuckets(buckets) {
+  return buckets.reduce(
+    (best, current) => (current.total > best.total ? current : best),
+    { hora: "--:--", total: 0, aprobados: 0, pendientes: 0, rechazados: 0 },
+  );
 }
 
 function getDateNDaysAgo(daysAgo) {
