@@ -91,25 +91,36 @@ export function GuardiaView() {
   useEffect(() => {
     let active = true;
 
-    getGuardVisitsRequest()
-      .then((response) => {
-        if (active) {
-          setVisits(response);
+    async function loadVisits(options: { silent?: boolean } = {}) {
+      try {
+        const response = await getGuardVisitsRequest();
+        if (!active) {
+          return;
         }
-      })
-      .catch((error) => {
-        if (active) {
-          setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar las visitas.");
+        setVisits(response);
+      } catch (error) {
+        if (!active || options.silent) {
+          return;
         }
-      })
-      .finally(() => {
-        if (active) {
+        setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar las visitas.");
+      } finally {
+        if (active && !options.silent) {
           setIsLoading(false);
         }
-      });
+      }
+    }
+
+    void loadVisits();
+
+    // SCRUM-181: Polling silencioso cada 10s para detectar cambios en accesos
+    // (cancelaciones, nuevos accesos, ingresos registrados)
+    const intervalId = window.setInterval(() => {
+      void loadVisits({ silent: true });
+    }, 10000);
 
     return () => {
       active = false;
+      window.clearInterval(intervalId);
     };
   }, []);
 
