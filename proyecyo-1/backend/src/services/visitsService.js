@@ -840,8 +840,12 @@ async function validateQrVisit(qrToken) {
   }
 
   if (mappedVisit.qr_status === "CANCELLED") {
-    const error = new Error("Este QR ya no es valido.");
+    // SCRUM-183: Mensaje claro para el guardia indicando cancelacion
+    const error = new Error(
+      `Acceso cancelado: ${mappedVisit.nombre} (casa ${mappedVisit.casa}). No autorizar el ingreso.`,
+    );
     error.status = 410;
+    error.code = "ACCESS_CANCELLED";
     throw error;
   }
 

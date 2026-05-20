@@ -236,13 +236,31 @@ export function GuardiaView() {
       setSuccessMessage("Visita autorizada e ingreso registrado.");
     } catch (error) {
       setValidatedVisit(null);
-      const message = error instanceof Error ? error.message : "No fue posible validar el QR.";
+      const apiError = error as { status?: number; message?: string; payload?: { code?: string } };
+      const message = apiError?.message || "No fue posible validar el QR.";
+
+      // SCRUM-183: Detectar especificamente cancelaciones para mensaje destacado
+      const isCancelled =
+        apiError?.status === 410 &&
+        (message.toLowerCase().includes("cancelado") ||
+          apiError?.payload?.code === "ACCESS_CANCELLED");
+
       setValidationResult({
         status: "rejected",
-        title: "Acceso rechazado",
+        title: isCancelled ? "ACCESO CANCELADO - NO AUTORIZAR" : "Acceso rechazado",
         message,
       });
       setErrorMessage(message);
+
+      // Refresca las notificaciones para que el guardia vea la alerta asociada
+      if (isCancelled) {
+        try {
+          const updatedNotifications = await getGuardNotificationsRequest();
+          setNotifications(updatedNotifications);
+        } catch {
+          // silencioso
+        }
+      }
     }
   }
 
