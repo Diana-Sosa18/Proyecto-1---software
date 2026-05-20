@@ -129,6 +129,18 @@ const hourlyAccesses = [
 
 const chartLabels = ["60", "45", "30", "15", "0"];
 
+function formatRefreshTime(date: Date | null) {
+  if (!date) {
+    return "Sin sincronizar";
+  }
+  return new Intl.DateTimeFormat("es-GT", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 export function AdminView() {
   // SCRUM-175: estado para datos reales del dashboard
   const [summary, setSummary] = useState<AdminAccessSummary>({
@@ -137,25 +149,41 @@ export function AdminView() {
     pendientes: 0,
     rechazados: 0,
   });
+  // SCRUM-176: estado para validar actualizacion en tiempo real
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState(false);
 
   useEffect(() => {
     let active = true;
 
-    async function loadSummary() {
+    async function loadSummary(options: { silent?: boolean } = {}) {
       try {
+        if (options.silent) {
+          setIsRefreshing(true);
+        }
         const data = await getAdminAccessSummaryRequest();
         if (active) {
           setSummary(data);
+          setLastUpdatedAt(new Date());
+          setRefreshError(false);
         }
       } catch {
-        // Si falla, deja los valores en cero (visual fallback)
+        // SCRUM-176: marca error de sincronizacion para indicador visual
+        if (active) {
+          setRefreshError(true);
+        }
+      } finally {
+        if (active) {
+          setIsRefreshing(false);
+        }
       }
     }
 
     void loadSummary();
     // Actualiza el resumen cada 30 segundos
     const interval = window.setInterval(() => {
-      void loadSummary();
+      void loadSummary({ silent: true });
     }, 30000);
 
     return () => {
@@ -167,7 +195,31 @@ export function AdminView() {
   const dashboardCards = buildDashboardCards(summary);
 
   return (
-    <AdminLayout title="Dashboard" subtitle="Resumen general del residencial">
+    <AdminLayout
+      title="Dashboard"
+      subtitle="Resumen general del residencial"
+      actions={
+        /* SCRUM-176: Indicador visual de sincronizacion en tiempo real */
+        <div className="flex items-center gap-3 text-xs">
+          {refreshError ? (
+            <span className="inline-flex items-center gap-1.5 text-rose-700">
+              <span className="size-2 rounded-full bg-rose-500" />
+              Sincronizacion fallida
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-emerald-700">
+              <span
+                className={`size-2 rounded-full bg-emerald-500 ${isRefreshing ? "animate-ping" : "animate-pulse"}`}
+              />
+              En vivo
+            </span>
+          )}
+          <span className="text-slate-500">
+            Actualizado: {formatRefreshTime(lastUpdatedAt)}
+          </span>
+        </div>
+      }
+    >
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {dashboardCards.map(({ label, value, icon: Icon, iconClassName, valueClassName }) => (
           <article
