@@ -325,6 +325,81 @@ async function getAdminAccessHourlyChart() {
   return buckets;
 }
 
+function getDateNDaysAgo(daysAgo) {
+  const now = new Date();
+  // Convertir a fecha base GT y restar dias
+  const isoCurrent = getCurrentDateInTimezone();
+  const [year, month, day] = isoCurrent.split("-").map(Number);
+  const base = new Date(Date.UTC(year, month - 1, day));
+  base.setUTCDate(base.getUTCDate() - daysAgo);
+  return base.toISOString().slice(0, 10);
+}
+
+// SCRUM-173: Agrupar accesos por dia (ultimos 7 dias)
+async function getAdminAccessDailyChart() {
+  const endDate = getCurrentDateInTimezone();
+  const startDate = getDateNDaysAgo(6); // 7 dias incluyendo hoy
+
+  const rows = await query(
+    `
+      SELECT
+        DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
+        COUNT(*) AS total,
+        SUM(
+          CASE
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'APROBADA')
+              THEN 1
+            ELSE 0
+          END
+        ) AS aprobados,
+        SUM(
+          CASE
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) = 'PENDIENTE'
+              THEN 1
+            ELSE 0
+          END
+        ) AS pendientes,
+        SUM(
+          CASE
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('CANCELADA', 'RECHAZADA')
+              THEN 1
+            ELSE 0
+          END
+        ) AS rechazados
+      FROM ACCESO a
+      WHERE a.fecha BETWEEN ? AND ?
+      GROUP BY a.fecha
+      ORDER BY a.fecha ASC
+    `,
+    [startDate, endDate],
+  );
+
+  // Crear buckets para los 7 dias con totales en cero
+  const buckets = [];
+  for (let i = 6; i >= 0; i -= 1) {
+    buckets.push({
+      fecha: getDateNDaysAgo(i),
+      total: 0,
+      aprobados: 0,
+      pendientes: 0,
+      rechazados: 0,
+    });
+  }
+
+  // Llenar buckets con los datos de la BD
+  rows.forEach((row) => {
+    const bucket = buckets.find((b) => b.fecha === row.fecha);
+    if (bucket) {
+      bucket.total = Number(row.total || 0);
+      bucket.aprobados = Number(row.aprobados || 0);
+      bucket.pendientes = Number(row.pendientes || 0);
+      bucket.rechazados = Number(row.rechazados || 0);
+    }
+  });
+
+  return buckets;
+}
+
 async function listAdminAccesses(filters = {}) {
   const currentDate = getCurrentDateInTimezone();
   const search = normalizeString(filters.search).toLowerCase();
@@ -384,5 +459,6 @@ async function listAdminAccesses(filters = {}) {
 module.exports = {
   getAdminAccessSummary,
   getAdminAccessHourlyChart,
+  getAdminAccessDailyChart,
   listAdminAccesses,
 };
