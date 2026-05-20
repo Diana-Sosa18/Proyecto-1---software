@@ -1,5 +1,6 @@
 import { apiRequest } from "@/services/api";
 import type {
+  AdminAccessDailyPoint,
   AdminAccessFilters,
   AdminAccessHourlyPoint,
   AdminAccessRecord,
@@ -55,6 +56,11 @@ export function getAdminAccessSummaryRequest() {
 
 export function getAdminAccessHourlyChartRequest() {
   return apiRequest<AdminAccessHourlyPoint[]>("/admin/accesos/grafica-horas");
+}
+
+// SCRUM-173: Servicio para grafica diaria (ultimos 7 dias)
+export function getAdminAccessDailyChartRequest() {
+  return apiRequest<AdminAccessDailyPoint[]>("/admin/accesos/grafica-dias");
 }
 
 export function getAdminAccessesRequest(filters: AdminAccessFilters) {
