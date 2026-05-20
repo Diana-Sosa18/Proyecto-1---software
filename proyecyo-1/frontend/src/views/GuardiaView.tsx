@@ -41,16 +41,33 @@ function canUseCamera() {
   return Boolean(navigator.mediaDevices?.getUserMedia) && (window.isSecureContext || isLocalhost);
 }
 
-function getVisitBadge(visit: VisitRecord) {
+function getVisitBadge(visit: VisitRecord): { label: string; className: string } {
+  // SCRUM-180: Mostrar badge "Cancelado" cuando el acceso fue cancelado
+  if (visit.estado_acceso === "CANCELADA" || visit.qr_status === "CANCELLED") {
+    return {
+      label: "Cancelado",
+      className: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200",
+    };
+  }
+
   if (visit.qr_status === "EXPIRED") {
-    return "QR expirado";
+    return {
+      label: "QR expirado",
+      className: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200",
+    };
   }
 
   if (visit.qr_status === "USED" || visit.estado_acceso === "INGRESO_REGISTRADO") {
-    return "Ingreso registrado";
+    return {
+      label: "Ingreso registrado",
+      className: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200",
+    };
   }
 
-  return "Autorizada";
+  return {
+    label: "Autorizada",
+    className: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200",
+  };
 }
 
 export function GuardiaView() {
@@ -459,9 +476,14 @@ export function GuardiaView() {
                     {visitor.casa} • {formatDate(visitor.fecha)} • {visitor.hora_inicio} - {visitor.hora_fin}
                   </p>
                 </div>
-                <span className="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">
-                  {getVisitBadge(visitor)}
-                </span>
+                {(() => {
+                  const badge = getVisitBadge(visitor);
+                  return (
+                    <span className={`rounded-full px-3 py-1 text-sm ${badge.className}`}>
+                      {badge.label}
+                    </span>
+                  );
+                })()}
               </div>
             ))
           )}
