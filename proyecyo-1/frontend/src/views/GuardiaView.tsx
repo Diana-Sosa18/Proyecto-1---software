@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import jsQR from "jsqr";
 import {
+  Bell,
+  BellRing,
   Camera,
+  CheckCheck,
   CircleAlert,
   QrCode,
   ScanLine,
   Shield,
   UserCheck,
   Users,
+  XCircle,
 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
@@ -20,6 +24,12 @@ import {
   registerQrEntryRequest,
   validateQrRequest,
 } from "@/services/visitsService";
+import {
+  getGuardNotificationsRequest,
+  markAllGuardNotificationsAsReadRequest,
+  markGuardNotificationAsReadRequest,
+} from "@/services/notificationsService";
+import type { NotificationRecord } from "@/types/notifications";
 import type { VisitRecord } from "@/types/visits";
 
 function formatDate(date: string) {
@@ -76,6 +86,7 @@ export function GuardiaView() {
   const frameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [visits, setVisits] = useState<VisitRecord[]>([]);
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [validatedVisit, setValidatedVisit] = useState<VisitRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
@@ -110,12 +121,25 @@ export function GuardiaView() {
       }
     }
 
-    void loadVisits();
+    async function loadNotifications() {
+      try {
+        const data = await getGuardNotificationsRequest();
+        if (active) {
+          setNotifications(data);
+        }
+      } catch {
+        // No bloquear la vista por errores de notificaciones
+      }
+    }
 
-    // SCRUM-181: Polling silencioso cada 10s para detectar cambios en accesos
-    // (cancelaciones, nuevos accesos, ingresos registrados)
+    void loadVisits();
+    void loadNotifications();
+
+    // SCRUM-181 + SCRUM-182: Polling silencioso cada 10s para detectar cambios
+    // en accesos y nuevas notificaciones (cancelaciones, etc.)
     const intervalId = window.setInterval(() => {
       void loadVisits({ silent: true });
+      void loadNotifications();
     }, 10000);
 
     return () => {
@@ -123,6 +147,38 @@ export function GuardiaView() {
       window.clearInterval(intervalId);
     };
   }, []);
+
+  // SCRUM-182: Filtra solo alertas de cancelacion no leidas para el panel
+  const cancellationAlerts = useMemo(
+    () => notifications.filter((n) => n.tipo === "ACCESO_CANCELADO" && !n.leido),
+    [notifications],
+  );
+
+  async function handleMarkAlertRead(notificationId: number) {
+    try {
+      await markGuardNotificationAsReadRequest(notificationId);
+      setNotifications((current) =>
+        current.map((n) =>
+          n.id_notificacion === notificationId ? { ...n, leido: true } : n,
+        ),
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "No fue posible marcar la alerta como leida.",
+      );
+    }
+  }
+
+  async function handleMarkAllAlertsRead() {
+    try {
+      await markAllGuardNotificationsAsReadRequest();
+      setNotifications((current) => current.map((n) => ({ ...n, leido: true })));
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "No fue posible marcar las alertas como leidas.",
+      );
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -365,6 +421,69 @@ export function GuardiaView() {
           <AlertTitle>Operacion exitosa</AlertTitle>
           <AlertDescription>{successMessage}</AlertDescription>
         </Alert>
+      ) : null}
+
+      {/* SCRUM-182: Panel de notificacion visual para alertas de cancelacion */}
+      {cancellationAlerts.length > 0 ? (
+        <Card className="border-rose-200 bg-rose-50/60 shadow-[0_10px_30px_rgba(244,63,94,0.08)]">
+          <CardHeader>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-full bg-rose-100 text-rose-700">
+                  <BellRing className="size-5 animate-pulse" />
+                </div>
+                <div>
+                  <CardTitle className="text-rose-900">
+                    {cancellationAlerts.length} alerta{cancellationAlerts.length !== 1 ? "s" : ""} de cancelacion
+                  </CardTitle>
+                  <CardDescription className="text-rose-700">
+                    Accesos cancelados por residentes/inquilinos. Verifica que el QR ya no sea valido.
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleMarkAllAlertsRead}
+                className="border-rose-200 bg-white text-rose-700 hover:bg-rose-100"
+              >
+                <CheckCheck className="size-4" />
+                Marcar todas
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {cancellationAlerts.slice(0, 5).map((alert) => (
+              <div
+                key={alert.id_notificacion}
+                className="flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-white px-4 py-3"
+              >
+                <div className="flex items-start gap-3">
+                  <XCircle className="mt-0.5 size-4 shrink-0 text-rose-600" />
+                  <div className="text-sm">
+                    <p className="font-medium text-slate-900">{alert.titulo}</p>
+                    <p className="text-slate-600">{alert.mensaje}</p>
+                    <p className="mt-1 text-xs text-slate-400">{alert.creado_en}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleMarkAlertRead(alert.id_notificacion)}
+                  className="text-xs font-medium text-rose-600 hover:underline"
+                  aria-label="Marcar como leida"
+                >
+                  Leida
+                </button>
+              </div>
+            ))}
+            {cancellationAlerts.length > 5 ? (
+              <p className="px-1 text-xs text-rose-700">
+                +{cancellationAlerts.length - 5} alertas mas pendientes.
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
