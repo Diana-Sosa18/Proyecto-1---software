@@ -1,46 +1,54 @@
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   CalendarDays,
+  CheckCircle2,
   Clock3,
   KeyRound,
   UserRound,
   Wrench,
+  XCircle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { UsersManagement } from "@/components/admin/UsersManagement";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { getAdminAccessSummaryRequest } from "@/services/adminAccessesService";
+import type { AdminAccessSummary } from "@/types/accesses";
 
-const dashboardCards = [
-  {
-    label: "Accesos Hoy",
-    value: "142",
-    icon: KeyRound,
-    iconClassName: "bg-blue-50 text-blue-600",
-    valueClassName: "text-slate-950",
-  },
-  {
-    label: "Visitas Pendientes",
-    value: "3",
-    icon: Clock3,
-    iconClassName: "bg-amber-50 text-amber-600",
-    valueClassName: "text-amber-600",
-  },
-  {
-    label: "Morosos",
-    value: "8",
-    icon: AlertTriangle,
-    iconClassName: "bg-rose-50 text-rose-600",
-    valueClassName: "text-rose-600",
-  },
-  {
-    label: "Reservas Activas",
-    value: "15",
-    icon: CalendarDays,
-    iconClassName: "bg-emerald-50 text-emerald-600",
-    valueClassName: "text-emerald-600",
-  },
-];
+// SCRUM-175: Construye las tarjetas del dashboard con datos reales del backend
+function buildDashboardCards(summary: AdminAccessSummary) {
+  return [
+    {
+      label: "Accesos Hoy",
+      value: String(summary.total_dia),
+      icon: KeyRound,
+      iconClassName: "bg-blue-50 text-blue-600",
+      valueClassName: "text-slate-950",
+    },
+    {
+      label: "Aprobados",
+      value: String(summary.aprobados),
+      icon: CheckCircle2,
+      iconClassName: "bg-emerald-50 text-emerald-600",
+      valueClassName: "text-emerald-600",
+    },
+    {
+      label: "Pendientes",
+      value: String(summary.pendientes),
+      icon: Clock3,
+      iconClassName: "bg-amber-50 text-amber-600",
+      valueClassName: "text-amber-600",
+    },
+    {
+      label: "Cancelados/Rechazados",
+      value: String(summary.rechazados),
+      icon: XCircle,
+      iconClassName: "bg-rose-50 text-rose-600",
+      valueClassName: "text-rose-600",
+    },
+  ];
+}
 
 const dashboardRows = [
   {
@@ -122,6 +130,42 @@ const hourlyAccesses = [
 const chartLabels = ["60", "45", "30", "15", "0"];
 
 export function AdminView() {
+  // SCRUM-175: estado para datos reales del dashboard
+  const [summary, setSummary] = useState<AdminAccessSummary>({
+    total_dia: 0,
+    aprobados: 0,
+    pendientes: 0,
+    rechazados: 0,
+  });
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSummary() {
+      try {
+        const data = await getAdminAccessSummaryRequest();
+        if (active) {
+          setSummary(data);
+        }
+      } catch {
+        // Si falla, deja los valores en cero (visual fallback)
+      }
+    }
+
+    void loadSummary();
+    // Actualiza el resumen cada 30 segundos
+    const interval = window.setInterval(() => {
+      void loadSummary();
+    }, 30000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  const dashboardCards = buildDashboardCards(summary);
+
   return (
     <AdminLayout title="Dashboard" subtitle="Resumen general del residencial">
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
