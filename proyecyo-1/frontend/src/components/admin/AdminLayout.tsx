@@ -7,6 +7,7 @@ import {
   LogOut,
   Settings,
   Wallet,
+  BriefcaseBusiness,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -38,6 +39,11 @@ const adminMenuItems: AdminMenuItem[] = [
     label: "Accesos",
     icon: KeyRound,
     to: "/admin/accesos",
+  },
+  {
+    label: "Proveedores",
+    icon: BriefcaseBusiness,
+    to: "/admin/proveedores",
   },
   {
     label: "Pagos",

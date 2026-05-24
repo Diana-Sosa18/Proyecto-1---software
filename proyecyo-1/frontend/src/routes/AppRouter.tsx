@@ -8,6 +8,7 @@ import { AdminAmenitiesReservationsView } from "@/views/AdminAmenitiesReservatio
 import { AdminAccessesView } from "@/views/AdminAccessesView";
 import { AdminPaymentsView } from "@/views/AdminPaymentsView";
 import { AdminReportsView } from "@/views/AdminReportsView";
+import { AdminProvidersView } from "@/views/AdminProvidersView";
 import { AdminSettingsView } from "@/views/AdminSettingsView";
 import { AdminView } from "@/views/AdminView";
 import { GuardiaView } from "@/views/GuardiaView";
@@ -33,6 +34,7 @@ export function AppRouter() {
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route path="/admin" element={<AdminView />} />
           <Route path="/admin/accesos" element={<AdminAccessesView />} />
+          <Route path="/admin/proveedores" element={<AdminProvidersView />} />
           <Route path="/admin/pagos" element={<AdminPaymentsView />} />
           <Route path="/admin/amenidades" element={<AdminAmenitiesReservationsView />} />
           <Route path="/admin/reportes" element={<AdminReportsView />} />
