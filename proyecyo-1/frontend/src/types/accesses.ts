@@ -41,6 +41,8 @@ export interface AdminAccessRecord {
   placa: string;
   estado: AdminAccessStatus;
   autorizado_por: string;
+  es_acceso_especial?: boolean;
+  fuera_horario?: boolean;
 }
 
 export interface AdminAccessFilters {

@@ -17,6 +17,14 @@ router.get("/notificaciones", requireResident, getNotifications);
 router.get("/notificaciones/no-leidas", requireResident, getUnreadCount);
 router.patch("/notificaciones/:id/leida", requireResident, patchNotificationRead);
 router.patch("/notificaciones/marcar-todas-leidas", requireResident, patchAllNotificationsRead);
+const { requireNotificationUser } = require("../middlewares/requireNotificationUser");
+
+const router = express.Router();
+
+router.get("/notificaciones", requireNotificationUser, getNotifications);
+router.get("/notificaciones/no-leidas", requireNotificationUser, getUnreadCount);
+router.patch("/notificaciones/:id/leida", requireNotificationUser, patchNotificationRead);
+router.patch("/notificaciones/marcar-todas-leidas", requireNotificationUser, patchAllNotificationsRead);
 
 // SCRUM-179: Notificaciones para guardias (sistema de alertas)
 router.get("/guardia/notificaciones", requireGuard, getNotifications);

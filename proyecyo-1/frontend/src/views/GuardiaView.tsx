@@ -9,6 +9,7 @@ import {
   QrCode,
   ScanLine,
   Shield,
+  ShieldAlert,
   UserCheck,
   Users,
   XCircle,
@@ -29,6 +30,7 @@ import {
   markAllGuardNotificationsAsReadRequest,
   markGuardNotificationAsReadRequest,
 } from "@/services/notificationsService";
+import { getNotificationsRequest } from "@/services/notificationsService";
 import type { NotificationRecord } from "@/types/notifications";
 import type { VisitRecord } from "@/types/visits";
 
@@ -58,6 +60,12 @@ function getVisitBadge(visit: VisitRecord): { label: string; className: string }
       label: "Cancelado",
       className: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200",
     };
+function getVisitBadge(visit: VisitRecord) {
+  if (visit.es_acceso_especial) {
+    if (visit.qr_status === "PENDING_APPROVAL" || visit.estado_acceso === "PENDIENTE_APROBACION") {
+      return "Acceso especial pendiente";
+    }
+    return "Acceso especial";
   }
 
   if (visit.qr_status === "EXPIRED") {
@@ -87,6 +95,7 @@ export function GuardiaView() {
   const streamRef = useRef<MediaStream | null>(null);
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [specialNotifications, setSpecialNotifications] = useState<NotificationRecord[]>([]);
   const [validatedVisit, setValidatedVisit] = useState<VisitRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
@@ -141,6 +150,28 @@ export function GuardiaView() {
       void loadVisits({ silent: true });
       void loadNotifications();
     }, 10000);
+    getGuardVisitsRequest()
+      .then((response) => {
+        if (active) setVisits(response);
+      })
+      .catch((error) => {
+        if (active) {
+          setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar las visitas.");
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    getNotificationsRequest()
+      .then((response) => {
+        if (active) {
+          setSpecialNotifications(response.filter((item) => item.tipo === "ACCESO_ESPECIAL"));
+        }
+      })
+      .catch(() => {
+        if (active) setSpecialNotifications([]);
+      });
 
     return () => {
       active = false;
@@ -500,6 +531,27 @@ export function GuardiaView() {
                 +{cancellationAlerts.length - 5} alertas mas pendientes.
               </p>
             ) : null}
+      {specialNotifications.length > 0 ? (
+        <Card className="border-violet-200 bg-violet-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-violet-900">
+              <ShieldAlert className="size-5" />
+              Notificar al guardia
+            </CardTitle>
+            <CardDescription className="text-violet-700">
+              Accesos especiales aprobados por administracion.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {specialNotifications.slice(0, 5).map((notification) => (
+              <div
+                key={notification.id_notificacion}
+                className="rounded-xl border border-violet-200 bg-white px-4 py-3 text-sm text-violet-900"
+              >
+                <p className="font-medium">{notification.titulo}</p>
+                <p className="mt-1 text-violet-700">{notification.mensaje}</p>
+              </div>
+            ))}
           </CardContent>
         </Card>
       ) : null}
@@ -575,6 +627,9 @@ export function GuardiaView() {
                   <p>Hora: {validatedVisit.hora_inicio} - {validatedVisit.hora_fin}</p>
                   <p>Tipo: {validatedVisit.tipo_visita}</p>
                   <p>Estado: {validatedVisit.estado_acceso}</p>
+                  {validatedVisit.es_acceso_especial ? (
+                    <p className="font-medium text-violet-700">Mostrar estado especial: autorizado</p>
+                  ) : null}
                 </div>
                 <Button
                   type="button"
@@ -632,6 +687,15 @@ export function GuardiaView() {
                     </span>
                   );
                 })()}
+                <span
+                  className={`rounded-full px-3 py-1 text-sm ${
+                    visitor.es_acceso_especial
+                      ? "bg-violet-50 text-violet-700"
+                      : "bg-blue-50 text-blue-700"
+                  }`}
+                >
+                  {getVisitBadge(visitor)}
+                </span>
               </div>
             ))
           )}

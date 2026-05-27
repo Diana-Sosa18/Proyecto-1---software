@@ -322,6 +322,134 @@ async function ensureTenantProvidersSchema() {
   `);
 }
 
+async function ensureAnnouncementsSchema() {
+  if (!(await tableExists("COMUNICADO"))) {
+    await query(`
+      CREATE TABLE COMUNICADO (
+        id_comunicado INT PRIMARY KEY AUTO_INCREMENT,
+        titulo VARCHAR(200),
+        descripcion TEXT,
+        fecha DATE,
+        creado_por INT,
+        tipo_destinatario VARCHAR(20) NOT NULL DEFAULT 'todos',
+        enviado_en DATETIME NULL,
+        total_destinatarios INT NOT NULL DEFAULT 0,
+        FOREIGN KEY (creado_por) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  if (!(await tableExists("COMUNICADO_USUARIO"))) {
+    await query(`
+      CREATE TABLE COMUNICADO_USUARIO (
+        id_comunicado INT,
+        id_usuario INT,
+        leido BOOLEAN,
+        PRIMARY KEY (id_comunicado, id_usuario),
+        FOREIGN KEY (id_comunicado) REFERENCES COMUNICADO(id_comunicado),
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  const comunicadoColumns = [
+    {
+      column: "tipo_destinatario",
+      ddl: `
+        ALTER TABLE COMUNICADO
+        ADD COLUMN tipo_destinatario VARCHAR(20) NOT NULL DEFAULT 'todos' AFTER creado_por
+      `,
+    },
+    {
+      column: "enviado_en",
+      ddl: `
+        ALTER TABLE COMUNICADO
+        ADD COLUMN enviado_en DATETIME NULL AFTER tipo_destinatario
+      `,
+    },
+    {
+      column: "total_destinatarios",
+      ddl: `
+        ALTER TABLE COMUNICADO
+        ADD COLUMN total_destinatarios INT NOT NULL DEFAULT 0 AFTER enviado_en
+      `,
+    },
+  ];
+
+  for (const definition of comunicadoColumns) {
+    if (!(await columnExists("COMUNICADO", definition.column))) {
+      await query(definition.ddl);
+    }
+  }
+}
+
+async function ensureSpecialAccessSchema() {
+  const accessColumns = [
+    {
+      column: "motivo_excepcion",
+      ddl: `
+        ALTER TABLE ACCESO
+        ADD COLUMN motivo_excepcion VARCHAR(255) NULL AFTER observaciones
+      `,
+    },
+    {
+      column: "es_acceso_especial",
+      ddl: `
+        ALTER TABLE ACCESO
+        ADD COLUMN es_acceso_especial BOOLEAN NOT NULL DEFAULT FALSE AFTER estado_acceso
+      `,
+    },
+    {
+      column: "fuera_horario",
+      ddl: `
+        ALTER TABLE ACCESO
+        ADD COLUMN fuera_horario BOOLEAN NOT NULL DEFAULT FALSE AFTER es_acceso_especial
+      `,
+    },
+  ];
+
+  for (const definition of accessColumns) {
+    if (!(await columnExists("ACCESO", definition.column))) {
+      await query(definition.ddl);
+    }
+  }
+
+  if (!(await tableExists("ACCESO_EXCEPCION"))) {
+    await query(`
+      CREATE TABLE ACCESO_EXCEPCION (
+        id_excepcion INT PRIMARY KEY AUTO_INCREMENT,
+        id_acceso INT NOT NULL,
+        aprobado_por INT NOT NULL,
+        motivo TEXT,
+        hora_solicitada_inicio TIME,
+        hora_solicitada_fin TIME,
+        accion VARCHAR(20) NOT NULL,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_acceso) REFERENCES ACCESO(id_acceso),
+        FOREIGN KEY (aprobado_por) REFERENCES USUARIO(id_usuario),
+        CHECK (accion IN ('APROBADO', 'RECHAZADO'))
+      )
+    `);
+  }
+
+  const configRows = await query(
+    `
+      SELECT COUNT(*) AS total
+      FROM CONFIGURACION
+      WHERE clave IN ('horario_visita_inicio', 'horario_visita_fin')
+    `,
+  );
+
+  if (Number(configRows[0]?.total || 0) < 2) {
+    await query(`
+      INSERT IGNORE INTO CONFIGURACION (clave, valor)
+      VALUES
+        ('horario_visita_inicio', '06:00'),
+        ('horario_visita_fin', '22:00')
+    `);
+  }
+}
+
 module.exports = {
   pool,
   query,
@@ -329,4 +457,6 @@ module.exports = {
   ensureAmenityReservationsSchema,
   ensureNotificationsSchema,
   ensureTenantProvidersSchema,
+  ensureAnnouncementsSchema,
+  ensureSpecialAccessSchema,
 };

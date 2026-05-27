@@ -8,6 +8,7 @@ export interface NotificationRecord {
   id_usuario: number;
   id_acceso: number | null;
   tipo: NotificationType;
+  tipo: string;
   titulo: string;
   mensaje: string;
   leido: boolean;
@@ -15,6 +16,8 @@ export interface NotificationRecord {
   leido_en: string | null;
   visitante: string | null;
   casa: string | null;
+  visitante?: string | null;
+  casa?: string | null;
 }
 
 export interface UnreadNotificationsResponse {

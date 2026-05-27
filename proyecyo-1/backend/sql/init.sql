@@ -1,6 +1,7 @@
 CREATE DATABASE IF NOT EXISTS nexus_residencial;
 USE nexus_residencial;
 
+DROP TABLE IF EXISTS ACCESO_EXCEPCION;
 DROP TABLE IF EXISTS COMUNICADO_USUARIO;
 DROP TABLE IF EXISTS TIPO_USUARIO_PERMISO;
 DROP TABLE IF EXISTS RESERVA;
@@ -138,13 +139,16 @@ CREATE TABLE ACCESO (
     tipo_visita VARCHAR(20),
     motivo_servicio VARCHAR(120),
     observaciones VARCHAR(255),
+    motivo_excepcion VARCHAR(255),
     token_qr VARCHAR(64) UNIQUE,
     estado_acceso VARCHAR(30) NOT NULL DEFAULT 'AUTORIZADA',
+    es_acceso_especial BOOLEAN NOT NULL DEFAULT FALSE,
+    fuera_horario BOOLEAN NOT NULL DEFAULT FALSE,
     FOREIGN KEY (id_visitante) REFERENCES VISITANTE(id_visitante),
     FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
     FOREIGN KEY (id_usuario_autoriza) REFERENCES USUARIO(id_usuario),
     CHECK (tipo_visita IN ('VISITA', 'DELIVERY', 'PROVEEDOR')),
-    CHECK (estado_acceso IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'CANCELADA'))
+    CHECK (estado_acceso IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'CANCELADA', 'PENDIENTE_APROBACION', 'RECHAZADA'))
 );
 
 CREATE TABLE REGISTRO_ACCESO (
@@ -187,6 +191,9 @@ CREATE TABLE COMUNICADO (
     descripcion TEXT,
     fecha DATE,
     creado_por INT,
+    tipo_destinatario VARCHAR(20) NOT NULL DEFAULT 'todos',
+    enviado_en DATETIME,
+    total_destinatarios INT NOT NULL DEFAULT 0,
     FOREIGN KEY (creado_por) REFERENCES USUARIO(id_usuario)
 );
 
@@ -216,6 +223,20 @@ CREATE TABLE CONFIGURACION (
     valor VARCHAR(200)
 );
 
+CREATE TABLE ACCESO_EXCEPCION (
+    id_excepcion INT PRIMARY KEY AUTO_INCREMENT,
+    id_acceso INT NOT NULL,
+    aprobado_por INT NOT NULL,
+    motivo TEXT,
+    hora_solicitada_inicio TIME,
+    hora_solicitada_fin TIME,
+    accion VARCHAR(20) NOT NULL,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_acceso) REFERENCES ACCESO(id_acceso),
+    FOREIGN KEY (aprobado_por) REFERENCES USUARIO(id_usuario),
+    CHECK (accion IN ('APROBADO', 'RECHAZADO'))
+);
+
 CREATE TABLE NOTIFICACION (
     id_notificacion INT PRIMARY KEY AUTO_INCREMENT,
     id_usuario INT NOT NULL,
@@ -232,6 +253,11 @@ CREATE TABLE NOTIFICACION (
 
 CREATE INDEX idx_notificacion_usuario_leido 
 ON NOTIFICACION (id_usuario, leido, creado_en);
+
+INSERT INTO CONFIGURACION (clave, valor)
+VALUES
+    ('horario_visita_inicio', '06:00'),
+    ('horario_visita_fin', '22:00');
 
 INSERT INTO TIPO_USUARIO (nombre)
 VALUES ('admin'), ('guardia'), ('residente'), ('inquilino');

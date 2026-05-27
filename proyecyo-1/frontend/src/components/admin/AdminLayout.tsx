@@ -5,7 +5,9 @@ import {
   KeyRound,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Settings,
+  ShieldAlert,
   Wallet,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -38,6 +40,16 @@ const adminMenuItems: AdminMenuItem[] = [
     label: "Accesos",
     icon: KeyRound,
     to: "/admin/accesos",
+  },
+  {
+    label: "Accesos especiales",
+    icon: ShieldAlert,
+    to: "/admin/accesos-especiales",
+  },
+  {
+    label: "Comunicados",
+    icon: Megaphone,
+    to: "/admin/comunicados",
   },
   {
     label: "Pagos",

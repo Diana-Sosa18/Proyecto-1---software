@@ -107,6 +107,9 @@ function mapVisit(row) {
     observaciones: row.observaciones || "",
     token_qr: row.token_qr,
     estado_acceso: row.estado_acceso,
+    es_acceso_especial: Boolean(row.es_acceso_especial),
+    fuera_horario: Boolean(row.fuera_horario),
+    motivo_excepcion: row.motivo_excepcion || "",
     qr_status: qrStatus,
     qr_value: row.token_qr ? `NEXUSVISIT:${row.token_qr}` : null,
     casa: row.casa,
@@ -146,8 +149,12 @@ function getQrStatus(visit) {
     return "USED";
   }
 
-  if (visit.estado_acceso === "CANCELADA") {
+  if (visit.estado_acceso === "CANCELADA" || visit.estado_acceso === "RECHAZADA") {
     return "CANCELLED";
+  }
+
+  if (visit.estado_acceso === "PENDIENTE_APROBACION" || !visit.token_qr) {
+    return "PENDING_APPROVAL";
   }
 
   const currentDateTime = getCurrentDateTimeInTimezone();
@@ -809,6 +816,9 @@ async function getGuardShiftVisits() {
         a.observaciones,
         a.token_qr,
         a.estado_acceso,
+        a.es_acceso_especial,
+        a.fuera_horario,
+        a.motivo_excepcion,
         CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
       FROM ACCESO a
       INNER JOIN VISITANTE v
@@ -826,6 +836,12 @@ async function getGuardShiftVisits() {
 async function validateQrVisit(qrToken) {
   const normalizedToken = normalizeQrToken(qrToken);
   const mappedVisit = await findVisitByQrToken(normalizedToken);
+
+  if (mappedVisit.qr_status === "PENDING_APPROVAL") {
+    const error = new Error("Este acceso especial aun no ha sido aprobado.");
+    error.status = 409;
+    throw error;
+  }
 
   if (mappedVisit.qr_status === "USED") {
     const error = new Error("Este QR ya fue utilizado.");
@@ -870,6 +886,9 @@ async function findVisitByQrToken(normalizedToken) {
         a.observaciones,
         a.token_qr,
         a.estado_acceso,
+        a.es_acceso_especial,
+        a.fuera_horario,
+        a.motivo_excepcion,
         CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
       FROM ACCESO a
       INNER JOIN VISITANTE v
