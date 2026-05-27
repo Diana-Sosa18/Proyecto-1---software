@@ -526,7 +526,16 @@ export function AdminAccessesView() {
                           {typeLabels[access.tipo]}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-950">{access.nombre}</td>
+                      <td className="px-5 py-3 text-sm text-slate-950">
+                        <div className="flex items-center gap-2">
+                          <span>{access.nombre}</span>
+                          {access.es_acceso_especial ? (
+                            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[0.65rem] font-medium text-violet-700">
+                              Especial
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="px-5 py-3 text-sm text-slate-500">{access.casa_unidad}</td>
                       <td className="px-5 py-3 text-sm text-slate-500">{access.placa}</td>
                       <td className="px-5 py-3">

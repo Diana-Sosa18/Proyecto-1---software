@@ -80,6 +80,10 @@ function mapAccessStatus(estadoAcceso) {
     return "APROBADO";
   }
 
+  if (normalized === "PENDIENTE_APROBACION") {
+    return "PENDIENTE";
+  }
+
   if (normalized === "PENDIENTE") {
     return "PENDIENTE";
   }
@@ -114,6 +118,8 @@ function mapAdminAccess(row) {
     placa: normalizeString(row.placa) || "-",
     estado: mapAccessStatus(row.estado_acceso),
     autorizado_por: buildAuthorizerLabel(row),
+    es_acceso_especial: Boolean(row.es_acceso_especial),
+    fuera_horario: Boolean(row.fuera_horario),
   };
 }
 
@@ -205,7 +211,7 @@ function appendStatusFilter(filters, accessStatus) {
   }
 
   if (accessStatus === "PENDIENTE") {
-    filters.push("UPPER(COALESCE(a.estado_acceso, '')) = 'PENDIENTE'");
+    filters.push("UPPER(COALESCE(a.estado_acceso, '')) IN ('PENDIENTE', 'PENDIENTE_APROBACION')");
     return;
   }
 
@@ -227,7 +233,7 @@ async function getAdminAccessSummary() {
         ) AS aprobados,
         SUM(
           CASE
-            WHEN UPPER(COALESCE(a.estado_acceso, '')) = 'PENDIENTE'
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('PENDIENTE', 'PENDIENTE_APROBACION')
               THEN 1
             ELSE 0
           END
@@ -281,7 +287,7 @@ async function getAdminAccessHourlyChart() {
         ) AS aprobados,
         SUM(
           CASE
-            WHEN UPPER(COALESCE(a.estado_acceso, '')) = 'PENDIENTE'
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('PENDIENTE', 'PENDIENTE_APROBACION')
               THEN 1
             ELSE 0
           END
@@ -354,6 +360,8 @@ async function listAdminAccesses(filters = {}) {
         TIME_FORMAT(ra.hora_salida, '%H:%i') AS hora_salida,
         a.tipo_visita,
         a.estado_acceso,
+        a.es_acceso_especial,
+        a.fuera_horario,
         v.nombre,
         v.placa,
         c.numero,

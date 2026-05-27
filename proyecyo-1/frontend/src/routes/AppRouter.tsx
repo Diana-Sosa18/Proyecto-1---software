@@ -6,9 +6,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { rolePaths } from "@/routes/rolePaths";
 import { AdminAmenitiesReservationsView } from "@/views/AdminAmenitiesReservationsView";
 import { AdminAccessesView } from "@/views/AdminAccessesView";
+import { AdminCommunicationsView } from "@/views/AdminCommunicationsView";
 import { AdminPaymentsView } from "@/views/AdminPaymentsView";
 import { AdminReportsView } from "@/views/AdminReportsView";
 import { AdminSettingsView } from "@/views/AdminSettingsView";
+import { AdminSpecialAccessView } from "@/views/AdminSpecialAccessView";
 import { AdminView } from "@/views/AdminView";
 import { GuardiaView } from "@/views/GuardiaView";
 import { InquilinoView } from "@/views/InquilinoView";
@@ -33,6 +35,8 @@ export function AppRouter() {
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route path="/admin" element={<AdminView />} />
           <Route path="/admin/accesos" element={<AdminAccessesView />} />
+          <Route path="/admin/accesos-especiales" element={<AdminSpecialAccessView />} />
+          <Route path="/admin/comunicados" element={<AdminCommunicationsView />} />
           <Route path="/admin/pagos" element={<AdminPaymentsView />} />
           <Route path="/admin/amenidades" element={<AdminAmenitiesReservationsView />} />
           <Route path="/admin/reportes" element={<AdminReportsView />} />
