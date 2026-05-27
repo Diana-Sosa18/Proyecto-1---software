@@ -5,6 +5,8 @@ const {
   ensureAmenityReservationsSchema,
   ensureNotificationsSchema,
   ensureTenantProvidersSchema,
+  ensureAnnouncementsSchema,
+  ensureSpecialAccessSchema,
   query,
 } = require("./src/database/mysql");
 
@@ -43,6 +45,8 @@ async function startServer() {
   await ensureAmenityReservationsSchema();
   await ensureNotificationsSchema();
   await ensureTenantProvidersSchema();
+  await ensureAnnouncementsSchema();
+  await ensureSpecialAccessSchema();
 
   const app = createApp();
 

@@ -1,5 +1,6 @@
 const {
   getAdminAccessHourlyChart,
+  getAdminAccessDailyChart,
   getAdminAccessSummary,
   listAdminAccesses,
 } = require("../services/adminAccessesService");
@@ -31,8 +32,18 @@ async function getAdminHourlyAccessChart(_req, res, next) {
   }
 }
 
+async function getAdminDailyAccessChart(_req, res, next) {
+  try {
+    const chartData = await getAdminAccessDailyChart();
+    res.status(200).json(chartData);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getAdminDailyAccessSummary,
   getAdminHourlyAccessChart,
+  getAdminDailyAccessChart,
   getAdminAccesses,
 };

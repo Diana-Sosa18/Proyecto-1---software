@@ -5,7 +5,9 @@ import {
   KeyRound,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Settings,
+  ShieldAlert,
   Wallet,
   BriefcaseBusiness,
 } from "lucide-react";
@@ -44,6 +46,14 @@ const adminMenuItems: AdminMenuItem[] = [
     label: "Proveedores",
     icon: BriefcaseBusiness,
     to: "/admin/proveedores",
+    label: "Accesos especiales",
+    icon: ShieldAlert,
+    to: "/admin/accesos-especiales",
+  },
+  {
+    label: "Comunicados",
+    icon: Megaphone,
+    to: "/admin/comunicados",
   },
   {
     label: "Pagos",

@@ -107,6 +107,9 @@ function mapVisit(row) {
     observaciones: row.observaciones || "",
     token_qr: row.token_qr,
     estado_acceso: row.estado_acceso,
+    es_acceso_especial: Boolean(row.es_acceso_especial),
+    fuera_horario: Boolean(row.fuera_horario),
+    motivo_excepcion: row.motivo_excepcion || "",
     qr_status: qrStatus,
     qr_value: row.token_qr ? `NEXUSVISIT:${row.token_qr}` : null,
     casa: row.casa,
@@ -146,8 +149,12 @@ function getQrStatus(visit) {
     return "USED";
   }
 
-  if (visit.estado_acceso === "CANCELADA") {
+  if (visit.estado_acceso === "CANCELADA" || visit.estado_acceso === "RECHAZADA") {
     return "CANCELLED";
+  }
+
+  if (visit.estado_acceso === "PENDIENTE_APROBACION" || !visit.token_qr) {
+    return "PENDING_APPROVAL";
   }
 
   const currentDateTime = getCurrentDateTimeInTimezone();
@@ -579,6 +586,65 @@ async function updateVisit(userId, role = "residente", accessId, payload = {}) {
   return mapVisit(updatedRows[0]);
 }
 
+async function createGuardCancellationNotifications(accessId) {
+  // Obtiene los datos del acceso para componer un mensaje informativo
+  const accessRows = await query(
+    `
+      SELECT
+        a.id_acceso,
+        v.nombre AS visitante,
+        TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
+        DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
+        CONCAT(
+          COALESCE(c.torre, ''),
+          CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END,
+          c.numero
+        ) AS casa
+      FROM ACCESO a
+      INNER JOIN VISITANTE v ON v.id_visitante = a.id_visitante
+      INNER JOIN CASA c ON c.id_casa = a.id_casa
+      WHERE a.id_acceso = ?
+      LIMIT 1
+    `,
+    [accessId],
+  );
+
+  const accessInfo = accessRows[0];
+  if (!accessInfo) {
+    return;
+  }
+
+  // Obtiene los ids de todos los guardias activos
+  const guards = await query(
+    `
+      SELECT u.id_usuario
+      FROM USUARIO u
+      INNER JOIN TIPO_USUARIO tu ON tu.id_tipo_usuario = u.id_tipo_usuario
+      WHERE tu.nombre = 'guardia' AND u.activo = TRUE
+    `,
+  );
+
+  if (guards.length === 0) {
+    return;
+  }
+
+  const titulo = "Acceso cancelado";
+  const mensaje = `${accessInfo.visitante} (casa ${accessInfo.casa}) cancelada para ${accessInfo.fecha} ${accessInfo.hora_inicio}.`;
+
+  // Inserta una notificacion por cada guardia
+  const insertPromises = guards.map((guard) =>
+    query(
+      `
+        INSERT INTO NOTIFICACION (id_usuario, id_acceso, tipo, titulo, mensaje)
+        VALUES (?, ?, 'ACCESO_CANCELADO', ?, ?)
+      `,
+      [guard.id_usuario, accessId, titulo, mensaje],
+    ),
+  );
+
+  await Promise.all(insertPromises);
+}
+
 async function cancelVisit(userId, role = "residente", accessId) {
   const house = await getHouseByUserId(userId, role);
   const normalizedAccessId = Number(accessId);
@@ -625,6 +691,14 @@ async function cancelVisit(userId, role = "residente", accessId) {
     "UPDATE ACCESO SET estado_acceso = 'CANCELADA' WHERE id_acceso = ?",
     [normalizedAccessId],
   );
+
+  // SCRUM-178: notifica a todos los guardias activos sobre la cancelacion
+  try {
+    await createGuardCancellationNotifications(normalizedAccessId);
+  } catch (notificationError) {
+    // No bloqueamos la cancelacion si fallan las notificaciones
+    console.error("Error creando notificaciones de cancelacion:", notificationError);
+  }
 
   const updatedRows = await query(
     `
@@ -742,6 +816,9 @@ async function getGuardShiftVisits() {
         a.observaciones,
         a.token_qr,
         a.estado_acceso,
+        a.es_acceso_especial,
+        a.fuera_horario,
+        a.motivo_excepcion,
         CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
       FROM ACCESO a
       INNER JOIN VISITANTE v
@@ -760,6 +837,12 @@ async function validateQrVisit(qrToken) {
   const normalizedToken = normalizeQrToken(qrToken);
   const mappedVisit = await findVisitByQrToken(normalizedToken);
 
+  if (mappedVisit.qr_status === "PENDING_APPROVAL") {
+    const error = new Error("Este acceso especial aun no ha sido aprobado.");
+    error.status = 409;
+    throw error;
+  }
+
   if (mappedVisit.qr_status === "USED") {
     const error = new Error("Este QR ya fue utilizado.");
     error.status = 409;
@@ -773,8 +856,12 @@ async function validateQrVisit(qrToken) {
   }
 
   if (mappedVisit.qr_status === "CANCELLED") {
-    const error = new Error("Este QR ya no es valido.");
+    // SCRUM-183: Mensaje claro para el guardia indicando cancelacion
+    const error = new Error(
+      `Acceso cancelado: ${mappedVisit.nombre} (casa ${mappedVisit.casa}). No autorizar el ingreso.`,
+    );
     error.status = 410;
+    error.code = "ACCESS_CANCELLED";
     throw error;
   }
 
@@ -799,6 +886,9 @@ async function findVisitByQrToken(normalizedToken) {
         a.observaciones,
         a.token_qr,
         a.estado_acceso,
+        a.es_acceso_especial,
+        a.fuera_horario,
+        a.motivo_excepcion,
         CONCAT(COALESCE(c.torre, ''), CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END, c.numero) AS casa
       FROM ACCESO a
       INNER JOIN VISITANTE v

@@ -11,6 +11,8 @@ const adminAccessesRoutes = require("./routes/adminAccessesRoutes");
 const notificationsRoutes = require("./routes/notificationsRoutes");
 const tenantProvidersRoutes = require("./routes/tenantProvidersRoutes");
 const adminProvidersRoutes = require("./routes/adminProvidersRoutes");
+const announcementsRoutes = require("./routes/announcementsRoutes");
+const specialAccessesRoutes = require("./routes/specialAccessesRoutes");
 
 function createApp() {
   const app = express();
@@ -37,6 +39,8 @@ function createApp() {
   app.use(notificationsRoutes);
   app.use(tenantProvidersRoutes);
   app.use(adminProvidersRoutes);
+  app.use(announcementsRoutes);
+  app.use(specialAccessesRoutes);
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;

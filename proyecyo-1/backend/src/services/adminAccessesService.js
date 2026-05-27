@@ -80,6 +80,10 @@ function mapAccessStatus(estadoAcceso) {
     return "APROBADO";
   }
 
+  if (normalized === "PENDIENTE_APROBACION") {
+    return "PENDIENTE";
+  }
+
   if (normalized === "PENDIENTE") {
     return "PENDIENTE";
   }
@@ -114,6 +118,8 @@ function mapAdminAccess(row) {
     placa: normalizeString(row.placa) || "-",
     estado: mapAccessStatus(row.estado_acceso),
     autorizado_por: buildAuthorizerLabel(row),
+    es_acceso_especial: Boolean(row.es_acceso_especial),
+    fuera_horario: Boolean(row.fuera_horario),
   };
 }
 
@@ -205,7 +211,7 @@ function appendStatusFilter(filters, accessStatus) {
   }
 
   if (accessStatus === "PENDIENTE") {
-    filters.push("UPPER(COALESCE(a.estado_acceso, '')) = 'PENDIENTE'");
+    filters.push("UPPER(COALESCE(a.estado_acceso, '')) IN ('PENDIENTE', 'PENDIENTE_APROBACION')");
     return;
   }
 
@@ -227,7 +233,7 @@ async function getAdminAccessSummary() {
         ) AS aprobados,
         SUM(
           CASE
-            WHEN UPPER(COALESCE(a.estado_acceso, '')) = 'PENDIENTE'
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('PENDIENTE', 'PENDIENTE_APROBACION')
               THEN 1
             ELSE 0
           END
@@ -265,6 +271,9 @@ function createHourlyAccessBuckets() {
   }));
 }
 
+// SCRUM-172: Agrupar accesos por hora del dia actual.
+// La hora de referencia es: hora_ingreso del registro si existe, sino hora_inicio del acceso.
+// Esto representa la ventana en que se espera/registra el acceso.
 async function getAdminAccessHourlyChart() {
   const currentDate = getCurrentDateInTimezone();
   const rows = await query(
@@ -281,7 +290,7 @@ async function getAdminAccessHourlyChart() {
         ) AS aprobados,
         SUM(
           CASE
-            WHEN UPPER(COALESCE(a.estado_acceso, '')) = 'PENDIENTE'
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('PENDIENTE', 'PENDIENTE_APROBACION')
               THEN 1
             ELSE 0
           END
@@ -325,6 +334,89 @@ async function getAdminAccessHourlyChart() {
   return buckets;
 }
 
+// SCRUM-172: Helper - obtiene la hora con mayor afluencia del dia
+function getBusiestHourFromBuckets(buckets) {
+  return buckets.reduce(
+    (best, current) => (current.total > best.total ? current : best),
+    { hora: "--:--", total: 0, aprobados: 0, pendientes: 0, rechazados: 0 },
+  );
+}
+
+function getDateNDaysAgo(daysAgo) {
+  const now = new Date();
+  // Convertir a fecha base GT y restar dias
+  const isoCurrent = getCurrentDateInTimezone();
+  const [year, month, day] = isoCurrent.split("-").map(Number);
+  const base = new Date(Date.UTC(year, month - 1, day));
+  base.setUTCDate(base.getUTCDate() - daysAgo);
+  return base.toISOString().slice(0, 10);
+}
+
+// SCRUM-173: Agrupar accesos por dia (ultimos 7 dias)
+async function getAdminAccessDailyChart() {
+  const endDate = getCurrentDateInTimezone();
+  const startDate = getDateNDaysAgo(6); // 7 dias incluyendo hoy
+
+  const rows = await query(
+    `
+      SELECT
+        DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
+        COUNT(*) AS total,
+        SUM(
+          CASE
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'APROBADA')
+              THEN 1
+            ELSE 0
+          END
+        ) AS aprobados,
+        SUM(
+          CASE
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) = 'PENDIENTE'
+              THEN 1
+            ELSE 0
+          END
+        ) AS pendientes,
+        SUM(
+          CASE
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('CANCELADA', 'RECHAZADA')
+              THEN 1
+            ELSE 0
+          END
+        ) AS rechazados
+      FROM ACCESO a
+      WHERE a.fecha BETWEEN ? AND ?
+      GROUP BY a.fecha
+      ORDER BY a.fecha ASC
+    `,
+    [startDate, endDate],
+  );
+
+  // Crear buckets para los 7 dias con totales en cero
+  const buckets = [];
+  for (let i = 6; i >= 0; i -= 1) {
+    buckets.push({
+      fecha: getDateNDaysAgo(i),
+      total: 0,
+      aprobados: 0,
+      pendientes: 0,
+      rechazados: 0,
+    });
+  }
+
+  // Llenar buckets con los datos de la BD
+  rows.forEach((row) => {
+    const bucket = buckets.find((b) => b.fecha === row.fecha);
+    if (bucket) {
+      bucket.total = Number(row.total || 0);
+      bucket.aprobados = Number(row.aprobados || 0);
+      bucket.pendientes = Number(row.pendientes || 0);
+      bucket.rechazados = Number(row.rechazados || 0);
+    }
+  });
+
+  return buckets;
+}
+
 async function listAdminAccesses(filters = {}) {
   const currentDate = getCurrentDateInTimezone();
   const search = normalizeString(filters.search).toLowerCase();
@@ -354,6 +446,8 @@ async function listAdminAccesses(filters = {}) {
         TIME_FORMAT(ra.hora_salida, '%H:%i') AS hora_salida,
         a.tipo_visita,
         a.estado_acceso,
+        a.es_acceso_especial,
+        a.fuera_horario,
         v.nombre,
         v.placa,
         c.numero,
@@ -384,5 +478,6 @@ async function listAdminAccesses(filters = {}) {
 module.exports = {
   getAdminAccessSummary,
   getAdminAccessHourlyChart,
+  getAdminAccessDailyChart,
   listAdminAccesses,
 };

@@ -21,6 +21,15 @@ export interface AdminAccessHourlyPoint {
   rechazados: number;
 }
 
+// SCRUM-173: Punto de datos para grafica diaria (ultimos 7 dias)
+export interface AdminAccessDailyPoint {
+  fecha: string;
+  total: number;
+  aprobados: number;
+  pendientes: number;
+  rechazados: number;
+}
+
 export interface AdminAccessRecord {
   id_acceso: number;
   fecha: string;
@@ -32,6 +41,8 @@ export interface AdminAccessRecord {
   placa: string;
   estado: AdminAccessStatus;
   autorizado_por: string;
+  es_acceso_especial?: boolean;
+  fuera_horario?: boolean;
 }
 
 export interface AdminAccessFilters {
