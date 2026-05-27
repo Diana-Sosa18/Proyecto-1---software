@@ -61,6 +61,24 @@ export function updateTenantProviderRequest(serviceId: number, activo: boolean) 
   });
 }
 
+export function getOwnerProvidersRequest(filters: TenantProviderFilters = {}) {
+  const query = buildQuery(filters);
+  const url = query ? `/residente/proveedores?${query}` : "/residente/proveedores";
+  return apiRequest<AdminProviderRecord[]>(url);
+}
+
+export function updateOwnerProviderValidationRequest(payload: {
+  id_servicio: number;
+  id_casa: number;
+  estado: "VALIDADO" | "PENDIENTE";
+  activo?: boolean;
+}) {
+  return apiRequest<AdminProviderRecord>(`/residente/proveedores/${payload.id_servicio}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
 export function getAdminProvidersRequest(filters: AdminProviderFilters = {}) {
   const query = buildQuery(filters);
   const url = query ? `/admin/proveedores?${query}` : "/admin/proveedores";
