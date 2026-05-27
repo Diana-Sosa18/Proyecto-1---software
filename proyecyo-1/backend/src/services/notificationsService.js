@@ -13,6 +13,7 @@ function normalizeNotification(row) {
     leido_en: row.leido_en || null,
     visitante: row.visitante || null,
     casa: row.casa || null,
+    hora_llegada: row.hora_llegada || null,
   };
 }
 
@@ -30,6 +31,7 @@ async function listNotifications(userId) {
         DATE_FORMAT(n.creado_en, '%Y-%m-%d %H:%i:%s') AS creado_en,
         DATE_FORMAT(n.leido_en, '%Y-%m-%d %H:%i:%s') AS leido_en,
         v.nombre AS visitante,
+        TIME_FORMAT(ra.hora_ingreso, '%H:%i') AS hora_llegada,
         CONCAT(
           COALESCE(c.torre, ''),
           CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END,
@@ -37,6 +39,7 @@ async function listNotifications(userId) {
         ) AS casa
       FROM NOTIFICACION n
       LEFT JOIN ACCESO a ON a.id_acceso = n.id_acceso
+      LEFT JOIN REGISTRO_ACCESO ra ON ra.id_acceso = a.id_acceso
       LEFT JOIN VISITANTE v ON v.id_visitante = a.id_visitante
       LEFT JOIN CASA c ON c.id_casa = a.id_casa
       WHERE n.id_usuario = ?
@@ -94,6 +97,7 @@ async function markNotificationAsRead(userId, notificationId) {
         DATE_FORMAT(n.creado_en, '%Y-%m-%d %H:%i:%s') AS creado_en,
         DATE_FORMAT(n.leido_en, '%Y-%m-%d %H:%i:%s') AS leido_en,
         v.nombre AS visitante,
+        TIME_FORMAT(ra.hora_ingreso, '%H:%i') AS hora_llegada,
         CONCAT(
           COALESCE(c.torre, ''),
           CASE WHEN c.torre IS NOT NULL AND c.torre <> '' THEN '-' ELSE '' END,
@@ -101,6 +105,7 @@ async function markNotificationAsRead(userId, notificationId) {
         ) AS casa
       FROM NOTIFICACION n
       LEFT JOIN ACCESO a ON a.id_acceso = n.id_acceso
+      LEFT JOIN REGISTRO_ACCESO ra ON ra.id_acceso = a.id_acceso
       LEFT JOIN VISITANTE v ON v.id_visitante = a.id_visitante
       LEFT JOIN CASA c ON c.id_casa = a.id_casa
       WHERE n.id_notificacion = ? AND n.id_usuario = ?
