@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import jsQR from "jsqr";
 import {
+  Bell,
+  BellRing,
   Camera,
+  CheckCheck,
   CircleAlert,
   QrCode,
   ScanLine,
@@ -9,6 +12,7 @@ import {
   ShieldAlert,
   UserCheck,
   Users,
+  XCircle,
 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
@@ -21,6 +25,11 @@ import {
   registerQrEntryRequest,
   validateQrRequest,
 } from "@/services/visitsService";
+import {
+  getGuardNotificationsRequest,
+  markAllGuardNotificationsAsReadRequest,
+  markGuardNotificationAsReadRequest,
+} from "@/services/notificationsService";
 import { getNotificationsRequest } from "@/services/notificationsService";
 import type { NotificationRecord } from "@/types/notifications";
 import type { VisitRecord } from "@/types/visits";
@@ -44,6 +53,13 @@ function canUseCamera() {
   return Boolean(navigator.mediaDevices?.getUserMedia) && (window.isSecureContext || isLocalhost);
 }
 
+function getVisitBadge(visit: VisitRecord): { label: string; className: string } {
+  // SCRUM-180: Mostrar badge "Cancelado" cuando el acceso fue cancelado
+  if (visit.estado_acceso === "CANCELADA" || visit.qr_status === "CANCELLED") {
+    return {
+      label: "Cancelado",
+      className: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200",
+    };
 function getVisitBadge(visit: VisitRecord) {
   if (visit.es_acceso_especial) {
     if (visit.qr_status === "PENDING_APPROVAL" || visit.estado_acceso === "PENDIENTE_APROBACION") {
@@ -53,14 +69,23 @@ function getVisitBadge(visit: VisitRecord) {
   }
 
   if (visit.qr_status === "EXPIRED") {
-    return "QR expirado";
+    return {
+      label: "QR expirado",
+      className: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200",
+    };
   }
 
   if (visit.qr_status === "USED" || visit.estado_acceso === "INGRESO_REGISTRADO") {
-    return "Ingreso registrado";
+    return {
+      label: "Ingreso registrado",
+      className: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200",
+    };
   }
 
-  return "Autorizada";
+  return {
+    label: "Autorizada",
+    className: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200",
+  };
 }
 
 export function GuardiaView() {
@@ -69,6 +94,7 @@ export function GuardiaView() {
   const frameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [visits, setVisits] = useState<VisitRecord[]>([]);
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [specialNotifications, setSpecialNotifications] = useState<NotificationRecord[]>([]);
   const [validatedVisit, setValidatedVisit] = useState<VisitRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -85,6 +111,45 @@ export function GuardiaView() {
   useEffect(() => {
     let active = true;
 
+    async function loadVisits(options: { silent?: boolean } = {}) {
+      try {
+        const response = await getGuardVisitsRequest();
+        if (!active) {
+          return;
+        }
+        setVisits(response);
+      } catch (error) {
+        if (!active || options.silent) {
+          return;
+        }
+        setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar las visitas.");
+      } finally {
+        if (active && !options.silent) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    async function loadNotifications() {
+      try {
+        const data = await getGuardNotificationsRequest();
+        if (active) {
+          setNotifications(data);
+        }
+      } catch {
+        // No bloquear la vista por errores de notificaciones
+      }
+    }
+
+    void loadVisits();
+    void loadNotifications();
+
+    // SCRUM-181 + SCRUM-182: Polling silencioso cada 10s para detectar cambios
+    // en accesos y nuevas notificaciones (cancelaciones, etc.)
+    const intervalId = window.setInterval(() => {
+      void loadVisits({ silent: true });
+      void loadNotifications();
+    }, 10000);
     getGuardVisitsRequest()
       .then((response) => {
         if (active) setVisits(response);
@@ -110,8 +175,41 @@ export function GuardiaView() {
 
     return () => {
       active = false;
+      window.clearInterval(intervalId);
     };
   }, []);
+
+  // SCRUM-182: Filtra solo alertas de cancelacion no leidas para el panel
+  const cancellationAlerts = useMemo(
+    () => notifications.filter((n) => n.tipo === "ACCESO_CANCELADO" && !n.leido),
+    [notifications],
+  );
+
+  async function handleMarkAlertRead(notificationId: number) {
+    try {
+      await markGuardNotificationAsReadRequest(notificationId);
+      setNotifications((current) =>
+        current.map((n) =>
+          n.id_notificacion === notificationId ? { ...n, leido: true } : n,
+        ),
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "No fue posible marcar la alerta como leida.",
+      );
+    }
+  }
+
+  async function handleMarkAllAlertsRead() {
+    try {
+      await markAllGuardNotificationsAsReadRequest();
+      setNotifications((current) => current.map((n) => ({ ...n, leido: true })));
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "No fue posible marcar las alertas como leidas.",
+      );
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -169,13 +267,31 @@ export function GuardiaView() {
       setSuccessMessage("Visita autorizada e ingreso registrado.");
     } catch (error) {
       setValidatedVisit(null);
-      const message = error instanceof Error ? error.message : "No fue posible validar el QR.";
+      const apiError = error as { status?: number; message?: string; payload?: { code?: string } };
+      const message = apiError?.message || "No fue posible validar el QR.";
+
+      // SCRUM-183: Detectar especificamente cancelaciones para mensaje destacado
+      const isCancelled =
+        apiError?.status === 410 &&
+        (message.toLowerCase().includes("cancelado") ||
+          apiError?.payload?.code === "ACCESS_CANCELLED");
+
       setValidationResult({
         status: "rejected",
-        title: "Acceso rechazado",
+        title: isCancelled ? "ACCESO CANCELADO - NO AUTORIZAR" : "Acceso rechazado",
         message,
       });
       setErrorMessage(message);
+
+      // Refresca las notificaciones para que el guardia vea la alerta asociada
+      if (isCancelled) {
+        try {
+          const updatedNotifications = await getGuardNotificationsRequest();
+          setNotifications(updatedNotifications);
+        } catch {
+          // silencioso
+        }
+      }
     }
   }
 
@@ -356,6 +472,65 @@ export function GuardiaView() {
         </Alert>
       ) : null}
 
+      {/* SCRUM-182: Panel de notificacion visual para alertas de cancelacion */}
+      {cancellationAlerts.length > 0 ? (
+        <Card className="border-rose-200 bg-rose-50/60 shadow-[0_10px_30px_rgba(244,63,94,0.08)]">
+          <CardHeader>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-full bg-rose-100 text-rose-700">
+                  <BellRing className="size-5 animate-pulse" />
+                </div>
+                <div>
+                  <CardTitle className="text-rose-900">
+                    {cancellationAlerts.length} alerta{cancellationAlerts.length !== 1 ? "s" : ""} de cancelacion
+                  </CardTitle>
+                  <CardDescription className="text-rose-700">
+                    Accesos cancelados por residentes/inquilinos. Verifica que el QR ya no sea valido.
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleMarkAllAlertsRead}
+                className="border-rose-200 bg-white text-rose-700 hover:bg-rose-100"
+              >
+                <CheckCheck className="size-4" />
+                Marcar todas
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {cancellationAlerts.slice(0, 5).map((alert) => (
+              <div
+                key={alert.id_notificacion}
+                className="flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-white px-4 py-3"
+              >
+                <div className="flex items-start gap-3">
+                  <XCircle className="mt-0.5 size-4 shrink-0 text-rose-600" />
+                  <div className="text-sm">
+                    <p className="font-medium text-slate-900">{alert.titulo}</p>
+                    <p className="text-slate-600">{alert.mensaje}</p>
+                    <p className="mt-1 text-xs text-slate-400">{alert.creado_en}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleMarkAlertRead(alert.id_notificacion)}
+                  className="text-xs font-medium text-rose-600 hover:underline"
+                  aria-label="Marcar como leida"
+                >
+                  Leida
+                </button>
+              </div>
+            ))}
+            {cancellationAlerts.length > 5 ? (
+              <p className="px-1 text-xs text-rose-700">
+                +{cancellationAlerts.length - 5} alertas mas pendientes.
+              </p>
+            ) : null}
       {specialNotifications.length > 0 ? (
         <Card className="border-violet-200 bg-violet-50">
           <CardHeader>
@@ -504,6 +679,14 @@ export function GuardiaView() {
                     {visitor.casa} • {formatDate(visitor.fecha)} • {visitor.hora_inicio} - {visitor.hora_fin}
                   </p>
                 </div>
+                {(() => {
+                  const badge = getVisitBadge(visitor);
+                  return (
+                    <span className={`rounded-full px-3 py-1 text-sm ${badge.className}`}>
+                      {badge.label}
+                    </span>
+                  );
+                })()}
                 <span
                   className={`rounded-full px-3 py-1 text-sm ${
                     visitor.es_acceso_especial

@@ -1,129 +1,196 @@
+import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   CalendarDays,
+  CheckCircle2,
   Clock3,
   KeyRound,
   UserRound,
   Wrench,
+  XCircle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { UsersManagement } from "@/components/admin/UsersManagement";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import {
+  getAdminAccessesRequest,
+  getAdminAccessHourlyChartRequest,
+  getAdminAccessSummaryRequest,
+} from "@/services/adminAccessesService";
+import type { AdminAccessHourlyPoint, AdminAccessRecord, AdminAccessSummary } from "@/types/accesses";
 
-const dashboardCards = [
-  {
-    label: "Accesos Hoy",
-    value: "142",
-    icon: KeyRound,
-    iconClassName: "bg-blue-50 text-blue-600",
-    valueClassName: "text-slate-950",
-  },
-  {
-    label: "Visitas Pendientes",
-    value: "3",
-    icon: Clock3,
-    iconClassName: "bg-amber-50 text-amber-600",
-    valueClassName: "text-amber-600",
-  },
-  {
-    label: "Morosos",
-    value: "8",
-    icon: AlertTriangle,
-    iconClassName: "bg-rose-50 text-rose-600",
-    valueClassName: "text-rose-600",
-  },
-  {
-    label: "Reservas Activas",
-    value: "15",
-    icon: CalendarDays,
-    iconClassName: "bg-emerald-50 text-emerald-600",
-    valueClassName: "text-emerald-600",
-  },
-];
-
-const dashboardRows = [
-  {
-    hour: "16:45",
-    type: "Residente",
-    name: "Juan Perez",
-    unit: "A-101",
-    plate: "ABC-123",
-    status: "Aprobado",
-  },
-  {
-    hour: "16:42",
-    type: "Visitante",
-    name: "Maria Gonzalez",
-    unit: "B-205",
-    plate: "-",
-    status: "Aprobado",
-  },
-  {
-    hour: "16:38",
-    type: "Proveedor",
-    name: "Servicio de limpieza",
-    unit: "C-303",
-    plate: "XYZ-789",
-    status: "Pendiente",
-  },
-  {
-    hour: "16:35",
-    type: "Residente",
-    name: "Ana Martinez",
-    unit: "A-102",
-    plate: "DEF-456",
-    status: "Aprobado",
-  },
-  {
-    hour: "16:30",
-    type: "Visitante",
-    name: "Carlos Lopez",
-    unit: "B-201",
-    plate: "-",
-    status: "Aprobado",
-  },
-  {
-    hour: "16:28",
-    type: "Residente",
-    name: "Sofia Lopez",
-    unit: "C-401",
-    plate: "GHI-789",
-    status: "Aprobado",
-  },
-];
+// SCRUM-175: Construye las tarjetas del dashboard con datos reales del backend
+function buildDashboardCards(summary: AdminAccessSummary) {
+  return [
+    {
+      label: "Accesos Hoy",
+      value: String(summary.total_dia),
+      icon: KeyRound,
+      iconClassName: "bg-blue-50 text-blue-600",
+      valueClassName: "text-slate-950",
+    },
+    {
+      label: "Aprobados",
+      value: String(summary.aprobados),
+      icon: CheckCircle2,
+      iconClassName: "bg-emerald-50 text-emerald-600",
+      valueClassName: "text-emerald-600",
+    },
+    {
+      label: "Pendientes",
+      value: String(summary.pendientes),
+      icon: Clock3,
+      iconClassName: "bg-amber-50 text-amber-600",
+      valueClassName: "text-amber-600",
+    },
+    {
+      label: "Cancelados/Rechazados",
+      value: String(summary.rechazados),
+      icon: XCircle,
+      iconClassName: "bg-rose-50 text-rose-600",
+      valueClassName: "text-rose-600",
+    },
+  ];
+}
 
 const typeStyles: Record<string, string> = {
-  Residente: "bg-blue-100 text-blue-700",
-  Visitante: "bg-fuchsia-100 text-fuchsia-700",
-  Proveedor: "bg-amber-100 text-amber-700",
+  RESIDENTE: "bg-blue-100 text-blue-700",
+  VISITANTE: "bg-fuchsia-100 text-fuchsia-700",
+  PROVEEDOR: "bg-amber-100 text-amber-700",
+};
+
+const typeLabels: Record<string, string> = {
+  RESIDENTE: "Residente",
+  VISITANTE: "Visitante",
+  PROVEEDOR: "Proveedor",
 };
 
 const statusStyles: Record<string, string> = {
-  Aprobado: "bg-emerald-100 text-emerald-700",
-  Pendiente: "bg-amber-100 text-amber-700",
+  APROBADO: "bg-emerald-100 text-emerald-700",
+  PENDIENTE: "bg-amber-100 text-amber-700",
+  RECHAZADO: "bg-rose-100 text-rose-700",
 };
 
-const hourlyAccesses = [
-  { label: "00:00", value: 4 },
-  { label: "02:00", value: 2 },
-  { label: "04:00", value: 1 },
-  { label: "06:00", value: 12 },
-  { label: "08:00", value: 35 },
-  { label: "10:00", value: 28 },
-  { label: "12:00", value: 42 },
-  { label: "14:00", value: 31 },
-  { label: "16:00", value: 38 },
-  { label: "18:00", value: 45 },
-  { label: "20:00", value: 22 },
-  { label: "22:00", value: 8 },
-];
+const statusLabels: Record<string, string> = {
+  APROBADO: "Aprobado",
+  PENDIENTE: "Pendiente",
+  RECHAZADO: "Rechazado",
+};
 
-const chartLabels = ["60", "45", "30", "15", "0"];
+function formatRefreshTime(date: Date | null) {
+  if (!date) {
+    return "Sin sincronizar";
+  }
+  return new Intl.DateTimeFormat("es-GT", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
 
 export function AdminView() {
+  // SCRUM-175: estado para datos reales del dashboard
+  const [summary, setSummary] = useState<AdminAccessSummary>({
+    total_dia: 0,
+    aprobados: 0,
+    pendientes: 0,
+    rechazados: 0,
+  });
+  const [accesses, setAccesses] = useState<AdminAccessRecord[]>([]);
+  const [hourlyAccesses, setHourlyAccesses] = useState<AdminAccessHourlyPoint[]>([]);
+  // SCRUM-176: estado para validar actualizacion en tiempo real
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadDashboard(options: { silent?: boolean } = {}) {
+      try {
+        if (options.silent) {
+          setIsRefreshing(true);
+        }
+        const [summaryResponse, hourlyResponse, accessesResponse] = await Promise.all([
+          getAdminAccessSummaryRequest(),
+          getAdminAccessHourlyChartRequest(),
+          getAdminAccessesRequest({}),
+        ]);
+        if (active) {
+          setSummary(summaryResponse);
+          setHourlyAccesses(hourlyResponse);
+          setAccesses(accessesResponse.slice(0, 6));
+          setLastUpdatedAt(new Date());
+          setRefreshError(false);
+        }
+      } catch {
+        // SCRUM-176: marca error de sincronizacion para indicador visual
+        if (active) {
+          setRefreshError(true);
+        }
+      } finally {
+        if (active) {
+          setIsRefreshing(false);
+        }
+      }
+    }
+
+    void loadDashboard();
+    // Actualiza el resumen cada 30 segundos
+    const interval = window.setInterval(() => {
+      void loadDashboard({ silent: true });
+    }, 30000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  const dashboardCards = buildDashboardCards(summary);
+  const maxHourlyValue = useMemo(
+    () => Math.max(1, ...hourlyAccesses.map((item) => item.total)),
+    [hourlyAccesses],
+  );
+  const chartLabels = useMemo(
+    () =>
+      Array.from({ length: 5 }, (_unused, index) =>
+        String(Math.round(maxHourlyValue - (maxHourlyValue / 4) * index)),
+      ),
+    [maxHourlyValue],
+  );
+  const compactHourlyAccesses = useMemo(
+    () => hourlyAccesses.filter((_item, index) => index % 2 === 0),
+    [hourlyAccesses],
+  );
+
   return (
-    <AdminLayout title="Dashboard" subtitle="Resumen general del residencial">
+    <AdminLayout
+      title="Dashboard"
+      subtitle="Resumen general del residencial"
+      actions={
+        /* SCRUM-176: Indicador visual de sincronizacion en tiempo real */
+        <div className="flex items-center gap-3 text-xs">
+          {refreshError ? (
+            <span className="inline-flex items-center gap-1.5 text-rose-700">
+              <span className="size-2 rounded-full bg-rose-500" />
+              Sincronizacion fallida
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-emerald-700">
+              <span
+                className={`size-2 rounded-full bg-emerald-500 ${isRefreshing ? "animate-ping" : "animate-pulse"}`}
+              />
+              En vivo
+            </span>
+          )}
+          <span className="text-slate-500">
+            Actualizado: {formatRefreshTime(lastUpdatedAt)}
+          </span>
+        </div>
+      }
+    >
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {dashboardCards.map(({ label, value, icon: Icon, iconClassName, valueClassName }) => (
           <article
@@ -162,28 +229,36 @@ export function AdminView() {
                 </tr>
               </thead>
               <tbody>
-                {dashboardRows.map((row) => (
-                  <tr key={`${row.hour}-${row.name}`} className="border-b border-slate-100 last:border-b-0">
-                    <td className="px-5 py-3 text-sm text-slate-900">{row.hour}</td>
-                    <td className="px-5 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${typeStyles[row.type]}`}
-                      >
-                        {row.type}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-sm text-slate-950">{row.name}</td>
-                    <td className="px-5 py-3 text-sm text-slate-500">{row.unit}</td>
-                    <td className="px-5 py-3 text-sm text-slate-500">{row.plate}</td>
-                    <td className="px-5 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${statusStyles[row.status]}`}
-                      >
-                        {row.status}
-                      </span>
+                {accesses.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-8 text-center text-sm text-slate-500">
+                      No hay accesos registrados para hoy.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  accesses.map((row) => (
+                    <tr key={row.id_acceso} className="border-b border-slate-100 last:border-b-0">
+                      <td className="px-5 py-3 text-sm text-slate-900">{row.hora}</td>
+                      <td className="px-5 py-3">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${typeStyles[row.tipo]}`}
+                        >
+                          {typeLabels[row.tipo]}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-sm text-slate-950">{row.nombre}</td>
+                      <td className="px-5 py-3 text-sm text-slate-500">{row.casa_unidad}</td>
+                      <td className="px-5 py-3 text-sm text-slate-500">{row.placa}</td>
+                      <td className="px-5 py-3">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${statusStyles[row.estado]}`}
+                        >
+                          {statusLabels[row.estado]}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -194,8 +269,8 @@ export function AdminView() {
 
           <div className="mt-4 flex gap-2.5">
             <div className="flex h-[250px] flex-col justify-between pb-6 text-[0.74rem] text-slate-500">
-              {chartLabels.map((label) => (
-                <span key={label}>{label}</span>
+              {chartLabels.map((label, index) => (
+                <span key={`${label}-${index}`}>{label}</span>
               ))}
             </div>
 
@@ -211,14 +286,15 @@ export function AdminView() {
               </div>
 
               <div className="relative flex h-[250px] items-end gap-2 px-2.5 pb-8 pt-4">
-                {hourlyAccesses.map((item) => (
-                  <div key={item.label} className="flex flex-1 flex-col items-center justify-end gap-3">
+                {compactHourlyAccesses.map((item) => (
+                  <div key={item.hora} className="flex flex-1 flex-col items-center justify-end gap-3">
                     <div
                       className="w-full max-w-[20px] rounded-t-md bg-blue-500"
-                      style={{ height: `${(item.value / 60) * 195}px` }}
+                      style={{ height: `${(item.total / maxHourlyValue) * 195}px` }}
+                      title={`${item.hora}: ${item.total} accesos`}
                     />
                     <span className="text-[0.7rem] text-slate-500">
-                      {Number(item.label.slice(0, 2)) % 4 === 2 ? item.label : ""}
+                      {Number(item.hora.slice(0, 2)) % 4 === 2 ? item.hora : ""}
                     </span>
                   </div>
                 ))}
