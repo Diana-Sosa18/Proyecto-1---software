@@ -1,0 +1,27 @@
+function requireNotificationUser(req, _res, next) {
+  const role = String(req.header("x-user-role") || "")
+    .trim()
+    .toLowerCase();
+  const userId = Number(req.header("x-user-id"));
+
+  if (!["residente", "inquilino", "guardia"].includes(role)) {
+    const error = new Error("Acceso restringido.");
+    error.status = 403;
+    return next(error);
+  }
+
+  if (!Number.isInteger(userId) || userId <= 0) {
+    const error = new Error("Sesion invalida.");
+    error.status = 401;
+    return next(error);
+  }
+
+  req.authUser = {
+    id: userId,
+    role,
+  };
+
+  return next();
+}
+
+module.exports = { requireNotificationUser };
