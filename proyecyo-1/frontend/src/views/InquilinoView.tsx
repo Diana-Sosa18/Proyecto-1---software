@@ -40,15 +40,21 @@ import {
 } from "@/services/visitsService";
 import {
   createTenantProviderRequest,
+  getTenantProviderHistoryRequest,
   getTenantProvidersRequest,
   updateTenantProviderRequest,
 } from "@/services/providersService";
-import type { TenantProvider, TenantProviderStatus } from "@/types/providers";
+import type {
+  TenantProvider,
+  TenantProviderHistoryRecord,
+  TenantProviderStatus,
+} from "@/types/providers";
 import type { FrequentVisitor, VisitPayload, VisitRecord, VisitType } from "@/types/visits";
 
 type VisitFormState = VisitPayload;
 type AccessFilter = "TODOS" | "APROBADO" | "UTILIZADO" | "RECHAZADO" | "PENDIENTE";
 type TenantAlertType = "VISITA" | "SOLICITUD" | "PAGO";
+type ProviderFilterStatus = TenantProviderStatus | "TODOS";
 
 type TenantAlert = {
   id: string;
@@ -65,6 +71,7 @@ const tenantAlertStyles: Record<TenantAlertType, string> = {
 };
 
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
+const PROVIDER_FORM_STORAGE_KEY = "nexus.tenant-provider-draft";
 
 const steps = [
   { id: 1, label: "Datos del Visitante", description: "Informacion basica de identificacion" },
@@ -154,6 +161,20 @@ function formatDate(date: string) {
   }).format(new Date(`${date}T00:00:00`));
 }
 
+function formatDateTime(dateTime: string | null) {
+  if (!dateTime) {
+    return "Sin registro";
+  }
+
+  return new Intl.DateTimeFormat("es-GT", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(dateTime.replace(" ", "T")));
+}
+
 function getAccessStatus(visit: VisitRecord): Exclude<AccessFilter, "TODOS"> {
   if (visit.estado_acceso === "INGRESO_REGISTRADO" || visit.qr_status === "USED") {
     return "UTILIZADO";
@@ -188,11 +209,18 @@ export function InquilinoView() {
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [frequentVisitors, setFrequentVisitors] = useState<FrequentVisitor[]>([]);
   const [providers, setProviders] = useState<TenantProvider[]>([]);
+  const [providerHistory, setProviderHistory] = useState<TenantProviderHistoryRecord[]>([]);
+  const [providerSearch, setProviderSearch] = useState("");
+  const [providerDateFilter, setProviderDateFilter] = useState("");
+  const [providerStatusFilter, setProviderStatusFilter] = useState<ProviderFilterStatus>("TODOS");
+  const [providerHistoryUserFilter, setProviderHistoryUserFilter] = useState("");
+  const [providerHistoryDateFilter, setProviderHistoryDateFilter] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<AccessFilter>("TODOS");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRegisteringProvider, setIsRegisteringProvider] = useState(false);
   const [isUpdatingAccess, setIsUpdatingAccess] = useState(false);
+  const [isLoadingProviderHistory, setIsLoadingProviderHistory] = useState(false);
   const [updatingProviderId, setUpdatingProviderId] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -207,10 +235,11 @@ export function InquilinoView() {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const [visitsResult, frequentResult, providersResult] = await Promise.allSettled([
+        const [visitsResult, frequentResult, providersResult, providerHistoryResult] = await Promise.allSettled([
           getVisitsRequest(),
           getFrequentVisitorsRequest(),
           getTenantProvidersRequest(),
+          getTenantProviderHistoryRequest(),
         ]);
 
         if (!active) {
@@ -229,6 +258,7 @@ export function InquilinoView() {
 
         setFrequentVisitors(frequentResult.status === "fulfilled" ? frequentResult.value : []);
         setProviders(providersResult.status === "fulfilled" ? providersResult.value : []);
+        setProviderHistory(providerHistoryResult.status === "fulfilled" ? providerHistoryResult.value : []);
       } finally {
         if (active) {
           setIsLoading(false);
@@ -242,6 +272,29 @@ export function InquilinoView() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const savedDraft = window.localStorage.getItem(PROVIDER_FORM_STORAGE_KEY);
+
+    if (!savedDraft) {
+      return;
+    }
+
+    try {
+      const parsedDraft = JSON.parse(savedDraft) as Partial<VisitFormState>;
+      setProviderForm((current) => ({
+        ...current,
+        ...parsedDraft,
+        tipo_visita: "PROVEEDOR",
+      }));
+    } catch {
+      window.localStorage.removeItem(PROVIDER_FORM_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(PROVIDER_FORM_STORAGE_KEY, JSON.stringify(providerForm));
+  }, [providerForm]);
 
   const todayVisits = useMemo(() => countTodayVisits(visits), [visits]);
   const usedCount = useMemo(
@@ -300,6 +353,40 @@ export function InquilinoView() {
         ? visits
         : visits.filter((visit) => getAccessStatus(visit) === selectedStatus),
     [selectedStatus, visits],
+  );
+  const filteredProviders = useMemo(
+    () =>
+      providers.filter((provider) => {
+        const matchesSearch =
+          !providerSearch.trim() ||
+          [provider.nombre, provider.tipo_servicio, provider.descripcion]
+            .join(" ")
+            .toLowerCase()
+            .includes(providerSearch.trim().toLowerCase());
+        const matchesStatus =
+          providerStatusFilter === "TODOS" || provider.estado === providerStatusFilter;
+        const matchesDate =
+          !providerDateFilter ||
+          (provider.fecha_registro ? provider.fecha_registro.slice(0, 10) === providerDateFilter : false);
+
+        return matchesSearch && matchesStatus && matchesDate;
+      }),
+    [providerDateFilter, providerSearch, providerStatusFilter, providers],
+  );
+  const filteredProviderHistory = useMemo(
+    () =>
+      providerHistory.filter((entry) => {
+        const matchesUser =
+          !providerHistoryUserFilter.trim() ||
+          entry.realizado_por_nombre
+            .toLowerCase()
+            .includes(providerHistoryUserFilter.trim().toLowerCase());
+        const matchesDate =
+          !providerHistoryDateFilter || entry.creado_en.slice(0, 10) === providerHistoryDateFilter;
+
+        return matchesUser && matchesDate;
+      }),
+    [providerHistory, providerHistoryDateFilter, providerHistoryUserFilter],
   );
   const tenantHouseLabel = providers[0]?.casa_unidad || visits[0]?.casa || "Asignada a tu usuario";
 
@@ -378,6 +465,17 @@ export function InquilinoView() {
     }
   }
 
+  async function refreshProviderHistory() {
+    try {
+      setIsLoadingProviderHistory(true);
+      setProviderHistory(await getTenantProviderHistoryRequest());
+    } catch {
+      setProviderHistory([]);
+    } finally {
+      setIsLoadingProviderHistory(false);
+    }
+  }
+
   async function createVisit(payload: VisitPayload, message: string) {
     try {
       setIsSubmitting(true);
@@ -431,6 +529,8 @@ export function InquilinoView() {
             );
       });
       setProviderForm(createInitialProviderForm());
+      window.localStorage.removeItem(PROVIDER_FORM_STORAGE_KEY);
+      await refreshProviderHistory();
       setSelectedStatus("TODOS");
       setSuccessMessage("Proveedor registrado correctamente. Ya aparece en gestion y en tus accesos.");
     } catch (error) {
@@ -537,6 +637,7 @@ export function InquilinoView() {
           item.id_servicio === updatedProvider.id_servicio ? updatedProvider : item,
         ),
       );
+      await refreshProviderHistory();
       setSuccessMessage(
         nextActive
           ? `${provider.nombre} fue activado y quedo pendiente de validacion.`
@@ -748,17 +849,41 @@ export function InquilinoView() {
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            <Input
+              value={providerSearch}
+              onChange={(event) => setProviderSearch(event.target.value)}
+              placeholder="Buscar por proveedor o tipo..."
+              className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+            />
+            <Input
+              type="date"
+              value={providerDateFilter}
+              onChange={(event) => setProviderDateFilter(event.target.value)}
+              className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+            />
+            <select
+              value={providerStatusFilter}
+              onChange={(event) => setProviderStatusFilter(event.target.value as ProviderFilterStatus)}
+              className="h-12 w-full rounded-2xl border border-slate-100 bg-slate-50 px-4 text-sm outline-none focus:border-blue-300"
+            >
+              <option value="TODOS">Todos los estados</option>
+              <option value="VALIDADO">Solo validados</option>
+              <option value="PENDIENTE">Solo pendientes</option>
+            </select>
+          </div>
+
           {isLoading ? (
             <div className="rounded-3xl bg-slate-50 p-6 text-sm text-slate-500">
               Cargando proveedores de tu unidad...
             </div>
-          ) : providers.length === 0 ? (
+          ) : filteredProviders.length === 0 ? (
             <div className="rounded-3xl bg-slate-50 p-6 text-sm text-slate-500">
-              No hay proveedores disponibles para gestionar.
+              No hay proveedores que coincidan con los filtros seleccionados.
             </div>
           ) : (
-            providers.map((provider) => {
+            filteredProviders.map((provider) => {
               const isUpdating = updatingProviderId === provider.id_servicio;
 
               return (
@@ -791,7 +916,17 @@ export function InquilinoView() {
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
                           Unidad: {provider.casa_unidad}
                         </span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+                          Registro: {formatDateTime(provider.fecha_registro)}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+                          Cambios: {formatDateTime(provider.actualizado_en)}
+                        </span>
                       </div>
+
+                      <p className="mt-3 text-xs text-slate-500">
+                        Registrado por: {provider.registrado_por || "Sin registro"}.
+                      </p>
                     </div>
                   </div>
 
@@ -837,6 +972,7 @@ export function InquilinoView() {
           </CardTitle>
           <CardDescription className="mt-2">
             Autoriza un proveedor para ingresar a tu unidad con fecha y horario definidos.
+            El formulario guarda cambios automaticamente mientras avanzas.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -936,6 +1072,81 @@ export function InquilinoView() {
               Registrar proveedor
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+        <CardHeader>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-2xl text-slate-900">
+                <Clock3 className="size-6 text-blue-600" />
+                Cambios realizados
+              </CardTitle>
+              <CardDescription className="mt-2">
+                Historial de activaciones, desactivaciones y registros hechos sobre tus proveedores.
+              </CardDescription>
+            </div>
+            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              {providerHistory.length} movimientos registrados
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <Input
+              value={providerHistoryUserFilter}
+              onChange={(event) => setProviderHistoryUserFilter(event.target.value)}
+              placeholder="Filtrar por usuario..."
+              className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+            />
+            <Input
+              type="date"
+              value={providerHistoryDateFilter}
+              onChange={(event) => setProviderHistoryDateFilter(event.target.value)}
+              className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+            />
+          </div>
+
+          {isLoadingProviderHistory ? (
+            <div className="rounded-3xl bg-slate-50 p-6 text-sm text-slate-500">
+              Cargando historial de proveedores...
+            </div>
+          ) : filteredProviderHistory.length === 0 ? (
+            <div className="rounded-3xl bg-slate-50 p-6 text-sm text-slate-500">
+              No hay cambios que coincidan con los filtros actuales.
+            </div>
+          ) : (
+            filteredProviderHistory.slice(0, 8).map((entry) => (
+              <article
+                key={entry.id_historial}
+                className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-semibold text-slate-900">{entry.proveedor_nombre}</h3>
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                        {entry.accion}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600">{entry.detalle}</p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Usuario: {entry.realizado_por_nombre} ({entry.realizado_por_rol}) | Fecha:{" "}
+                      {formatDateTime(entry.creado_en)}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                    <p>Estado: {entry.estado_nuevo || entry.estado_anterior || "Sin cambio"}</p>
+                    <p className="mt-1">
+                      Activo:{" "}
+                      {entry.activo_nuevo === null ? "Sin cambio" : entry.activo_nuevo ? "ON" : "OFF"}
+                    </p>
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
         </CardContent>
       </Card>
 

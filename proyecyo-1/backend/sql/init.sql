@@ -3,6 +3,7 @@ USE nexus_residencial;
 
 DROP TABLE IF EXISTS ACCESO_EXCEPCION;
 DROP TABLE IF EXISTS COMUNICADO_USUARIO;
+DROP TABLE IF EXISTS HISTORIAL_CAMBIO_PROVEEDOR;
 DROP TABLE IF EXISTS TIPO_USUARIO_PERMISO;
 DROP TABLE IF EXISTS RESERVA;
 DROP TABLE IF EXISTS REGISTRO_ACCESO;
@@ -95,12 +96,33 @@ CREATE TABLE SERVICIO (
 CREATE TABLE CASA_SERVICIO (
     id_casa INT,
     id_servicio INT,
+    fecha_registro DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     estado_validacion VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
     PRIMARY KEY (id_casa, id_servicio),
     FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
     FOREIGN KEY (id_servicio) REFERENCES SERVICIO(id_servicio),
     CHECK (estado_validacion IN ('VALIDADO', 'PENDIENTE'))
+);
+
+CREATE TABLE HISTORIAL_CAMBIO_PROVEEDOR (
+    id_historial INT PRIMARY KEY AUTO_INCREMENT,
+    id_casa INT NOT NULL,
+    id_servicio INT NOT NULL,
+    accion VARCHAR(40) NOT NULL,
+    detalle VARCHAR(255) NOT NULL,
+    activo_anterior BOOLEAN NULL,
+    activo_nuevo BOOLEAN NULL,
+    estado_anterior VARCHAR(20) NULL,
+    estado_nuevo VARCHAR(20) NULL,
+    realizado_por_usuario INT NOT NULL,
+    realizado_por_nombre VARCHAR(100) NOT NULL,
+    realizado_por_rol VARCHAR(40) NOT NULL,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
+    FOREIGN KEY (id_servicio) REFERENCES SERVICIO(id_servicio),
+    FOREIGN KEY (realizado_por_usuario) REFERENCES USUARIO(id_usuario)
 );
 
 CREATE TABLE CUOTA (
@@ -326,6 +348,40 @@ SELECT
     'VALIDADO'
 FROM SERVICIO
 WHERE nombre IN ('Energia electrica', 'Agua potable', 'Seguridad privada');
+
+INSERT INTO HISTORIAL_CAMBIO_PROVEEDOR (
+    id_casa,
+    id_servicio,
+    accion,
+    detalle,
+    activo_anterior,
+    activo_nuevo,
+    estado_anterior,
+    estado_nuevo,
+    realizado_por_usuario,
+    realizado_por_nombre,
+    realizado_por_rol
+)
+SELECT
+    cs.id_casa,
+    cs.id_servicio,
+    'CREACION',
+    CONCAT('Proveedor inicial asociado a la unidad ', c.torre, '-', c.numero, '.'),
+    NULL,
+    cs.activo,
+    NULL,
+    cs.estado_validacion,
+    u.id_usuario,
+    u.nombre,
+    'residente'
+FROM CASA_SERVICIO cs
+INNER JOIN CASA c
+    ON c.id_casa = cs.id_casa
+INNER JOIN RESIDENTE r
+    ON r.id_residente = c.id_residente
+INNER JOIN USUARIO u
+    ON u.id_usuario = r.id_usuario
+WHERE c.numero = '302' AND c.torre = 'B';
 
 INSERT INTO VISITANTE (nombre, dpi, placa)
 VALUES

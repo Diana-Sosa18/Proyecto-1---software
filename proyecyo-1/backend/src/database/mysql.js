@@ -272,6 +272,20 @@ async function ensureTenantProvidersSchema() {
 
   const houseServiceColumns = [
     {
+      column: "fecha_registro",
+      ddl: `
+        ALTER TABLE CASA_SERVICIO
+        ADD COLUMN fecha_registro DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      `,
+    },
+    {
+      column: "actualizado_en",
+      ddl: `
+        ALTER TABLE CASA_SERVICIO
+        ADD COLUMN actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      `,
+    },
+    {
       column: "activo",
       ddl: `
         ALTER TABLE CASA_SERVICIO
@@ -295,9 +309,38 @@ async function ensureTenantProvidersSchema() {
 
   await query(`
     UPDATE CASA_SERVICIO
-    SET estado_validacion = 'PENDIENTE'
-    WHERE estado_validacion IS NULL OR estado_validacion = ''
+    SET
+      estado_validacion = COALESCE(NULLIF(estado_validacion, ''), 'PENDIENTE'),
+      fecha_registro = COALESCE(fecha_registro, CURRENT_TIMESTAMP),
+      actualizado_en = COALESCE(actualizado_en, CURRENT_TIMESTAMP)
+    WHERE estado_validacion IS NULL
+      OR estado_validacion = ''
+      OR fecha_registro IS NULL
+      OR actualizado_en IS NULL
   `);
+
+  if (!(await tableExists("HISTORIAL_CAMBIO_PROVEEDOR"))) {
+    await query(`
+      CREATE TABLE HISTORIAL_CAMBIO_PROVEEDOR (
+        id_historial INT PRIMARY KEY AUTO_INCREMENT,
+        id_casa INT NOT NULL,
+        id_servicio INT NOT NULL,
+        accion VARCHAR(40) NOT NULL,
+        detalle VARCHAR(255) NOT NULL,
+        activo_anterior BOOLEAN NULL,
+        activo_nuevo BOOLEAN NULL,
+        estado_anterior VARCHAR(20) NULL,
+        estado_nuevo VARCHAR(20) NULL,
+        realizado_por_usuario INT NOT NULL,
+        realizado_por_nombre VARCHAR(100) NOT NULL,
+        realizado_por_rol VARCHAR(40) NOT NULL,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
+        FOREIGN KEY (id_servicio) REFERENCES SERVICIO(id_servicio),
+        FOREIGN KEY (realizado_por_usuario) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
 
   const serviceRows = await query("SELECT COUNT(*) AS total FROM SERVICIO");
 

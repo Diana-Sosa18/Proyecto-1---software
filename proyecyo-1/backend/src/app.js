@@ -10,6 +10,7 @@ const amenitiesReservationsRoutes = require("./routes/amenitiesReservationsRoute
 const adminAccessesRoutes = require("./routes/adminAccessesRoutes");
 const notificationsRoutes = require("./routes/notificationsRoutes");
 const tenantProvidersRoutes = require("./routes/tenantProvidersRoutes");
+const adminProvidersRoutes = require("./routes/adminProvidersRoutes");
 const announcementsRoutes = require("./routes/announcementsRoutes");
 const specialAccessesRoutes = require("./routes/specialAccessesRoutes");
 
@@ -37,6 +38,7 @@ function createApp() {
   app.use(adminAccessesRoutes);
   app.use(notificationsRoutes);
   app.use(tenantProvidersRoutes);
+  app.use(adminProvidersRoutes);
   app.use(announcementsRoutes);
   app.use(specialAccessesRoutes);
 

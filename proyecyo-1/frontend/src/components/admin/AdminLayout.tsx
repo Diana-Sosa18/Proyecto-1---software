@@ -9,6 +9,7 @@ import {
   Settings,
   ShieldAlert,
   Wallet,
+  BriefcaseBusiness,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -42,6 +43,9 @@ const adminMenuItems: AdminMenuItem[] = [
     to: "/admin/accesos",
   },
   {
+    label: "Proveedores",
+    icon: BriefcaseBusiness,
+    to: "/admin/proveedores",
     label: "Accesos especiales",
     icon: ShieldAlert,
     to: "/admin/accesos-especiales",
