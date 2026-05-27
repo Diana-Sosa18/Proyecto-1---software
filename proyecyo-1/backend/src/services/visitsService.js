@@ -830,12 +830,14 @@ async function createArrivalNotification(connection, accessId) {
         v.nombre AS visitante,
         c.numero,
         c.torre,
-        u.id_usuario AS id_residente_usuario
+        u.id_usuario AS id_residente_usuario,
+        TIME_FORMAT(ra.hora_ingreso, '%H:%i') AS hora_llegada
       FROM ACCESO a
       INNER JOIN VISITANTE v ON v.id_visitante = a.id_visitante
       INNER JOIN CASA c ON c.id_casa = a.id_casa
       INNER JOIN RESIDENTE r ON r.id_residente = c.id_residente
       INNER JOIN USUARIO u ON u.id_usuario = r.id_usuario
+      LEFT JOIN REGISTRO_ACCESO ra ON ra.id_acceso = a.id_acceso
       WHERE a.id_acceso = ?
       LIMIT 1
     `,
@@ -849,8 +851,9 @@ async function createArrivalNotification(connection, accessId) {
   }
 
   const casa = `${data.torre ? `${data.torre}-` : ""}${data.numero}`;
+  const hora = data.hora_llegada ? ` a las ${data.hora_llegada}` : "";
   const titulo = "Tu visita ya llegó";
-  const mensaje = `${data.visitante} llegó a la garita y su ingreso fue registrado para la casa ${casa}.`;
+  const mensaje = `${data.visitante} llegó a la garita${hora} y su ingreso fue registrado para la casa ${casa}.`;
 
   await connection.execute(
     `
