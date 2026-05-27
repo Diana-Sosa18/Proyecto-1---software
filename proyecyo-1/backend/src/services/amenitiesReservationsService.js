@@ -216,6 +216,23 @@ function createReservationKey(reservation) {
   ].join("-");
 }
 
+function parseReservationKey(value) {
+  const match = normalizeString(value).match(/^(\d+)-(\d+)-(\d{4}-\d{2}-\d{2})-(\d{2}:\d{2})$/);
+
+  if (!match) {
+    const error = new Error("La reserva indicada no es valida.");
+    error.status = 400;
+    throw error;
+  }
+
+  return {
+    id_usuario: Number(match[1]),
+    id_amenidad: Number(match[2]),
+    fecha: match[3],
+    hora_inicio: `${match[4]}:00`,
+  };
+}
+
 function mapAmenity(row) {
   return {
     id_amenidad: Number(row.id_amenidad),
@@ -343,6 +360,112 @@ function validateReservationRange(amenity, fecha, horaInicio, horaFin) {
     error.status = 400;
     throw error;
   }
+}
+
+function assertReservationChangeAllowed(reservation) {
+  const currentDateTime = getCurrentDateTimeInTimezone();
+  const reservationStart = new Date(`${reservation.fecha}T${reservation.hora_inicio}:00`);
+  const now = new Date(`${currentDateTime.date}T${currentDateTime.time}`);
+  const minutesUntilStart = (reservationStart.getTime() - now.getTime()) / 60000;
+
+  if (String(reservation.estado || "").toUpperCase() === "CANCELADA") {
+    const error = new Error("La reserva ya fue cancelada.");
+    error.status = 409;
+    throw error;
+  }
+
+  if (minutesUntilStart < 120) {
+    const error = new Error("Solo puedes modificar o cancelar reservas con al menos 2 horas de anticipacion.");
+    error.status = 409;
+    throw error;
+  }
+}
+
+async function getReservationForChange(connection, key, viewer, lockRow) {
+  const [rows] = await connection.execute(
+    `
+      SELECT
+        r.id_usuario,
+        r.id_amenidad,
+        a.nombre AS amenidad_nombre,
+        DATE_FORMAT(r.fecha, '%Y-%m-%d') AS fecha,
+        TIME_FORMAT(r.hora_inicio, '%H:%i') AS hora_inicio,
+        TIME_FORMAT(r.hora_fin, '%H:%i') AS hora_fin,
+        COALESCE(r.estado, 'CONFIRMADA') AS estado,
+        u.nombre AS usuario_nombre,
+        tu.nombre AS usuario_rol,
+        COALESCE(unidad.unidad, 'Sin unidad') AS unidad
+      FROM RESERVA r
+      INNER JOIN AMENIDAD a
+        ON a.id_amenidad = r.id_amenidad
+      INNER JOIN USUARIO u
+        ON u.id_usuario = r.id_usuario
+      INNER JOIN TIPO_USUARIO tu
+        ON tu.id_tipo_usuario = u.id_tipo_usuario
+      LEFT JOIN (${USER_UNIT_SUBQUERY}) unidad
+        ON unidad.id_usuario = u.id_usuario
+      WHERE r.id_usuario = ?
+        AND r.id_amenidad = ?
+        AND r.fecha = ?
+        AND r.hora_inicio = ?
+        AND r.id_usuario = ?
+      LIMIT 1
+      ${lockRow ? "FOR UPDATE" : ""}
+    `,
+    [key.id_usuario, key.id_amenidad, key.fecha, key.hora_inicio, viewer.id],
+  );
+
+  const reservation = rows[0];
+
+  if (!reservation) {
+    const error = new Error("Reserva no encontrada para el residente autenticado.");
+    error.status = 404;
+    throw error;
+  }
+
+  return reservation;
+}
+
+async function insertReservationHistory(connection, before, after, action, viewer) {
+  await connection.execute(
+    `
+      INSERT INTO HISTORIAL_RESERVA (
+        id_usuario,
+        id_amenidad,
+        fecha_anterior,
+        hora_inicio_anterior,
+        hora_fin_anterior,
+        fecha_nueva,
+        hora_inicio_nueva,
+        hora_fin_nueva,
+        estado_anterior,
+        estado_nuevo,
+        accion,
+        detalle,
+        realizado_por,
+        realizado_por_nombre
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      before.id_usuario,
+      before.id_amenidad,
+      before.fecha,
+      before.hora_inicio,
+      before.hora_fin,
+      after?.fecha || before.fecha,
+      after?.hora_inicio || before.hora_inicio,
+      after?.hora_fin || before.hora_fin,
+      before.estado,
+      after?.estado || before.estado,
+      action,
+      action === "CANCELACION"
+        ? `${viewer.nombre} cancelo la reserva de ${before.amenidad_nombre}.`
+        : `${viewer.nombre} modifico la reserva de ${before.amenidad_nombre}.`,
+      viewer.id,
+      viewer.nombre,
+    ],
+  );
 }
 
 async function ensureAmenityCatalog(connection) {
@@ -490,6 +613,15 @@ async function getReservableUserRecord(connection, userId) {
     rol: user.rol,
     unidad: user.unidad || "Sin unidad",
   };
+}
+
+async function getUserName(connection, userId) {
+  const [rows] = await connection.execute(
+    "SELECT nombre FROM USUARIO WHERE id_usuario = ? LIMIT 1",
+    [userId],
+  );
+
+  return rows[0]?.nombre || "Usuario";
 }
 
 async function findReservationConflict(connection, amenityId, fecha, horaInicio, horaFin, lockRow) {
@@ -672,6 +804,246 @@ async function listReservationsByRange(fromDate, toDate, options = {}) {
   );
 
   return rows.map((row) => mapReservation(row, includeUserDetails));
+}
+
+async function listReservationHistory(userId) {
+  const rows = await query(
+    `
+      SELECT
+        h.id_historial,
+        h.accion,
+        h.detalle,
+        a.nombre AS amenidad_nombre,
+        DATE_FORMAT(h.fecha_anterior, '%Y-%m-%d') AS fecha_anterior,
+        TIME_FORMAT(h.hora_inicio_anterior, '%H:%i') AS hora_inicio_anterior,
+        TIME_FORMAT(h.hora_fin_anterior, '%H:%i') AS hora_fin_anterior,
+        DATE_FORMAT(h.fecha_nueva, '%Y-%m-%d') AS fecha_nueva,
+        TIME_FORMAT(h.hora_inicio_nueva, '%H:%i') AS hora_inicio_nueva,
+        TIME_FORMAT(h.hora_fin_nueva, '%H:%i') AS hora_fin_nueva,
+        h.estado_anterior,
+        h.estado_nuevo,
+        h.realizado_por_nombre,
+        DATE_FORMAT(h.creado_en, '%Y-%m-%d %H:%i:%s') AS creado_en
+      FROM HISTORIAL_RESERVA h
+      INNER JOIN AMENIDAD a
+        ON a.id_amenidad = h.id_amenidad
+      WHERE h.id_usuario = ?
+      ORDER BY h.creado_en DESC, h.id_historial DESC
+      LIMIT 20
+    `,
+    [userId],
+  );
+
+  return rows.map((row) => ({
+    id_historial: Number(row.id_historial),
+    accion: row.accion,
+    detalle: row.detalle,
+    amenidad_nombre: row.amenidad_nombre,
+    fecha_anterior: row.fecha_anterior,
+    hora_inicio_anterior: row.hora_inicio_anterior,
+    hora_fin_anterior: row.hora_fin_anterior,
+    fecha_nueva: row.fecha_nueva,
+    hora_inicio_nueva: row.hora_inicio_nueva,
+    hora_fin_nueva: row.hora_fin_nueva,
+    estado_anterior: row.estado_anterior,
+    estado_nuevo: row.estado_nuevo,
+    realizado_por_nombre: row.realizado_por_nombre,
+    creado_en: row.creado_en,
+  }));
+}
+
+async function updateAmenityReservation(viewer, reservationKey, payload = {}) {
+  const key = parseReservationKey(reservationKey);
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    await ensureAmenityCatalog(connection);
+    const current = await getReservationForChange(connection, key, viewer, true);
+    assertReservationChangeAllowed(current);
+
+    const next = normalizeReservationPayload(
+      {
+        id_usuario: current.id_usuario,
+        id_amenidad: payload.id_amenidad || current.id_amenidad,
+        fecha: payload.fecha || current.fecha,
+        hora_inicio: payload.hora_inicio || current.hora_inicio,
+        hora_fin: payload.hora_fin || current.hora_fin,
+      },
+      true,
+    );
+    const amenity = await getAmenityRecord(connection, next.id_amenidad);
+    validateReservationRange(amenity, next.fecha, next.hora_inicio, next.hora_fin);
+
+    const conflict = await findReservationConflict(
+      connection,
+      next.id_amenidad,
+      next.fecha,
+      next.hora_inicio,
+      next.hora_fin,
+      true,
+    );
+
+    if (
+      conflict &&
+      !(
+        Number(conflict.id_usuario) === Number(current.id_usuario) &&
+        Number(conflict.id_amenidad) === Number(current.id_amenidad) &&
+        conflict.fecha === current.fecha &&
+        conflict.hora_inicio === current.hora_inicio
+      )
+    ) {
+      const error = new Error("El nuevo horario ya esta ocupado para esta amenidad.");
+      error.status = 409;
+      throw error;
+    }
+
+    await connection.execute(
+      `
+        UPDATE RESERVA
+        SET
+          id_amenidad = ?,
+          fecha = ?,
+          hora_inicio = ?,
+          hora_fin = ?,
+          estado = 'CONFIRMADA'
+        WHERE id_usuario = ?
+          AND id_amenidad = ?
+          AND fecha = ?
+          AND hora_inicio = ?
+      `,
+      [
+        next.id_amenidad,
+        next.fecha,
+        next.hora_inicio,
+        next.hora_fin,
+        current.id_usuario,
+        current.id_amenidad,
+        current.fecha,
+        `${current.hora_inicio}:00`,
+      ],
+    );
+
+    const viewerName = await getUserName(connection, viewer.id);
+    await insertReservationHistory(
+      connection,
+      current,
+      {
+        fecha: next.fecha,
+        hora_inicio: next.hora_inicio,
+        hora_fin: next.hora_fin,
+        estado: "CONFIRMADA",
+      },
+      "MODIFICACION",
+      { id: viewer.id, nombre: viewerName },
+    );
+
+    await connection.commit();
+
+    const updatedRows = await listReservationsByRange(next.fecha, next.fecha, {
+      id_amenidad: next.id_amenidad,
+      id_usuario: current.id_usuario,
+      includeUserDetails: false,
+    });
+    return updatedRows.find((item) => item.hora_inicio === next.hora_inicio.slice(0, 5)) || null;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function cancelAmenityReservation(viewer, reservationKey) {
+  const key = parseReservationKey(reservationKey);
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    const current = await getReservationForChange(connection, key, viewer, true);
+    assertReservationChangeAllowed(current);
+
+    await connection.execute(
+      `
+        UPDATE RESERVA
+        SET estado = 'CANCELADA'
+        WHERE id_usuario = ?
+          AND id_amenidad = ?
+          AND fecha = ?
+          AND hora_inicio = ?
+      `,
+      [current.id_usuario, current.id_amenidad, current.fecha, `${current.hora_inicio}:00`],
+    );
+
+    const viewerName = await getUserName(connection, viewer.id);
+    await insertReservationHistory(
+      connection,
+      current,
+      { ...current, estado: "CANCELADA" },
+      "CANCELACION",
+      { id: viewer.id, nombre: viewerName },
+    );
+
+    await connection.commit();
+    return mapReservation({ ...current, estado: "CANCELADA" }, false);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function getAmenityStats(fromDate, toDate, filters = {}) {
+  const from = ensureValidDate(fromDate);
+  const to = ensureValidDate(toDate);
+  const amenityId = filters.id_amenidad == null ? null : Number(filters.id_amenidad);
+  const params = [from, to];
+  let amenityFilter = "";
+
+  if (amenityId && Number.isInteger(amenityId) && amenityId > 0) {
+    amenityFilter = " AND a.id_amenidad = ?";
+    params.push(amenityId);
+  }
+
+  const rows = await query(
+    `
+      SELECT
+        a.id_amenidad,
+        a.nombre,
+        COUNT(r.id_usuario) AS total_reservas,
+        SUM(CASE WHEN COALESCE(r.estado, 'CONFIRMADA') = 'CANCELADA' THEN 1 ELSE 0 END) AS canceladas,
+        SUM(CASE WHEN COALESCE(r.estado, 'CONFIRMADA') <> 'CANCELADA' THEN 1 ELSE 0 END) AS activas
+      FROM AMENIDAD a
+      LEFT JOIN RESERVA r
+        ON r.id_amenidad = a.id_amenidad
+        AND r.fecha BETWEEN ? AND ?
+      WHERE a.activo = TRUE
+        ${amenityFilter}
+      GROUP BY a.id_amenidad, a.nombre
+      ORDER BY activas DESC, total_reservas DESC, a.nombre ASC
+    `,
+    params,
+  );
+
+  const byAmenity = rows.map((row, index) => ({
+    id_amenidad: Number(row.id_amenidad),
+    nombre: row.nombre,
+    activas: Number(row.activas || 0),
+    canceladas: Number(row.canceladas || 0),
+    total_reservas: Number(row.activas || 0) + Number(row.canceladas || 0),
+    ranking: index + 1,
+  }));
+
+  return {
+    from,
+    to,
+    total_reservas: byAmenity.reduce((total, item) => total + item.total_reservas, 0),
+    reservas_activas: byAmenity.reduce((total, item) => total + item.activas, 0),
+    reservas_canceladas: byAmenity.reduce((total, item) => total + item.canceladas, 0),
+    por_amenidad: byAmenity,
+    ranking: byAmenity.filter((item) => item.total_reservas > 0),
+  };
 }
 
 async function getAmenityAvailability(amenityIdValue, fechaValue, options = {}) {
@@ -999,8 +1371,12 @@ module.exports = {
   listAmenities,
   listReservableUsers,
   listReservationsByRange,
+  listReservationHistory,
   getAmenityAvailability,
   validateAmenityReservationConflict,
   createAmenityReservation,
+  updateAmenityReservation,
+  cancelAmenityReservation,
+  getAmenityStats,
   updateAmenitySchedule,
 };

@@ -493,6 +493,126 @@ async function ensureSpecialAccessSchema() {
   }
 }
 
+async function ensureSprintUserStoriesSchema() {
+  if (!(await tableExists("HISTORIAL_RESERVA"))) {
+    await query(`
+      CREATE TABLE HISTORIAL_RESERVA (
+        id_historial INT PRIMARY KEY AUTO_INCREMENT,
+        id_usuario INT NOT NULL,
+        id_amenidad INT NOT NULL,
+        fecha_anterior DATE NULL,
+        hora_inicio_anterior TIME NULL,
+        hora_fin_anterior TIME NULL,
+        fecha_nueva DATE NULL,
+        hora_inicio_nueva TIME NULL,
+        hora_fin_nueva TIME NULL,
+        estado_anterior VARCHAR(20) NULL,
+        estado_nuevo VARCHAR(20) NULL,
+        accion VARCHAR(40) NOT NULL,
+        detalle VARCHAR(255) NOT NULL,
+        realizado_por INT NOT NULL,
+        realizado_por_nombre VARCHAR(100) NOT NULL,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario),
+        FOREIGN KEY (id_amenidad) REFERENCES AMENIDAD(id_amenidad),
+        FOREIGN KEY (realizado_por) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  if (!(await tableExists("PERMISO_INQUILINO"))) {
+    await query(`
+      CREATE TABLE PERMISO_INQUILINO (
+        id_permiso_inquilino INT PRIMARY KEY AUTO_INCREMENT,
+        id_usuario INT NOT NULL,
+        nombre VARCHAR(120) NOT NULL,
+        descripcion VARCHAR(255) NOT NULL,
+        restriccion VARCHAR(255) NULL,
+        fecha_inicio DATE NOT NULL,
+        fecha_fin DATE NULL,
+        estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVO',
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  if (!(await tableExists("SOLICITUD_AUTORIZACION_DIGITAL"))) {
+    await query(`
+      CREATE TABLE SOLICITUD_AUTORIZACION_DIGITAL (
+        id_solicitud INT PRIMARY KEY AUTO_INCREMENT,
+        id_inquilino_usuario INT NOT NULL,
+        id_propietario_usuario INT NOT NULL,
+        id_casa INT NOT NULL,
+        accion VARCHAR(120) NOT NULL,
+        motivo VARCHAR(255) NOT NULL,
+        estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+        respuesta VARCHAR(255) NULL,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_inquilino_usuario) REFERENCES USUARIO(id_usuario),
+        FOREIGN KEY (id_propietario_usuario) REFERENCES USUARIO(id_usuario),
+        FOREIGN KEY (id_casa) REFERENCES CASA(id_casa)
+      )
+    `);
+  }
+
+  if (!(await tableExists("REGLAMENTO"))) {
+    await query(`
+      CREATE TABLE REGLAMENTO (
+        id_reglamento INT PRIMARY KEY AUTO_INCREMENT,
+        categoria VARCHAR(80) NOT NULL,
+        titulo VARCHAR(150) NOT NULL,
+        contenido TEXT NOT NULL,
+        activo BOOLEAN NOT NULL DEFAULT TRUE,
+        actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
+
+  await query(`
+    INSERT INTO PERMISO_INQUILINO (id_usuario, nombre, descripcion, restriccion, fecha_inicio, fecha_fin, estado)
+    SELECT u.id_usuario, 'Gestion de visitas', 'Puede crear accesos temporales para visitas autorizadas.', 'No aplica para accesos fuera del horario permitido por el residencial.', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 1 YEAR), 'ACTIVO'
+    FROM USUARIO u
+    INNER JOIN TIPO_USUARIO tu ON tu.id_tipo_usuario = u.id_tipo_usuario
+    WHERE tu.nombre = 'inquilino'
+      AND NOT EXISTS (
+        SELECT 1 FROM PERMISO_INQUILINO pi
+        WHERE pi.id_usuario = u.id_usuario AND pi.nombre = 'Gestion de visitas'
+      )
+  `);
+
+  await query(`
+    INSERT INTO PERMISO_INQUILINO (id_usuario, nombre, descripcion, restriccion, fecha_inicio, fecha_fin, estado)
+    SELECT u.id_usuario, 'Reservas de amenidades', 'Puede solicitar reservas segun disponibilidad de la unidad.', 'Requiere autorizacion digital para horarios o acciones restringidas.', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 1 YEAR), 'ACTIVO'
+    FROM USUARIO u
+    INNER JOIN TIPO_USUARIO tu ON tu.id_tipo_usuario = u.id_tipo_usuario
+    WHERE tu.nombre = 'inquilino'
+      AND NOT EXISTS (
+        SELECT 1 FROM PERMISO_INQUILINO pi
+        WHERE pi.id_usuario = u.id_usuario AND pi.nombre = 'Reservas de amenidades'
+      )
+  `);
+
+  await query(`
+    INSERT INTO REGLAMENTO (categoria, titulo, contenido)
+    SELECT 'Amenidades', 'Uso de amenidades', 'Las amenidades deben reservarse dentro de los horarios configurados. El uso queda sujeto a disponibilidad, estado de cuenta y normas de convivencia.'
+    WHERE NOT EXISTS (SELECT 1 FROM REGLAMENTO WHERE titulo = 'Uso de amenidades')
+  `);
+
+  await query(`
+    INSERT INTO REGLAMENTO (categoria, titulo, contenido)
+    SELECT 'Accesos', 'Ingreso de visitantes', 'Todo visitante debe contar con una autorizacion vigente, QR valido y registro en garita. Los accesos vencidos o cancelados no pueden utilizarse.'
+    WHERE NOT EXISTS (SELECT 1 FROM REGLAMENTO WHERE titulo = 'Ingreso de visitantes')
+  `);
+
+  await query(`
+    INSERT INTO REGLAMENTO (categoria, titulo, contenido)
+    SELECT 'Convivencia', 'Normas de convivencia', 'Se debe evitar ruido excesivo, respetar areas comunes y atender las indicaciones administrativas o de seguridad del residencial.'
+    WHERE NOT EXISTS (SELECT 1 FROM REGLAMENTO WHERE titulo = 'Normas de convivencia')
+  `);
+}
+
 module.exports = {
   pool,
   query,
@@ -502,4 +622,5 @@ module.exports = {
   ensureTenantProvidersSchema,
   ensureAnnouncementsSchema,
   ensureSpecialAccessSchema,
+  ensureSprintUserStoriesSchema,
 };

@@ -46,6 +46,8 @@ const adminMenuItems: AdminMenuItem[] = [
     label: "Proveedores",
     icon: BriefcaseBusiness,
     to: "/admin/proveedores",
+  },
+  {
     label: "Accesos especiales",
     icon: ShieldAlert,
     to: "/admin/accesos-especiales",

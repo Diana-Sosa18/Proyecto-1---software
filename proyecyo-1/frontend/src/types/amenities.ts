@@ -23,6 +23,23 @@ export interface AmenityReservation {
   unidad?: string;
 }
 
+export interface AmenityReservationHistory {
+  id_historial: number;
+  accion: string;
+  detalle: string;
+  amenidad_nombre: string;
+  fecha_anterior: string;
+  hora_inicio_anterior: string;
+  hora_fin_anterior: string;
+  fecha_nueva: string;
+  hora_inicio_nueva: string;
+  hora_fin_nueva: string;
+  estado_anterior: string;
+  estado_nuevo: string;
+  realizado_por_nombre: string;
+  creado_en: string;
+}
+
 export interface AmenityAvailabilitySlot {
   hora_inicio: string;
   hora_fin: string;
@@ -63,4 +80,23 @@ export interface UpdateAmenitySchedulePayload {
   hora_cierre: string;
   intervalo_minutos: number;
   activo: boolean;
+}
+
+export interface AmenityStatsItem {
+  id_amenidad: number;
+  nombre: string;
+  total_reservas: number;
+  activas: number;
+  canceladas: number;
+  ranking: number;
+}
+
+export interface AmenityStatsResponse {
+  from: string;
+  to: string;
+  total_reservas: number;
+  reservas_activas: number;
+  reservas_canceladas: number;
+  por_amenidad: AmenityStatsItem[];
+  ranking: AmenityStatsItem[];
 }

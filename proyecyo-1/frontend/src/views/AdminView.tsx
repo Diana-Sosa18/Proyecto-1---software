@@ -17,9 +17,10 @@ import {
   getAdminAccessHourlyChartRequest,
   getAdminAccessSummaryRequest,
 } from "@/services/adminAccessesService";
+import { getAdminAmenityStatsRequest } from "@/services/amenitiesService";
 import type { AdminAccessHourlyPoint, AdminAccessRecord, AdminAccessSummary } from "@/types/accesses";
+import type { AmenityStatsResponse } from "@/types/amenities";
 
-// SCRUM-175: Construye las tarjetas del dashboard con datos reales del backend
 function buildDashboardCards(summary: AdminAccessSummary) {
   return [
     {
@@ -65,13 +66,13 @@ const typeLabels: Record<string, string> = {
   PROVEEDOR: "Proveedor",
 };
 
-const statusStyles: Record<string, string> = {
+const accessStatusStyles: Record<string, string> = {
   APROBADO: "bg-emerald-100 text-emerald-700",
   PENDIENTE: "bg-amber-100 text-amber-700",
   RECHAZADO: "bg-rose-100 text-rose-700",
 };
 
-const statusLabels: Record<string, string> = {
+const accessStatusLabels: Record<string, string> = {
   APROBADO: "Aprobado",
   PENDIENTE: "Pendiente",
   RECHAZADO: "Rechazado",
@@ -90,7 +91,7 @@ function formatRefreshTime(date: Date | null) {
 }
 
 export function AdminView() {
-  // SCRUM-175: estado para datos reales del dashboard
+  const today = new Date().toISOString().slice(0, 10);
   const [summary, setSummary] = useState<AdminAccessSummary>({
     total_dia: 0,
     aprobados: 0,
@@ -99,10 +100,12 @@ export function AdminView() {
   });
   const [accesses, setAccesses] = useState<AdminAccessRecord[]>([]);
   const [hourlyAccesses, setHourlyAccesses] = useState<AdminAccessHourlyPoint[]>([]);
-  // SCRUM-176: estado para validar actualizacion en tiempo real
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState(false);
+  const [statsFrom, setStatsFrom] = useState(today);
+  const [statsTo, setStatsTo] = useState(today);
+  const [amenityStats, setAmenityStats] = useState<AmenityStatsResponse | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -125,7 +128,6 @@ export function AdminView() {
           setRefreshError(false);
         }
       } catch {
-        // SCRUM-176: marca error de sincronizacion para indicador visual
         if (active) {
           setRefreshError(true);
         }
@@ -137,7 +139,6 @@ export function AdminView() {
     }
 
     void loadDashboard();
-    // Actualiza el resumen cada 30 segundos
     const interval = window.setInterval(() => {
       void loadDashboard({ silent: true });
     }, 30000);
@@ -147,6 +148,26 @@ export function AdminView() {
       window.clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    getAdminAmenityStatsRequest({ from: statsFrom, to: statsTo })
+      .then((response) => {
+        if (active) {
+          setAmenityStats(response);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setAmenityStats(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [statsFrom, statsTo]);
 
   const dashboardCards = buildDashboardCards(summary);
   const maxHourlyValue = useMemo(
@@ -164,13 +185,16 @@ export function AdminView() {
     () => hourlyAccesses.filter((_item, index) => index % 2 === 0),
     [hourlyAccesses],
   );
+  const maxAmenityReservations = Math.max(
+    1,
+    ...(amenityStats?.por_amenidad.map((item) => item.total_reservas) || [1]),
+  );
 
   return (
     <AdminLayout
       title="Dashboard"
       subtitle="Resumen general del residencial"
       actions={
-        /* SCRUM-176: Indicador visual de sincronizacion en tiempo real */
         <div className="flex items-center gap-3 text-xs">
           {refreshError ? (
             <span className="inline-flex items-center gap-1.5 text-rose-700">
@@ -185,9 +209,7 @@ export function AdminView() {
               En vivo
             </span>
           )}
-          <span className="text-slate-500">
-            Actualizado: {formatRefreshTime(lastUpdatedAt)}
-          </span>
+          <span className="text-slate-500">Actualizado: {formatRefreshTime(lastUpdatedAt)}</span>
         </div>
       }
     >
@@ -208,6 +230,66 @@ export function AdminView() {
             </div>
           </article>
         ))}
+      </section>
+
+      <section className="mt-5 rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-[1.24rem] font-semibold text-slate-950">Estadisticas de amenidades</h2>
+            <p className="text-sm text-slate-500">Uso, ranking y reservas por amenidad con datos reales.</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input
+              type="date"
+              value={statsFrom}
+              onChange={(event) => setStatsFrom(event.target.value)}
+              className="h-10 rounded-xl border border-slate-200 px-3 text-sm"
+            />
+            <input
+              type="date"
+              value={statsTo}
+              onChange={(event) => setStatsTo(event.target.value)}
+              className="h-10 rounded-xl border border-slate-200 px-3 text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.6fr)]">
+          <div className="space-y-3">
+            {(amenityStats?.por_amenidad || []).map((item) => (
+              <div key={item.id_amenidad} className="grid gap-2 md:grid-cols-[150px_minmax(0,1fr)_90px] md:items-center">
+                <p className="text-sm font-medium text-slate-700">{item.nombre}</p>
+                <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-blue-500"
+                    style={{ width: `${Math.max(4, (item.total_reservas / maxAmenityReservations) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-sm text-slate-500">{item.total_reservas} reservas</p>
+              </div>
+            ))}
+            {!amenityStats?.por_amenidad.length ? (
+              <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Sin reservas en el rango.</p>
+            ) : null}
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-900">Ranking</p>
+            <div className="mt-3 space-y-2">
+              {(amenityStats?.ranking || []).slice(0, 5).map((item) => (
+                <div key={item.id_amenidad} className="flex items-center justify-between rounded-xl bg-white px-3 py-2">
+                  <span className="text-sm text-slate-700">
+                    {item.ranking}. {item.nombre}
+                  </span>
+                  <span className="rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700">{item.activas}</span>
+                </div>
+              ))}
+              {!amenityStats?.ranking.length ? (
+                <p className="text-sm text-slate-500">Sin ranking disponible.</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.85fr)]">
@@ -240,9 +322,7 @@ export function AdminView() {
                     <tr key={row.id_acceso} className="border-b border-slate-100 last:border-b-0">
                       <td className="px-5 py-3 text-sm text-slate-900">{row.hora}</td>
                       <td className="px-5 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${typeStyles[row.tipo]}`}
-                        >
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${typeStyles[row.tipo]}`}>
                           {typeLabels[row.tipo]}
                         </span>
                       </td>
@@ -250,10 +330,8 @@ export function AdminView() {
                       <td className="px-5 py-3 text-sm text-slate-500">{row.casa_unidad}</td>
                       <td className="px-5 py-3 text-sm text-slate-500">{row.placa}</td>
                       <td className="px-5 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${statusStyles[row.estado]}`}
-                        >
-                          {statusLabels[row.estado]}
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${accessStatusStyles[row.estado]}`}>
+                          {accessStatusLabels[row.estado]}
                         </span>
                       </td>
                     </tr>
@@ -340,9 +418,7 @@ export function AdminView() {
                 className="block rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition hover:border-blue-200 hover:shadow-[0_12px_36px_rgba(37,99,235,0.08)]"
               >
                 {body}
-                <p className="mt-3 text-[0.78rem] font-medium text-blue-600">
-                  Ir a control con filtros
-                </p>
+                <p className="mt-3 text-[0.78rem] font-medium text-blue-600">Ir a control con filtros</p>
               </Link>
             );
           }

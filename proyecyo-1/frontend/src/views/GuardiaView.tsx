@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import jsQR from "jsqr";
 import {
-  Bell,
   BellRing,
   Camera,
   CheckCheck,
@@ -27,11 +26,13 @@ import {
 } from "@/services/visitsService";
 import {
   getGuardNotificationsRequest,
+  getNotificationsRequest,
   markAllGuardNotificationsAsReadRequest,
   markGuardNotificationAsReadRequest,
 } from "@/services/notificationsService";
-import { getNotificationsRequest } from "@/services/notificationsService";
+import { getGuardAccessHistoryRequest } from "@/services/sprintStoriesService";
 import type { NotificationRecord } from "@/types/notifications";
+import type { GuardAccessHistoryRecord } from "@/types/sprintStories";
 import type { VisitRecord } from "@/types/visits";
 
 function formatDate(date: string) {
@@ -54,18 +55,24 @@ function canUseCamera() {
 }
 
 function getVisitBadge(visit: VisitRecord): { label: string; className: string } {
-  // SCRUM-180: Mostrar badge "Cancelado" cuando el acceso fue cancelado
   if (visit.estado_acceso === "CANCELADA" || visit.qr_status === "CANCELLED") {
     return {
       label: "Cancelado",
       className: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200",
     };
-function getVisitBadge(visit: VisitRecord) {
+  }
+
   if (visit.es_acceso_especial) {
     if (visit.qr_status === "PENDING_APPROVAL" || visit.estado_acceso === "PENDIENTE_APROBACION") {
-      return "Acceso especial pendiente";
+      return {
+        label: "Acceso especial pendiente",
+        className: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200",
+      };
     }
-    return "Acceso especial";
+    return {
+      label: "Acceso especial",
+      className: "bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200",
+    };
   }
 
   if (visit.qr_status === "EXPIRED") {
@@ -96,6 +103,10 @@ export function GuardiaView() {
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [specialNotifications, setSpecialNotifications] = useState<NotificationRecord[]>([]);
+  const [accessHistory, setAccessHistory] = useState<GuardAccessHistoryRecord[]>([]);
+  const [historyDate, setHistoryDate] = useState(new Date().toISOString().slice(0, 10));
+  const [historyStatus, setHistoryStatus] = useState("TODOS");
+  const [historySearch, setHistorySearch] = useState("");
   const [validatedVisit, setValidatedVisit] = useState<VisitRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
@@ -114,15 +125,13 @@ export function GuardiaView() {
     async function loadVisits(options: { silent?: boolean } = {}) {
       try {
         const response = await getGuardVisitsRequest();
-        if (!active) {
-          return;
+        if (active) {
+          setVisits(response);
         }
-        setVisits(response);
       } catch (error) {
-        if (!active || options.silent) {
-          return;
+        if (active && !options.silent) {
+          setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar las visitas.");
         }
-        setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar las visitas.");
       } finally {
         if (active && !options.silent) {
           setIsLoading(false);
@@ -132,46 +141,27 @@ export function GuardiaView() {
 
     async function loadNotifications() {
       try {
-        const data = await getGuardNotificationsRequest();
+        const [guardData, allData] = await Promise.all([
+          getGuardNotificationsRequest(),
+          getNotificationsRequest(),
+        ]);
         if (active) {
-          setNotifications(data);
+          setNotifications(guardData);
+          setSpecialNotifications(allData.filter((item) => item.tipo === "ACCESO_ESPECIAL"));
         }
       } catch {
-        // No bloquear la vista por errores de notificaciones
+        if (active) {
+          setSpecialNotifications([]);
+        }
       }
     }
 
     void loadVisits();
     void loadNotifications();
-
-    // SCRUM-181 + SCRUM-182: Polling silencioso cada 10s para detectar cambios
-    // en accesos y nuevas notificaciones (cancelaciones, etc.)
     const intervalId = window.setInterval(() => {
       void loadVisits({ silent: true });
       void loadNotifications();
     }, 10000);
-    getGuardVisitsRequest()
-      .then((response) => {
-        if (active) setVisits(response);
-      })
-      .catch((error) => {
-        if (active) {
-          setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar las visitas.");
-        }
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
-
-    getNotificationsRequest()
-      .then((response) => {
-        if (active) {
-          setSpecialNotifications(response.filter((item) => item.tipo === "ACCESO_ESPECIAL"));
-        }
-      })
-      .catch(() => {
-        if (active) setSpecialNotifications([]);
-      });
 
     return () => {
       active = false;
@@ -179,37 +169,36 @@ export function GuardiaView() {
     };
   }, []);
 
-  // SCRUM-182: Filtra solo alertas de cancelacion no leidas para el panel
-  const cancellationAlerts = useMemo(
-    () => notifications.filter((n) => n.tipo === "ACCESO_CANCELADO" && !n.leido),
-    [notifications],
-  );
+  useEffect(() => {
+    let active = true;
 
-  async function handleMarkAlertRead(notificationId: number) {
-    try {
-      await markGuardNotificationAsReadRequest(notificationId);
-      setNotifications((current) =>
-        current.map((n) =>
-          n.id_notificacion === notificationId ? { ...n, leido: true } : n,
-        ),
-      );
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "No fue posible marcar la alerta como leida.",
-      );
+    async function loadHistory() {
+      try {
+        const response = await getGuardAccessHistoryRequest({
+          date: historyDate,
+          status: historyStatus,
+          search: historySearch,
+        });
+        if (active) {
+          setAccessHistory(response);
+        }
+      } catch {
+        if (active) {
+          setAccessHistory([]);
+        }
+      }
     }
-  }
 
-  async function handleMarkAllAlertsRead() {
-    try {
-      await markAllGuardNotificationsAsReadRequest();
-      setNotifications((current) => current.map((n) => ({ ...n, leido: true })));
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "No fue posible marcar las alertas como leidas.",
-      );
-    }
-  }
+    void loadHistory();
+    const timer = window.setInterval(() => {
+      void loadHistory();
+    }, 15000);
+
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [historyDate, historySearch, historyStatus]);
 
   useEffect(() => {
     return () => {
@@ -217,11 +206,14 @@ export function GuardiaView() {
     };
   }, []);
 
+  const cancellationAlerts = useMemo(
+    () => notifications.filter((notification) => notification.tipo === "ACCESO_CANCELADO" && !notification.leido),
+    [notifications],
+  );
   const pendingCount = useMemo(
     () => visits.filter((visit) => visit.qr_status === "VALID").length,
     [visits],
   );
-
   const registeredCount = useMemo(
     () => visits.filter((visit) => visit.qr_status === "USED").length,
     [visits],
@@ -252,6 +244,28 @@ export function GuardiaView() {
     setIsScanning(false);
   }
 
+  async function handleMarkAlertRead(notificationId: number) {
+    try {
+      await markGuardNotificationAsReadRequest(notificationId);
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id_notificacion === notificationId ? { ...notification, leido: true } : notification,
+        ),
+      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible marcar la alerta como leida.");
+    }
+  }
+
+  async function handleMarkAllAlertsRead() {
+    try {
+      await markAllGuardNotificationsAsReadRequest();
+      setNotifications((current) => current.map((notification) => ({ ...notification, leido: true })));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible marcar las alertas como leidas.");
+    }
+  }
+
   async function handleValidateToken(qrToken: string) {
     try {
       setErrorMessage("");
@@ -269,12 +283,9 @@ export function GuardiaView() {
       setValidatedVisit(null);
       const apiError = error as { status?: number; message?: string; payload?: { code?: string } };
       const message = apiError?.message || "No fue posible validar el QR.";
-
-      // SCRUM-183: Detectar especificamente cancelaciones para mensaje destacado
       const isCancelled =
         apiError?.status === 410 &&
-        (message.toLowerCase().includes("cancelado") ||
-          apiError?.payload?.code === "ACCESS_CANCELLED");
+        (message.toLowerCase().includes("cancelado") || apiError?.payload?.code === "ACCESS_CANCELLED");
 
       setValidationResult({
         status: "rejected",
@@ -283,13 +294,11 @@ export function GuardiaView() {
       });
       setErrorMessage(message);
 
-      // Refresca las notificaciones para que el guardia vea la alerta asociada
       if (isCancelled) {
         try {
-          const updatedNotifications = await getGuardNotificationsRequest();
-          setNotifications(updatedNotifications);
+          setNotifications(await getGuardNotificationsRequest());
         } catch {
-          // silencioso
+          // Mantiene el resultado de validacion aunque falle el refresco de alertas.
         }
       }
     }
@@ -342,7 +351,6 @@ export function GuardiaView() {
     try {
       setErrorMessage("");
       setSuccessMessage("");
-
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: "environment" },
@@ -472,7 +480,6 @@ export function GuardiaView() {
         </Alert>
       ) : null}
 
-      {/* SCRUM-182: Panel de notificacion visual para alertas de cancelacion */}
       {cancellationAlerts.length > 0 ? (
         <Card className="border-rose-200 bg-rose-50/60 shadow-[0_10px_30px_rgba(244,63,94,0.08)]">
           <CardHeader>
@@ -518,7 +525,7 @@ export function GuardiaView() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleMarkAlertRead(alert.id_notificacion)}
+                  onClick={() => void handleMarkAlertRead(alert.id_notificacion)}
                   className="text-xs font-medium text-rose-600 hover:underline"
                   aria-label="Marcar como leida"
                 >
@@ -527,10 +534,12 @@ export function GuardiaView() {
               </div>
             ))}
             {cancellationAlerts.length > 5 ? (
-              <p className="px-1 text-xs text-rose-700">
-                +{cancellationAlerts.length - 5} alertas mas pendientes.
-              </p>
+              <p className="px-1 text-xs text-rose-700">+{cancellationAlerts.length - 5} alertas mas pendientes.</p>
             ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
       {specialNotifications.length > 0 ? (
         <Card className="border-violet-200 bg-violet-50">
           <CardHeader>
@@ -631,12 +640,7 @@ export function GuardiaView() {
                     <p className="font-medium text-violet-700">Mostrar estado especial: autorizado</p>
                   ) : null}
                 </div>
-                <Button
-                  type="button"
-                  onClick={() => void handleRegisterEntry()}
-                  disabled
-                  className="rounded-2xl"
-                >
+                <Button type="button" onClick={() => void handleRegisterEntry()} disabled className="rounded-2xl">
                   Ingreso ya registrado
                 </Button>
               </div>
@@ -668,37 +672,111 @@ export function GuardiaView() {
               Cargando visitas del turno...
             </div>
           ) : (
-            visits.map((visitor) => (
-              <div
-                key={visitor.id_acceso}
-                className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 md:flex-row md:items-center md:justify-between"
-              >
-                <div>
-                  <p className="text-slate-900">{visitor.nombre}</p>
-                  <p className="text-sm text-slate-500">
-                    {visitor.casa} • {formatDate(visitor.fecha)} • {visitor.hora_inicio} - {visitor.hora_fin}
-                  </p>
-                </div>
-                {(() => {
-                  const badge = getVisitBadge(visitor);
-                  return (
-                    <span className={`rounded-full px-3 py-1 text-sm ${badge.className}`}>
-                      {badge.label}
-                    </span>
-                  );
-                })()}
-                <span
-                  className={`rounded-full px-3 py-1 text-sm ${
-                    visitor.es_acceso_especial
-                      ? "bg-violet-50 text-violet-700"
-                      : "bg-blue-50 text-blue-700"
-                  }`}
+            visits.map((visitor) => {
+              const badge = getVisitBadge(visitor);
+              return (
+                <div
+                  key={visitor.id_acceso}
+                  className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 md:flex-row md:items-center md:justify-between"
                 >
-                  {getVisitBadge(visitor)}
-                </span>
-              </div>
-            ))
+                  <div>
+                    <p className="text-slate-900">{visitor.nombre}</p>
+                    <p className="text-sm text-slate-500">
+                      {visitor.casa} - {formatDate(visitor.fecha)} - {visitor.hora_inicio} a {visitor.hora_fin}
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-sm ${badge.className}`}>{badge.label}</span>
+                </div>
+              );
+            })
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle>Historial diario de ingresos y salidas</CardTitle>
+              <CardDescription>Tabla sincronizada con garita y actualizacion cada 15 segundos.</CardDescription>
+            </div>
+            <div className="grid gap-2 md:grid-cols-3">
+              <input
+                type="date"
+                value={historyDate}
+                onChange={(event) => setHistoryDate(event.target.value)}
+                className="h-10 rounded-xl border border-slate-200 px-3 text-sm"
+              />
+              <select
+                value={historyStatus}
+                onChange={(event) => setHistoryStatus(event.target.value)}
+                className="h-10 rounded-xl border border-slate-200 px-3 text-sm"
+              >
+                <option value="TODOS">Todos</option>
+                <option value="PENDIENTE">Pendientes</option>
+                <option value="INGRESO">Ingresos</option>
+                <option value="SALIDA">Salidas</option>
+                <option value="CANCELADA">Canceladas</option>
+              </select>
+              <input
+                value={historySearch}
+                onChange={(event) => setHistorySearch(event.target.value)}
+                placeholder="Visitante o casa"
+                className="h-10 rounded-xl border border-slate-200 px-3 text-sm"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-2xl border border-slate-200">
+            <table className="min-w-full text-left">
+              <thead className="bg-slate-50 text-xs uppercase tracking-[0.1em] text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Visitante</th>
+                  <th className="px-4 py-3">Casa</th>
+                  <th className="px-4 py-3">Ingreso</th>
+                  <th className="px-4 py-3">Salida</th>
+                  <th className="px-4 py-3">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accessHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-sm text-slate-500">
+                      Sin registros para los filtros actuales.
+                    </td>
+                  </tr>
+                ) : (
+                  accessHistory.map((record) => (
+                    <tr key={record.id_acceso} className="border-t border-slate-100">
+                      <td className="px-4 py-3 text-sm text-slate-900">
+                        <p className="font-medium">{record.visitante}</p>
+                        <p className="text-xs text-slate-500">{record.placa}</p>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-500">{record.casa}</td>
+                      <td className="px-4 py-3 text-sm text-slate-500">{record.hora_ingreso || record.hora_programada}</td>
+                      <td className="px-4 py-3 text-sm text-slate-500">{record.hora_salida || "--:--"}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            record.estado === "INGRESO"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : record.estado === "SALIDA"
+                                ? "bg-blue-50 text-blue-700"
+                                : record.estado === "CANCELADA"
+                                  ? "bg-rose-50 text-rose-700"
+                                  : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {record.estado}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </AppShell>

@@ -346,8 +346,14 @@ export function ResidenteView() {
             path: "/residente/amenidades",
           },
           {
-            title: "Comunidad",
-            description: "Revise avisos, mantenimientos y novedades del residencial.",
+            title: "Accesos y reservas",
+            description: "Revise accesos activos y reservas vigentes en una sola pantalla.",
+            path: "/residente/unificado",
+          },
+          {
+            title: "Reglamentos",
+            description: "Consulte reglas por categoria con buscador y detalle.",
+            path: "/residente/reglamentos",
           },
         ].map((section) => (
           <Card

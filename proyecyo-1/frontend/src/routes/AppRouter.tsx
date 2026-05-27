@@ -17,6 +17,8 @@ import { GuardiaView } from "@/views/GuardiaView";
 import { InquilinoView } from "@/views/InquilinoView";
 import { LoginView } from "@/views/LoginView";
 import { ResidenteAmenitiesView } from "@/views/ResidenteAmenitiesView";
+import { ResidenteRegulationsView } from "@/views/ResidenteRegulationsView";
+import { ResidenteUnifiedView } from "@/views/ResidenteUnifiedView";
 import { ResidenteView } from "@/views/ResidenteView";
 import { ResidenteVisitsView } from "@/views/ResidenteVisitsView";
 
@@ -51,6 +53,8 @@ export function AppRouter() {
 
         <Route element={<ProtectedRoute allowedRoles={["residente"]} />}>
           <Route path="/residente" element={<ResidenteView />} />
+          <Route path="/residente/unificado" element={<ResidenteUnifiedView />} />
+          <Route path="/residente/reglamentos" element={<ResidenteRegulationsView />} />
           <Route path="/residente/visitas" element={<ResidenteVisitsView />} />
           <Route path="/residente/amenidades" element={<ResidenteAmenitiesView />} />
         </Route>

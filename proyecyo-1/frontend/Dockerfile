@@ -16,5 +16,5 @@ COPY . .
 # Expone puerto de Vite
 EXPOSE 5173
 
-# Corre la app
-CMD ["npm", "run", "dev", "--", "--host"]
+# Corre una version servida sin watcher para evitar ENOMEM en Docker Desktop
+CMD ["sh", "-c", "npm run build && npm run preview -- --host 0.0.0.0 --port 5173"]

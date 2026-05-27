@@ -7,16 +7,7 @@ const {
   patchAllNotificationsRead,
 } = require("../controllers/notificationsController");
 
-const { requireResident } = require("../middlewares/requireResident");
 const { requireGuard } = require("../middlewares/requireGuard");
-
-const router = express.Router();
-
-// Notificaciones para residentes
-router.get("/notificaciones", requireResident, getNotifications);
-router.get("/notificaciones/no-leidas", requireResident, getUnreadCount);
-router.patch("/notificaciones/:id/leida", requireResident, patchNotificationRead);
-router.patch("/notificaciones/marcar-todas-leidas", requireResident, patchAllNotificationsRead);
 const { requireNotificationUser } = require("../middlewares/requireNotificationUser");
 
 const router = express.Router();
