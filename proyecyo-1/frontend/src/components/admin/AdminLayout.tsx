@@ -8,6 +8,7 @@ import {
   Megaphone,
   Settings,
   ShieldAlert,
+  UserCheck,
   Wallet,
   BriefcaseBusiness,
 } from "lucide-react";
@@ -41,6 +42,11 @@ const adminMenuItems: AdminMenuItem[] = [
     label: "Accesos",
     icon: KeyRound,
     to: "/admin/accesos",
+  },
+  {
+    label: "Usuarios autorizados",
+    icon: UserCheck,
+    to: "/admin/usuarios-autorizados",
   },
   {
     label: "Proveedores",
