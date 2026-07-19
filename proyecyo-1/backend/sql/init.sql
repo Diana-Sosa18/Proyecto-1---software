@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS RESERVA;
 DROP TABLE IF EXISTS REGISTRO_ACCESO;
 DROP TABLE IF EXISTS ACCESO;
 DROP TABLE IF EXISTS VISITANTE;
+DROP TABLE IF EXISTS SANCION;
 DROP TABLE IF EXISTS PAGO;
 DROP TABLE IF EXISTS CUOTA;
 DROP TABLE IF EXISTS CASA_SERVICIO;
@@ -140,6 +141,27 @@ CREATE TABLE PAGO (
     monto_pagado DECIMAL(10,2) NOT NULL,
     fecha_pago DATE,
     FOREIGN KEY (id_cuota) REFERENCES CUOTA(id_cuota)
+);
+
+CREATE TABLE SANCION (
+    id_sancion INT PRIMARY KEY AUTO_INCREMENT,
+    id_casa INT NOT NULL,
+    id_cuota INT NULL,
+    codigo_regla VARCHAR(60) NOT NULL,
+    motivo VARCHAR(120) NOT NULL,
+    detalle VARCHAR(255) NOT NULL,
+    monto DECIMAL(10,2) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+    generada_automaticamente BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_incumplimiento DATE NOT NULL,
+    fecha_generacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creado_por INT NULL,
+    FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
+    FOREIGN KEY (id_cuota) REFERENCES CUOTA(id_cuota),
+    FOREIGN KEY (creado_por) REFERENCES USUARIO(id_usuario),
+    UNIQUE KEY uq_sancion_regla_cuota (codigo_regla, id_cuota),
+    INDEX idx_sancion_estado_fecha (estado, fecha_generacion),
+    CHECK (estado IN ('PENDIENTE', 'PAGADA', 'ANULADA'))
 );
 
 CREATE TABLE VISITANTE (
@@ -356,6 +378,33 @@ INNER JOIN RESIDENTE r
 INNER JOIN USUARIO u
     ON u.id_usuario = r.id_usuario
 WHERE c.numero = '302' AND c.torre = 'B';
+
+INSERT INTO CUOTA (id_servicio, id_casa, monto, fecha_limite)
+VALUES
+    (
+        (SELECT id_servicio FROM SERVICIO WHERE nombre = 'Agua potable'),
+        (SELECT id_casa FROM CASA WHERE numero = '302' AND torre = 'B'),
+        350.00,
+        DATE_SUB(CURDATE(), INTERVAL 12 DAY)
+    ),
+    (
+        (SELECT id_servicio FROM SERVICIO WHERE nombre = 'Seguridad privada'),
+        (SELECT id_casa FROM CASA WHERE numero = '302' AND torre = 'B'),
+        500.00,
+        DATE_SUB(CURDATE(), INTERVAL 5 DAY)
+    ),
+    (
+        (SELECT id_servicio FROM SERVICIO WHERE nombre = 'Energia electrica'),
+        (SELECT id_casa FROM CASA WHERE numero = '302' AND torre = 'B'),
+        275.00,
+        DATE_ADD(CURDATE(), INTERVAL 8 DAY)
+    );
+
+INSERT INTO PAGO (id_cuota, monto_pagado, fecha_pago)
+SELECT id_cuota, monto, DATE_SUB(CURDATE(), INTERVAL 2 DAY)
+FROM CUOTA
+WHERE monto = 500.00
+LIMIT 1;
 
 INSERT INTO VISITANTE (nombre, dpi, placa)
 VALUES

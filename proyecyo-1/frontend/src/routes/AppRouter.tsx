@@ -9,6 +9,7 @@ import { AdminAccessesView } from "@/views/AdminAccessesView";
 import { AdminPaymentsView } from "@/views/AdminPaymentsView";
 import { AdminReportsView } from "@/views/AdminReportsView";
 import { AdminProvidersView } from "@/views/AdminProvidersView";
+import { AdminSanctionsView } from "@/views/AdminSanctionsView";
 import { AdminSettingsView } from "@/views/AdminSettingsView";
 import { AdminView } from "@/views/AdminView";
 import { GuardiaView } from "@/views/GuardiaView";
@@ -36,6 +37,7 @@ export function AppRouter() {
           <Route path="/admin/accesos" element={<AdminAccessesView />} />
           <Route path="/admin/proveedores" element={<AdminProvidersView />} />
           <Route path="/admin/pagos" element={<AdminPaymentsView />} />
+          <Route path="/admin/sanciones" element={<AdminSanctionsView />} />
           <Route path="/admin/amenidades" element={<AdminAmenitiesReservationsView />} />
           <Route path="/admin/reportes" element={<AdminReportsView />} />
           <Route path="/admin/configuracion" element={<AdminSettingsView />} />
