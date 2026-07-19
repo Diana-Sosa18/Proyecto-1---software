@@ -2,6 +2,7 @@ const {
   applyAutomaticSanctions,
   getSanctionSummary,
   listSanctionRules,
+  listSanctionHistory,
   listSanctions,
   updateSanctionStatus,
 } = require("../services/adminSanctionsService");
@@ -42,9 +43,22 @@ async function getAdminSanctions(req, res, next) {
   }
 }
 
+async function getAdminSanctionHistory(req, res, next) {
+  try {
+    const history = await listSanctionHistory(req.query || {});
+    res.status(200).json(history);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function patchAdminSanctionStatus(req, res, next) {
   try {
-    const sanction = await updateSanctionStatus(req.params.id, req.body?.estado);
+    const sanction = await updateSanctionStatus(
+      req.params.id,
+      req.body?.estado,
+      req.authUser.id,
+    );
     res.status(200).json(sanction);
   } catch (error) {
     next(error);
@@ -56,5 +70,6 @@ module.exports = {
   getAdminSanctionRules,
   generateAdminSanctions,
   getAdminSanctions,
+  getAdminSanctionHistory,
   patchAdminSanctionStatus,
 };

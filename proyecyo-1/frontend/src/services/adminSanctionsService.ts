@@ -2,6 +2,7 @@ import { apiRequest } from "@/services/api";
 import type {
   AdminSanctionFilters,
   AdminSanctionGenerationResult,
+  AdminSanctionHistoryRecord,
   AdminSanctionRecord,
   AdminSanctionRule,
   AdminSanctionStatus,
@@ -44,6 +45,12 @@ export function getAdminSanctionsRequest(filters: AdminSanctionFilters) {
   const query = buildSanctionQuery(filters);
   const url = query ? `/admin/sanciones?${query}` : "/admin/sanciones";
   return apiRequest<AdminSanctionRecord[]>(url);
+}
+
+export function getAdminSanctionHistoryRequest(filters: AdminSanctionFilters) {
+  const query = buildSanctionQuery(filters);
+  const url = query ? `/admin/sanciones/historial?${query}` : "/admin/sanciones/historial";
+  return apiRequest<AdminSanctionHistoryRecord[]>(url);
 }
 
 export function updateAdminSanctionStatusRequest(id: number, estado: AdminSanctionStatus) {

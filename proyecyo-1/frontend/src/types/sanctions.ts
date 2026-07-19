@@ -36,6 +36,21 @@ export interface AdminSanctionRecord {
   servicio: string | null;
 }
 
+export interface AdminSanctionHistoryRecord {
+  id_historial: number;
+  id_sancion: number;
+  accion: "GENERACION_AUTOMATICA" | "CAMBIO_ESTADO";
+  estado_anterior: AdminSanctionStatus | null;
+  estado_nuevo: AdminSanctionStatus;
+  detalle: string;
+  realizado_por: string;
+  creado_en: string;
+  casa_unidad: string;
+  residente: string;
+  monto: number;
+  motivo: string;
+}
+
 export interface AdminSanctionFilters {
   search?: string;
   house?: string;

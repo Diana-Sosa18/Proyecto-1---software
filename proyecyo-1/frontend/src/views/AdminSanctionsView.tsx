@@ -13,6 +13,7 @@ import {
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
   generateAdminSanctionsRequest,
+  getAdminSanctionHistoryRequest,
   getAdminSanctionRulesRequest,
   getAdminSanctionSummaryRequest,
   getAdminSanctionsRequest,
@@ -20,6 +21,7 @@ import {
 } from "@/services/adminSanctionsService";
 import type {
   AdminSanctionFilterStatus,
+  AdminSanctionHistoryRecord,
   AdminSanctionRecord,
   AdminSanctionRule,
   AdminSanctionStatus,
@@ -46,6 +48,11 @@ const statusLabels: Record<AdminSanctionStatus, string> = {
   PENDIENTE: "Pendiente",
   PAGADA: "Pagada",
   ANULADA: "Anulada",
+};
+
+const historyActionLabels: Record<AdminSanctionHistoryRecord["accion"], string> = {
+  GENERACION_AUTOMATICA: "Generacion automatica",
+  CAMBIO_ESTADO: "Cambio de estado",
 };
 
 function formatCurrency(value: number) {
@@ -135,6 +142,7 @@ export function AdminSanctionsView() {
   });
   const [rules, setRules] = useState<AdminSanctionRule[]>([]);
   const [sanctions, setSanctions] = useState<AdminSanctionRecord[]>([]);
+  const [history, setHistory] = useState<AdminSanctionHistoryRecord[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [house, setHouse] = useState("");
@@ -171,15 +179,17 @@ export function AdminSanctionsView() {
       setIsLoading(true);
       setErrorMessage("");
 
-      const [summaryResponse, rulesResponse, sanctionsResponse] = await Promise.all([
+      const [summaryResponse, rulesResponse, sanctionsResponse, historyResponse] = await Promise.all([
         getAdminSanctionSummaryRequest(),
         getAdminSanctionRulesRequest(),
         getAdminSanctionsRequest(filters),
+        getAdminSanctionHistoryRequest(filters),
       ]);
 
       setSummary(summaryResponse);
       setRules(rulesResponse);
       setSanctions(sanctionsResponse);
+      setHistory(historyResponse);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "No fue posible cargar las sanciones.",
@@ -398,6 +408,70 @@ export function AdminSanctionsView() {
                         <option value="ANULADA">Anulada</option>
                       </select>
                     </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mt-5 rounded-[20px] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 className="text-[1rem] font-semibold text-slate-950">Historial de sanciones</h2>
+          <p className="mt-1 text-[0.82rem] text-slate-500">
+            Ultimos eventos registrados para generacion y cambios de estado.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-[920px] w-full">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-[0.1em] text-slate-500">
+                <th className="px-5 py-3 font-semibold">Fecha</th>
+                <th className="px-5 py-3 font-semibold">Unidad</th>
+                <th className="px-5 py-3 font-semibold">Residente</th>
+                <th className="px-5 py-3 font-semibold">Evento</th>
+                <th className="px-5 py-3 font-semibold">Estado</th>
+                <th className="px-5 py-3 font-semibold">Detalle</th>
+                <th className="px-5 py-3 font-semibold">Responsable</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
+                    Cargando historial...
+                  </td>
+                </tr>
+              ) : history.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
+                    Aun no hay eventos en el historial de sanciones.
+                  </td>
+                </tr>
+              ) : (
+                history.map((event) => (
+                  <tr key={event.id_historial} className="border-b border-slate-100 last:border-b-0">
+                    <td className="px-5 py-3 text-sm text-slate-500">{event.creado_en}</td>
+                    <td className="px-5 py-3 text-sm font-medium text-slate-950">
+                      {event.casa_unidad}
+                    </td>
+                    <td className="px-5 py-3 text-sm text-slate-600">{event.residente}</td>
+                    <td className="px-5 py-3">
+                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[0.7rem] font-medium text-slate-700">
+                        {historyActionLabels[event.accion]}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-sm text-slate-600">
+                      {event.estado_anterior
+                        ? `${statusLabels[event.estado_anterior]} -> ${statusLabels[event.estado_nuevo]}`
+                        : statusLabels[event.estado_nuevo]}
+                    </td>
+                    <td className="max-w-[320px] px-5 py-3 text-sm text-slate-600">
+                      <p className="line-clamp-2">{event.detalle}</p>
+                    </td>
+                    <td className="px-5 py-3 text-sm text-slate-500">{event.realizado_por}</td>
                   </tr>
                 ))
               )}

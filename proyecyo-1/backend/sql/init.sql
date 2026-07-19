@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS RESERVA;
 DROP TABLE IF EXISTS REGISTRO_ACCESO;
 DROP TABLE IF EXISTS ACCESO;
 DROP TABLE IF EXISTS VISITANTE;
+DROP TABLE IF EXISTS SANCION_HISTORIAL;
 DROP TABLE IF EXISTS SANCION;
 DROP TABLE IF EXISTS PAGO;
 DROP TABLE IF EXISTS CUOTA;
@@ -162,6 +163,21 @@ CREATE TABLE SANCION (
     UNIQUE KEY uq_sancion_regla_cuota (codigo_regla, id_cuota),
     INDEX idx_sancion_estado_fecha (estado, fecha_generacion),
     CHECK (estado IN ('PENDIENTE', 'PAGADA', 'ANULADA'))
+);
+
+CREATE TABLE SANCION_HISTORIAL (
+    id_historial INT PRIMARY KEY AUTO_INCREMENT,
+    id_sancion INT NOT NULL,
+    accion VARCHAR(40) NOT NULL,
+    estado_anterior VARCHAR(20) NULL,
+    estado_nuevo VARCHAR(20) NOT NULL,
+    detalle VARCHAR(255) NOT NULL,
+    realizado_por INT NULL,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_sancion) REFERENCES SANCION(id_sancion),
+    FOREIGN KEY (realizado_por) REFERENCES USUARIO(id_usuario),
+    INDEX idx_sancion_historial_fecha (creado_en),
+    CHECK (accion IN ('GENERACION_AUTOMATICA', 'CAMBIO_ESTADO'))
 );
 
 CREATE TABLE VISITANTE (

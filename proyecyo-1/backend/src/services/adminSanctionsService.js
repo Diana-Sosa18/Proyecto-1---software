@@ -9,6 +9,15 @@ const OVERDUE_FEE_RULE = {
   porcentaje: 10,
 };
 
+function calculateSanctionAmount(amount) {
+  const percentageAmount = Number(amount || 0) * (OVERDUE_FEE_RULE.porcentaje / 100);
+
+  return Math.max(
+    OVERDUE_FEE_RULE.monto_base,
+    Math.round(percentageAmount * 100 + 1e-9) / 100,
+  );
+}
+
 function normalizeString(value) {
   return String(value || "").trim();
 }
@@ -71,6 +80,23 @@ function mapSanction(row) {
     cuota_monto: row.cuota_monto === null ? null : Number(row.cuota_monto || 0),
     fecha_limite: row.fecha_limite,
     servicio: row.servicio,
+  };
+}
+
+function mapSanctionHistory(row) {
+  return {
+    id_historial: row.id_historial,
+    id_sancion: row.id_sancion,
+    accion: row.accion,
+    estado_anterior: row.estado_anterior,
+    estado_nuevo: row.estado_nuevo,
+    detalle: row.detalle,
+    realizado_por: row.realizado_por_nombre || "Sistema",
+    creado_en: row.creado_en,
+    casa_unidad: buildHouseLabel(row),
+    residente: row.residente,
+    monto: Number(row.monto || 0),
+    motivo: row.motivo,
   };
 }
 
@@ -152,6 +178,35 @@ async function listSanctionRules() {
   ];
 }
 
+async function syncGeneratedSanctionHistory(userId) {
+  await query(
+    `
+      INSERT INTO SANCION_HISTORIAL (
+        id_sancion,
+        accion,
+        estado_anterior,
+        estado_nuevo,
+        detalle,
+        realizado_por
+      )
+      SELECT
+        s.id_sancion,
+        'GENERACION_AUTOMATICA',
+        NULL,
+        s.estado,
+        CONCAT('Sancion generada por regla ', s.codigo_regla, '.'),
+        ?
+      FROM SANCION s
+      LEFT JOIN SANCION_HISTORIAL h
+        ON h.id_sancion = s.id_sancion
+        AND h.accion = 'GENERACION_AUTOMATICA'
+      WHERE s.codigo_regla = ?
+        AND h.id_historial IS NULL
+    `,
+    [userId, OVERDUE_FEE_RULE.codigo],
+  );
+}
+
 async function applyAutomaticSanctions(userId) {
   const currentDate = getCurrentDateInTimezone();
   const result = await query(
@@ -205,6 +260,7 @@ async function applyAutomaticSanctions(userId) {
       currentDate,
     ],
   );
+  await syncGeneratedSanctionHistory(userId);
 
   return {
     generadas: Number(result.affectedRows || 0),
@@ -266,7 +322,60 @@ async function listSanctions(filters = {}) {
   return rows.map(mapSanction);
 }
 
-async function updateSanctionStatus(id, status) {
+async function listSanctionHistory(filters = {}) {
+  const search = normalizeString(filters.search).toLowerCase();
+  const house = normalizeString(filters.house).toLowerCase();
+  const status = normalizeSanctionStatus(filters.status);
+  const sqlFilters = [];
+  const params = [];
+
+  appendSearchFilter(sqlFilters, params, search);
+  appendHouseFilter(sqlFilters, params, house);
+
+  if (status) {
+    sqlFilters.push("h.estado_nuevo = ?");
+    params.push(status);
+  }
+
+  const whereClause = sqlFilters.length ? `WHERE ${sqlFilters.join(" AND ")}` : "";
+  const rows = await query(
+    `
+      SELECT
+        h.id_historial,
+        h.id_sancion,
+        h.accion,
+        h.estado_anterior,
+        h.estado_nuevo,
+        h.detalle,
+        DATE_FORMAT(h.creado_en, '%Y-%m-%d %H:%i') AS creado_en,
+        actor.nombre AS realizado_por_nombre,
+        s.motivo,
+        s.monto,
+        c.numero,
+        c.torre,
+        u.nombre AS residente
+      FROM SANCION_HISTORIAL h
+      INNER JOIN SANCION s
+        ON s.id_sancion = h.id_sancion
+      INNER JOIN CASA c
+        ON c.id_casa = s.id_casa
+      INNER JOIN RESIDENTE r
+        ON r.id_residente = c.id_residente
+      INNER JOIN USUARIO u
+        ON u.id_usuario = r.id_usuario
+      LEFT JOIN USUARIO actor
+        ON actor.id_usuario = h.realizado_por
+      ${whereClause}
+      ORDER BY h.creado_en DESC, h.id_historial DESC
+      LIMIT 100
+    `,
+    params,
+  );
+
+  return rows.map(mapSanctionHistory);
+}
+
+async function updateSanctionStatus(id, status, userId = null) {
   const sanctionId = Number(id);
   const normalizedStatus = normalizeSanctionStatus(status);
 
@@ -281,6 +390,24 @@ async function updateSanctionStatus(id, status) {
     error.status = 400;
     throw error;
   }
+
+  const currentRows = await query(
+    `
+      SELECT estado
+      FROM SANCION
+      WHERE id_sancion = ?
+      LIMIT 1
+    `,
+    [sanctionId],
+  );
+
+  if (currentRows.length === 0) {
+    const error = new Error("No se encontro la sancion solicitada.");
+    error.status = 404;
+    throw error;
+  }
+
+  const previousStatus = currentRows[0].estado;
 
   const result = await query(
     `
@@ -297,6 +424,29 @@ async function updateSanctionStatus(id, status) {
     throw error;
   }
 
+  if (previousStatus !== normalizedStatus) {
+    await query(
+      `
+        INSERT INTO SANCION_HISTORIAL (
+          id_sancion,
+          accion,
+          estado_anterior,
+          estado_nuevo,
+          detalle,
+          realizado_por
+        )
+        VALUES (?, 'CAMBIO_ESTADO', ?, ?, ?, ?)
+      `,
+      [
+        sanctionId,
+        previousStatus,
+        normalizedStatus,
+        `Estado actualizado de ${previousStatus} a ${normalizedStatus}.`,
+        userId,
+      ],
+    );
+  }
+
   const rows = await listSanctions({});
   return rows.find((sanction) => sanction.id_sancion === sanctionId) || null;
 }
@@ -306,5 +456,12 @@ module.exports = {
   listSanctionRules,
   applyAutomaticSanctions,
   listSanctions,
+  listSanctionHistory,
   updateSanctionStatus,
+  __private__: {
+    buildHouseLabel,
+    calculateSanctionAmount,
+    mapSanction,
+    normalizeSanctionStatus,
+  },
 };

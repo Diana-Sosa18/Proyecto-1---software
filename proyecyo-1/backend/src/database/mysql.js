@@ -395,6 +395,58 @@ async function ensureSanctionsSchema() {
       ADD INDEX idx_sancion_estado_fecha (estado, fecha_generacion)
     `);
   }
+
+  if (!(await tableExists("SANCION_HISTORIAL"))) {
+    await query(`
+      CREATE TABLE SANCION_HISTORIAL (
+        id_historial INT PRIMARY KEY AUTO_INCREMENT,
+        id_sancion INT NOT NULL,
+        accion VARCHAR(40) NOT NULL,
+        estado_anterior VARCHAR(20) NULL,
+        estado_nuevo VARCHAR(20) NOT NULL,
+        detalle VARCHAR(255) NOT NULL,
+        realizado_por INT NULL,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_sancion) REFERENCES SANCION(id_sancion),
+        FOREIGN KEY (realizado_por) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  if (!(await indexExists("SANCION_HISTORIAL", "idx_sancion_historial_fecha"))) {
+    await query(`
+      ALTER TABLE SANCION_HISTORIAL
+      ADD INDEX idx_sancion_historial_fecha (creado_en)
+    `);
+  }
+
+  const feeRows = await query("SELECT COUNT(*) AS total FROM CUOTA");
+
+  if (Number(feeRows[0]?.total || 0) === 0) {
+    await query(`
+      INSERT INTO CUOTA (id_servicio, id_casa, monto, fecha_limite)
+      SELECT s.id_servicio, c.id_casa, seed.monto, seed.fecha_limite
+      FROM CASA c
+      CROSS JOIN (
+        SELECT 'Agua potable' AS servicio, 350.00 AS monto, DATE_SUB(CURDATE(), INTERVAL 12 DAY) AS fecha_limite
+        UNION ALL
+        SELECT 'Seguridad privada', 500.00, DATE_SUB(CURDATE(), INTERVAL 5 DAY)
+        UNION ALL
+        SELECT 'Energia electrica', 275.00, DATE_ADD(CURDATE(), INTERVAL 8 DAY)
+      ) seed
+      INNER JOIN SERVICIO s
+        ON s.nombre = seed.servicio
+      LIMIT 3
+    `);
+
+    await query(`
+      INSERT INTO PAGO (id_cuota, monto_pagado, fecha_pago)
+      SELECT id_cuota, monto, DATE_SUB(CURDATE(), INTERVAL 2 DAY)
+      FROM CUOTA
+      WHERE monto = 500.00
+      LIMIT 1
+    `);
+  }
 }
 
 module.exports = {
