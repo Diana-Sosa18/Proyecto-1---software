@@ -85,10 +85,17 @@ async function getAdminAmenitiesAvailability(req, res, next) {
 
 async function getAmenitiesConflict(req, res, next) {
   try {
-    const conflict = await validateAmenityReservationConflict(req.query, {
-      includeUserDetails: false,
-      requireUserId: false,
-    });
+    const conflict = await validateAmenityReservationConflict(
+      {
+        ...req.query,
+        id_usuario: req.authUser?.id,
+      },
+      {
+        includeUserDetails: false,
+        requireUserId: false,
+        validateUserLimit: true,
+      },
+    );
     res.status(200).json(conflict);
   } catch (error) {
     next(error);
@@ -100,6 +107,7 @@ async function getAdminAmenitiesConflict(req, res, next) {
     const conflict = await validateAmenityReservationConflict(req.query, {
       includeUserDetails: true,
       requireUserId: false,
+      validateUserLimit: true,
     });
     res.status(200).json(conflict);
   } catch (error) {
