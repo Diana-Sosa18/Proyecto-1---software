@@ -449,6 +449,36 @@ async function ensureSanctionsSchema() {
   }
 }
 
+async function ensureConfigurationSchema() {
+  if (!(await tableExists("CONFIGURACION"))) {
+    await query(`
+      CREATE TABLE CONFIGURACION (
+        id_configuracion INT PRIMARY KEY AUTO_INCREMENT,
+        clave VARCHAR(100) UNIQUE NOT NULL,
+        valor VARCHAR(200)
+      )
+    `);
+  }
+
+  const defaultEntries = [
+    ["visitas_hora_apertura", "06:00"],
+    ["visitas_hora_cierre", "22:00"],
+    ["visitas_duracion_maxima_horas", "4"],
+    ["visitas_activo", "true"],
+  ];
+
+  for (const [clave, valor] of defaultEntries) {
+    await query(
+      `
+        INSERT INTO CONFIGURACION (clave, valor)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE clave = clave
+      `,
+      [clave, valor],
+    );
+  }
+}
+
 module.exports = {
   pool,
   query,
@@ -457,4 +487,5 @@ module.exports = {
   ensureNotificationsSchema,
   ensureTenantProvidersSchema,
   ensureSanctionsSchema,
+  ensureConfigurationSchema,
 };

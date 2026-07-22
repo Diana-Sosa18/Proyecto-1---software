@@ -276,6 +276,13 @@ CREATE TABLE CONFIGURACION (
     valor VARCHAR(200)
 );
 
+INSERT INTO CONFIGURACION (clave, valor)
+VALUES
+    ('visitas_hora_apertura', '06:00'),
+    ('visitas_hora_cierre', '22:00'),
+    ('visitas_duracion_maxima_horas', '4'),
+    ('visitas_activo', 'true');
+
 CREATE TABLE NOTIFICACION (
     id_notificacion INT PRIMARY KEY AUTO_INCREMENT,
     id_usuario INT NOT NULL,

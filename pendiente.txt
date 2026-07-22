@@ -1,1 +1,6 @@
-pendiente
+☑ Guardar horarios en la base de datos.
+☑ Diseñar pantalla de configuración.
+☑ HU4. Configurar horarios generales de visita.
+☑ Crear formulario de horarios.
+☑ Validar horarios permitidos.
+☑ Integrar frontend con backend.

@@ -44,12 +44,18 @@ import {
   getTenantProvidersRequest,
   updateTenantProviderRequest,
 } from "@/services/providersService";
+import { getVisitScheduleConfigRequest } from "@/services/configurationService";
 import type {
   TenantProvider,
   TenantProviderHistoryRecord,
   TenantProviderStatus,
 } from "@/types/providers";
 import type { FrequentVisitor, VisitPayload, VisitRecord, VisitType } from "@/types/visits";
+import type { VisitScheduleConfig } from "@/types/configuration";
+import {
+  formatVisitScheduleSummary,
+  validateVisitTimesAgainstSchedule,
+} from "@/utils/visitSchedule";
 
 type VisitFormState = VisitPayload;
 type AccessFilter = "TODOS" | "APROBADO" | "UTILIZADO" | "RECHAZADO" | "PENDIENTE";
@@ -227,6 +233,7 @@ export function InquilinoView() {
   const [authorizingVisitorId, setAuthorizingVisitorId] = useState<number | null>(null);
   const [visitToCancel, setVisitToCancel] = useState<VisitRecord | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [visitSchedule, setVisitSchedule] = useState<VisitScheduleConfig | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -235,11 +242,13 @@ export function InquilinoView() {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const [visitsResult, frequentResult, providersResult, providerHistoryResult] = await Promise.allSettled([
+        const [visitsResult, frequentResult, providersResult, providerHistoryResult, scheduleResult] =
+          await Promise.allSettled([
           getVisitsRequest(),
           getFrequentVisitorsRequest(),
           getTenantProvidersRequest(),
           getTenantProviderHistoryRequest(),
+          getVisitScheduleConfigRequest(),
         ]);
 
         if (!active) {
@@ -259,6 +268,10 @@ export function InquilinoView() {
         setFrequentVisitors(frequentResult.status === "fulfilled" ? frequentResult.value : []);
         setProviders(providersResult.status === "fulfilled" ? providersResult.value : []);
         setProviderHistory(providerHistoryResult.status === "fulfilled" ? providerHistoryResult.value : []);
+
+        if (scheduleResult.status === "fulfilled") {
+          setVisitSchedule(scheduleResult.value);
+        }
       } finally {
         if (active) {
           setIsLoading(false);
@@ -397,6 +410,21 @@ export function InquilinoView() {
     }));
   }
 
+  function validateVisitTimes(horaInicio: string, horaFin: string) {
+    if (!visitSchedule) {
+      return true;
+    }
+
+    const scheduleError = validateVisitTimesAgainstSchedule(horaInicio, horaFin, visitSchedule);
+
+    if (scheduleError) {
+      setErrorMessage(scheduleError);
+      return false;
+    }
+
+    return true;
+  }
+
   function validateStep() {
     if (step === 1 && !form.nombre.trim()) {
       setErrorMessage("El nombre del visitante es obligatorio.");
@@ -409,8 +437,7 @@ export function InquilinoView() {
         return false;
       }
 
-      if (form.hora_inicio >= form.hora_fin) {
-        setErrorMessage("La hora de fin debe ser mayor a la hora de inicio.");
+      if (!validateVisitTimes(form.hora_inicio, form.hora_fin)) {
         return false;
       }
     }
@@ -430,8 +457,7 @@ export function InquilinoView() {
       return false;
     }
 
-    if (payload.hora_inicio >= payload.hora_fin) {
-      setErrorMessage("La hora de fin debe ser mayor a la hora de inicio.");
+    if (!validateVisitTimes(payload.hora_inicio, payload.hora_fin)) {
       return false;
     }
 
@@ -443,6 +469,8 @@ export function InquilinoView() {
     setErrorMessage("");
     return true;
   }
+
+  const visitsDisabled = visitSchedule !== null && !visitSchedule.activo;
 
   function handleNext() {
     if (!validateStep()) {
@@ -477,6 +505,10 @@ export function InquilinoView() {
   }
 
   async function createVisit(payload: VisitPayload, message: string) {
+    if (!validateVisitTimes(payload.hora_inicio, payload.hora_fin)) {
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorMessage("");
@@ -596,6 +628,10 @@ export function InquilinoView() {
   async function handleSubmit() {
     if (step < steps.length) {
       handleNext();
+      return;
+    }
+
+    if (!validateStep()) {
       return;
     }
 
@@ -830,6 +866,15 @@ export function InquilinoView() {
         </Alert>
       ) : null}
 
+      {visitSchedule && !visitSchedule.activo ? (
+        <Alert variant="destructive">
+          <AlertTitle>Autorizaciones pausadas</AlertTitle>
+          <AlertDescription>
+            Las autorizaciones de visita estan temporalmente deshabilitadas por el administrador.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <Card className="border-0 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
         <CardHeader>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -976,6 +1021,12 @@ export function InquilinoView() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
+          {visitSchedule ? (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+              Horario permitido:{" "}
+              <span className="font-medium">{formatVisitScheduleSummary(visitSchedule)}</span>
+            </div>
+          ) : null}
           <div className="grid gap-5 md:grid-cols-2">
             <label className="block space-y-2">
               <span className="text-sm font-medium text-slate-800">Nombre del proveedor *</span>
@@ -1021,6 +1072,8 @@ export function InquilinoView() {
               <Input
                 type="time"
                 value={providerForm.hora_inicio}
+                min={visitSchedule?.hora_apertura}
+                max={visitSchedule?.hora_cierre}
                 onChange={(event) => updateProviderForm("hora_inicio", event.target.value)}
                 className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
               />
@@ -1031,6 +1084,8 @@ export function InquilinoView() {
               <Input
                 type="time"
                 value={providerForm.hora_fin}
+                min={visitSchedule?.hora_apertura}
+                max={visitSchedule?.hora_cierre}
                 onChange={(event) => updateProviderForm("hora_fin", event.target.value)}
                 className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
               />
@@ -1061,7 +1116,7 @@ export function InquilinoView() {
             <Button
               type="button"
               onClick={handleProviderSubmit}
-              disabled={isRegisteringProvider}
+              disabled={isRegisteringProvider || visitsDisabled}
               className="h-12 rounded-2xl bg-blue-600 px-6 text-white hover:bg-blue-700"
             >
               {isRegisteringProvider ? (
@@ -1188,7 +1243,7 @@ export function InquilinoView() {
                 </div>
                 <Button
                   onClick={() => handleQuickAuthorize(visitor)}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || visitsDisabled}
                   className="rounded-2xl bg-[linear-gradient(90deg,#a855f7_0%,#8b2cf5_100%)] px-6 text-base text-white hover:opacity-95"
                 >
                   {authorizingVisitorId === visitor.id_visitante ? (
@@ -1272,7 +1327,13 @@ export function InquilinoView() {
 
           {step === 2 ? (
             <>
-              <div className="rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
+              {visitSchedule ? (
+                <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                  Horario permitido:{" "}
+                  <span className="font-medium">{formatVisitScheduleSummary(visitSchedule)}</span>
+                </div>
+              ) : null}
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 La fecha y hora se completaron automaticamente con la hora actual.
               </div>
               <div className="grid gap-5 md:grid-cols-2">
@@ -1306,6 +1367,8 @@ export function InquilinoView() {
                   <Input
                     type="time"
                     value={form.hora_inicio}
+                    min={visitSchedule?.hora_apertura}
+                    max={visitSchedule?.hora_cierre}
                     onChange={(event) => updateForm("hora_inicio", event.target.value)}
                     className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
                   />
@@ -1316,6 +1379,8 @@ export function InquilinoView() {
                   <Input
                     type="time"
                     value={form.hora_fin}
+                    min={visitSchedule?.hora_apertura}
+                    max={visitSchedule?.hora_cierre}
                     onChange={(event) => updateForm("hora_fin", event.target.value)}
                     className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
                   />
@@ -1358,7 +1423,7 @@ export function InquilinoView() {
         <Button
           type="button"
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || visitsDisabled}
           className="h-14 rounded-2xl bg-[linear-gradient(90deg,#3b82f6_0%,#1d4ed8_100%)] text-xl text-white hover:opacity-95"
         >
           {step === steps.length ? "Autorizar Visita" : "Siguiente"}
@@ -1590,6 +1655,8 @@ export function InquilinoView() {
                 <Input
                   type="time"
                   value={editForm.hora_inicio}
+                  min={visitSchedule?.hora_apertura}
+                  max={visitSchedule?.hora_cierre}
                   onChange={(event) => updateEditForm("hora_inicio", event.target.value)}
                   className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
                 />
@@ -1600,6 +1667,8 @@ export function InquilinoView() {
                 <Input
                   type="time"
                   value={editForm.hora_fin}
+                  min={visitSchedule?.hora_apertura}
+                  max={visitSchedule?.hora_cierre}
                   onChange={(event) => updateEditForm("hora_fin", event.target.value)}
                   className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
                 />

@@ -12,6 +12,7 @@ const notificationsRoutes = require("./routes/notificationsRoutes");
 const tenantProvidersRoutes = require("./routes/tenantProvidersRoutes");
 const adminProvidersRoutes = require("./routes/adminProvidersRoutes");
 const adminSanctionsRoutes = require("./routes/adminSanctionsRoutes");
+const configurationRoutes = require("./routes/configurationRoutes");
 
 function createApp() {
   const app = express();
@@ -39,6 +40,7 @@ function createApp() {
   app.use(tenantProvidersRoutes);
   app.use(adminProvidersRoutes);
   app.use(adminSanctionsRoutes);
+  app.use(configurationRoutes);
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;

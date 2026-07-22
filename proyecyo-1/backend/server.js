@@ -6,6 +6,7 @@ const {
   ensureNotificationsSchema,
   ensureTenantProvidersSchema,
   ensureSanctionsSchema,
+  ensureConfigurationSchema,
   query,
 } = require("./src/database/mysql");
 
@@ -45,6 +46,7 @@ async function startServer() {
   await ensureNotificationsSchema();
   await ensureTenantProvidersSchema();
   await ensureSanctionsSchema();
+  await ensureConfigurationSchema();
 
   const app = createApp();
 
