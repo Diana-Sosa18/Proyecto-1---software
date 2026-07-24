@@ -64,6 +64,24 @@ async function indexExists(tableName, indexName) {
   return rows.length > 0;
 }
 
+async function ensureRestoreHistorySchema() {
+  if (!(await tableExists("HISTORIAL_RESTAURACION"))) {
+    await query(`
+      CREATE TABLE HISTORIAL_RESTAURACION (
+        id_restauracion INT PRIMARY KEY AUTO_INCREMENT,
+        nombre_archivo VARCHAR(180) NOT NULL,
+        estado VARCHAR(20) NOT NULL,
+        total_sentencias INT NOT NULL DEFAULT 0,
+        tablas_afectadas VARCHAR(500) NULL,
+        mensaje VARCHAR(255) NOT NULL,
+        realizado_por INT NOT NULL,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        finalizado_en DATETIME NULL
+      )
+    `);
+  }
+}
+
 async function ensureVisitQrSchema() {
   const hasTokenQr = await columnExists("ACCESO", "token_qr");
   const hasEstadoAcceso = await columnExists("ACCESO", "estado_acceso");
@@ -623,4 +641,5 @@ module.exports = {
   ensureAnnouncementsSchema,
   ensureSpecialAccessSchema,
   ensureSprintUserStoriesSchema,
+  ensureRestoreHistorySchema,
 };
