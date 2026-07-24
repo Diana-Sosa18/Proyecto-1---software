@@ -43,6 +43,18 @@ function ensureVisitType(value) {
   return normalized;
 }
 
+function ensureMaxLength(value, maxLength, fieldName) {
+  const normalized = normalizeString(value);
+
+  if (normalized.length > maxLength) {
+    const error = new Error(`${fieldName} no puede superar ${maxLength} caracteres.`);
+    error.status = 400;
+    throw error;
+  }
+
+  return normalized;
+}
+
 async function getHouseByUserId(userId, role = "residente") {
   const rows =
     role === "inquilino"
@@ -273,8 +285,8 @@ async function createVisit(userId, role = "residente", payload) {
   const horaInicio = ensureValidTime(payload.hora_inicio, "hora de inicio");
   const horaFin = ensureValidTime(payload.hora_fin, "hora de fin");
   const tipoVisita = ensureVisitType(payload.tipo_visita);
-  const motivoServicio = normalizeString(payload.motivo_servicio);
-  const observaciones = normalizeString(payload.observaciones);
+  const motivoServicio = ensureMaxLength(payload.motivo_servicio, 120, "El motivo del servicio");
+  const observaciones = ensureMaxLength(payload.observaciones, 255, "Las observaciones");
   const qrToken = generateQrToken();
 
   if (!nombre) {
@@ -500,8 +512,8 @@ async function updateVisit(userId, role = "residente", accessId, payload = {}) {
   const horaInicio = ensureValidTime(payload.hora_inicio, "hora de inicio");
   const horaFin = ensureValidTime(payload.hora_fin, "hora de fin");
   const tipoVisita = ensureVisitType(payload.tipo_visita);
-  const motivoServicio = normalizeString(payload.motivo_servicio);
-  const observaciones = normalizeString(payload.observaciones);
+  const motivoServicio = ensureMaxLength(payload.motivo_servicio, 120, "El motivo del servicio");
+  const observaciones = ensureMaxLength(payload.observaciones, 255, "Las observaciones");
 
   if (!nombre) {
     const error = new Error("El nombre del visitante es obligatorio.");

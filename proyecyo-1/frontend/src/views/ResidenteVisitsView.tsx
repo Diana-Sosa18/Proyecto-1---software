@@ -60,6 +60,7 @@ function createInitialForm(): VisitFormState {
     hora_inicio: startTime,
     hora_fin: finishTime,
     tipo_visita: "VISITA",
+    observaciones: "",
   };
 }
 
@@ -201,6 +202,11 @@ export function ResidenteVisitsView() {
         setErrorMessage("La hora de fin debe ser mayor a la hora de inicio.");
         return false;
       }
+
+      if ((form.observaciones || "").length > 255) {
+        setErrorMessage("Las observaciones no pueden superar 255 caracteres.");
+        return false;
+      }
     }
 
     setErrorMessage("");
@@ -274,6 +280,7 @@ export function ResidenteVisitsView() {
         hora_inicio: getTimeInTimezone(now),
         hora_fin: getTimeInTimezone(finish),
         tipo_visita: "VISITA",
+        observaciones: "",
       },
       `Visita rapida autorizada para ${visitor.nombre}.`,
     );
@@ -605,6 +612,22 @@ export function ResidenteVisitsView() {
                     />
                   </label>
                 </div>
+
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-slate-800">
+                    Observaciones adicionales (Opcional)
+                  </span>
+                  <textarea
+                    value={form.observaciones || ""}
+                    onChange={(event) => updateForm("observaciones", event.target.value)}
+                    maxLength={255}
+                    placeholder="Ej. trae equipo de trabajo, paquete pequeno, requiere autorizacion en recepcion"
+                    className="min-h-28 w-full resize-none rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-300"
+                  />
+                  <span className="block text-right text-xs text-slate-400">
+                    {(form.observaciones || "").length}/255
+                  </span>
+                </label>
               </>
             ) : null}
 
@@ -617,6 +640,7 @@ export function ResidenteVisitsView() {
                   { label: "Fecha", value: form.fecha ? formatDate(form.fecha) : "No definida" },
                   { label: "Hora", value: `${form.hora_inicio || "--:--"} - ${form.hora_fin || "--:--"}` },
                   { label: "Tipo", value: visitTypeLabels[form.tipo_visita] },
+                  { label: "Observaciones", value: form.observaciones || "Sin informacion adicional" },
                 ].map((item) => (
                   <div key={item.label} className="rounded-3xl bg-slate-50 p-5">
                     <p className="text-sm text-slate-500">{item.label}</p>
@@ -706,6 +730,9 @@ export function ResidenteVisitsView() {
                           Hora: {visit.hora_inicio} - {visit.hora_fin}
                         </p>
                         <p>Tipo de acceso: {visitTypeLabels[visit.tipo_visita]}</p>
+                        {visit.observaciones ? (
+                          <p>Observaciones: {visit.observaciones}</p>
+                        ) : null}
                       </div>
                       <span className="mt-4 inline-flex rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">
                         {visitTypeLabels[visit.tipo_visita]}

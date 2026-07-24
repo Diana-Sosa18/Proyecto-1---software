@@ -636,6 +636,9 @@ export function GuardiaView() {
                   <p>Hora: {validatedVisit.hora_inicio} - {validatedVisit.hora_fin}</p>
                   <p>Tipo: {validatedVisit.tipo_visita}</p>
                   <p>Estado: {validatedVisit.estado_acceso}</p>
+                  {validatedVisit.observaciones ? (
+                    <p>Observaciones: {validatedVisit.observaciones}</p>
+                  ) : null}
                   {validatedVisit.es_acceso_especial ? (
                     <p className="font-medium text-violet-700">Mostrar estado especial: autorizado</p>
                   ) : null}
@@ -684,6 +687,11 @@ export function GuardiaView() {
                     <p className="text-sm text-slate-500">
                       {visitor.casa} - {formatDate(visitor.fecha)} - {visitor.hora_inicio} a {visitor.hora_fin}
                     </p>
+                    {visitor.observaciones ? (
+                      <p className="mt-1 max-w-2xl text-sm text-slate-600">
+                        Observaciones: {visitor.observaciones}
+                      </p>
+                    ) : null}
                   </div>
                   <span className={`rounded-full px-3 py-1 text-sm ${badge.className}`}>{badge.label}</span>
                 </div>
