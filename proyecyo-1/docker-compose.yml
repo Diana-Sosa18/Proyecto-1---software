@@ -1,6 +1,6 @@
 services:
   db:
-    image: mysql:8.4
+    build: ./backend/sql
     container_name: nexus_mysql
     restart: unless-stopped
     environment:
@@ -10,7 +10,6 @@ services:
       - "${MYSQL_HOST_PORT:-3308}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       # El servidor temporal de inicialización solo escucha por socket. TCP
       # garantiza que init.sql terminó antes de iniciar las aplicaciones.
