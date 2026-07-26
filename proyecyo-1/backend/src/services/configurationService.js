@@ -5,6 +5,7 @@ const CONFIG_KEYS = {
   HORA_CIERRE: "visitas_hora_cierre",
   DURACION_MAXIMA_HORAS: "visitas_duracion_maxima_horas",
   ACTIVO: "visitas_activo",
+  DIAS_HABILITADOS: "visitas_dias_habilitados",
 };
 
 const DEFAULT_VISIT_SCHEDULE = {
@@ -12,6 +13,7 @@ const DEFAULT_VISIT_SCHEDULE = {
   hora_cierre: "22:00",
   duracion_maxima_horas: 4,
   activo: true,
+  dias_habilitados: [1, 2, 3, 4, 5, 6, 0],
 };
 
 function normalizeString(value) {
@@ -77,13 +79,14 @@ async function getConfigMap() {
     `
       SELECT clave, valor
       FROM CONFIGURACION
-      WHERE clave IN (?, ?, ?, ?)
+      WHERE clave IN (?, ?, ?, ?, ?)
     `,
     [
       CONFIG_KEYS.HORA_APERTURA,
       CONFIG_KEYS.HORA_CIERRE,
       CONFIG_KEYS.DURACION_MAXIMA_HORAS,
       CONFIG_KEYS.ACTIVO,
+      CONFIG_KEYS.DIAS_HABILITADOS,
     ],
   );
 
@@ -91,6 +94,13 @@ async function getConfigMap() {
 }
 
 function mapVisitScheduleConfig(configMap) {
+  let diasHabilitados = DEFAULT_VISIT_SCHEDULE.dias_habilitados;
+  try {
+    const parsed = JSON.parse(configMap[CONFIG_KEYS.DIAS_HABILITADOS] || "[]");
+    if (Array.isArray(parsed) && parsed.length) diasHabilitados = parsed;
+  } catch {
+    diasHabilitados = DEFAULT_VISIT_SCHEDULE.dias_habilitados;
+  }
   return {
     hora_apertura: ensureValidTime(
       configMap[CONFIG_KEYS.HORA_APERTURA] || DEFAULT_VISIT_SCHEDULE.hora_apertura,
@@ -107,6 +117,7 @@ function mapVisitScheduleConfig(configMap) {
       configMap[CONFIG_KEYS.ACTIVO],
       DEFAULT_VISIT_SCHEDULE.activo,
     ),
+    dias_habilitados: diasHabilitados,
   };
 }
 
@@ -123,6 +134,13 @@ function validateVisitSchedulePayload(payload) {
     payload.duracion_maxima_horas ?? DEFAULT_VISIT_SCHEDULE.duracion_maxima_horas,
   );
   const activo = ensureBoolean(payload.activo, DEFAULT_VISIT_SCHEDULE.activo);
+  const diasHabilitados = [...new Set(payload.dias_habilitados ?? DEFAULT_VISIT_SCHEDULE.dias_habilitados)]
+    .map(Number);
+  if (!diasHabilitados.length || diasHabilitados.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) {
+    const error = new Error("Selecciona al menos un dia valido para las visitas.");
+    error.status = 400;
+    throw error;
+  }
 
   if (horaApertura >= horaCierre) {
     const error = new Error("La hora de cierre debe ser mayor a la hora de apertura.");
@@ -145,6 +163,7 @@ function validateVisitSchedulePayload(payload) {
     hora_cierre: horaCierre,
     duracion_maxima_horas: duracionMaximaHoras,
     activo,
+    dias_habilitados: diasHabilitados,
   };
 }
 
@@ -165,6 +184,7 @@ async function updateVisitScheduleConfig(payload) {
       [CONFIG_KEYS.HORA_CIERRE, validated.hora_cierre],
       [CONFIG_KEYS.DURACION_MAXIMA_HORAS, String(validated.duracion_maxima_horas)],
       [CONFIG_KEYS.ACTIVO, validated.activo ? "true" : "false"],
+      [CONFIG_KEYS.DIAS_HABILITADOS, JSON.stringify(validated.dias_habilitados)],
     ];
 
     for (const [clave, valor] of entries) {
@@ -188,11 +208,19 @@ async function updateVisitScheduleConfig(payload) {
   }
 }
 
-function validateVisitTimesAgainstSchedule(horaInicio, horaFin, schedule) {
+function validateVisitTimesAgainstSchedule(horaInicio, horaFin, schedule, fecha) {
   if (!schedule.activo) {
     const error = new Error("Las autorizaciones de visita estan temporalmente deshabilitadas.");
     error.status = 403;
     throw error;
+  }
+  if (fecha) {
+    const day = new Date(`${fecha}T12:00:00Z`).getUTCDay();
+    if (!schedule.dias_habilitados.includes(day)) {
+      const error = new Error("El dia seleccionado no esta habilitado para visitas.");
+      error.status = 400;
+      throw error;
+    }
   }
 
   const startMinutes = toMinutes(horaInicio);
@@ -218,9 +246,9 @@ function validateVisitTimesAgainstSchedule(horaInicio, horaFin, schedule) {
   }
 }
 
-async function assertVisitTimesAllowed(horaInicio, horaFin) {
+async function assertVisitTimesAllowed(horaInicio, horaFin, fecha) {
   const schedule = await getVisitScheduleConfig();
-  validateVisitTimesAgainstSchedule(horaInicio, horaFin, schedule);
+  validateVisitTimesAgainstSchedule(horaInicio, horaFin, schedule, fecha);
   return schedule;
 }
 

@@ -3,6 +3,7 @@ export type VisitScheduleConfig = {
   hora_cierre: string;
   duracion_maxima_horas: number;
   activo: boolean;
+  dias_habilitados: number[];
 };
 
 export type UpdateVisitSchedulePayload = {
@@ -10,4 +11,5 @@ export type UpdateVisitSchedulePayload = {
   hora_cierre: string;
   duracion_maxima_horas: number;
   activo: boolean;
+  dias_habilitados: number[];
 };

@@ -24,7 +24,11 @@ const DEFAULT_SCHEDULE: VisitScheduleConfig = {
   hora_cierre: "22:00",
   duracion_maxima_horas: 4,
   activo: true,
+  dias_habilitados: [1, 2, 3, 4, 5, 6, 0],
 };
+const DAYS = [
+  ["Dom", 0], ["Lun", 1], ["Mar", 2], ["Mie", 3], ["Jue", 4], ["Vie", 5], ["Sab", 6],
+] as const;
 
 const settingsGroups = [
   {
@@ -228,6 +232,26 @@ export function AdminSettingsView() {
                       <option value="activo">Autorizaciones activas</option>
                       <option value="inactivo">Autorizaciones pausadas</option>
                     </select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">Dias habilitados</label>
+                  <div className="flex flex-wrap gap-2">
+                    {DAYS.map(([label, day]) => (
+                      <label key={day} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={scheduleForm.dias_habilitados.includes(day)}
+                          onChange={() => setScheduleForm((current) => ({
+                            ...current,
+                            dias_habilitados: current.dias_habilitados.includes(day)
+                              ? current.dias_habilitados.filter((value) => value !== day)
+                              : [...current.dias_habilitados, day],
+                          }))}
+                        />
+                        {label}
+                      </label>
+                    ))}
                   </div>
                 </div>
 

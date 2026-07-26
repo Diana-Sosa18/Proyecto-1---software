@@ -12,6 +12,7 @@ const baseSchedule = {
   hora_cierre: "22:00",
   duracion_maxima_horas: 4,
   activo: true,
+  dias_habilitados: [1, 2, 3, 4, 5, 6, 0],
 };
 
 test("validateVisitSchedulePayload accepts a valid schedule", () => {
@@ -85,11 +86,22 @@ test("validateVisitTimesAgainstSchedule rejects visits when schedule is inactive
   );
 });
 
+test("validateVisitTimesAgainstSchedule rejects disabled weekdays", () => {
+  assert.throws(
+    () => validateVisitTimesAgainstSchedule("10:00", "11:00", {
+      ...baseSchedule,
+      dias_habilitados: [1, 2, 3, 4, 5],
+    }, "2026-07-26"),
+    /dia seleccionado no esta habilitado/,
+  );
+});
+
 test("DEFAULT_VISIT_SCHEDULE matches expected seed values", () => {
   assert.deepEqual(DEFAULT_VISIT_SCHEDULE, {
     hora_apertura: "06:00",
     hora_cierre: "22:00",
     duracion_maxima_horas: 4,
     activo: true,
+    dias_habilitados: [1, 2, 3, 4, 5, 6, 0],
   });
 });
