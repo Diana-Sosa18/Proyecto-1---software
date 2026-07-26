@@ -47,10 +47,13 @@ npm run build
 Para Docker:
 
 ```bash
-docker compose -p nexus_landing_test build
-docker compose -p nexus_landing_test up -d
-docker compose -p nexus_landing_test down -v --remove-orphans
+docker compose -p nexus_landing_test -f docker-compose.yml -f docker-compose.test.yml build
+docker compose -p nexus_landing_test -f docker-compose.yml -f docker-compose.test.yml up -d
+docker compose -p nexus_landing_test -f docker-compose.yml -f docker-compose.test.yml down -v --remove-orphans
 ```
+
+El override elimina los nombres fijos de los contenedores y utiliza los puertos
+3318, 3010 y 5183 para no tocar el entorno de desarrollo existente.
 
 ## Decisiones y pendientes comerciales
 
