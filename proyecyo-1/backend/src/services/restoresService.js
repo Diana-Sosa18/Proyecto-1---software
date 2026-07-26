@@ -1,6 +1,15 @@
 const { pool, query } = require("../database/mysql");
 
 const MAX_BACKUP_SIZE_BYTES = 2 * 1024 * 1024;
+const RESTORABLE_TABLES = new Set([
+  "ACCESO", "ACCESO_EXCEPCION", "AMENIDAD", "CASA", "CASA_SERVICIO",
+  "COMUNICADO", "COMUNICADO_USUARIO", "CONFIGURACION", "CUOTA",
+  "HISTORIAL_CAMBIO_PROVEEDOR", "HISTORIAL_RESERVA", "INQUILINO",
+  "INQUILINO_CASA", "NOTIFICACION", "PAGO", "PERMISO", "PERMISO_INQUILINO",
+  "REGISTRO_ACCESO", "REGLAMENTO", "RESERVA", "RESIDENTE", "SERVICIO",
+  "SOLICITUD_AUTORIZACION_DIGITAL", "TICKET", "TIPO_USUARIO",
+  "TIPO_USUARIO_PERMISO", "USUARIO", "VISITANTE",
+]);
 const DISALLOWED_PATTERNS = [
   /\bDROP\s+DATABASE\b/i,
   /\bCREATE\s+DATABASE\b/i,
@@ -116,6 +125,23 @@ function getAffectedTables(statements) {
   return [...tables].sort();
 }
 
+function ensureSafeDataStatements(statements) {
+  for (const statement of statements) {
+    const match = statement.match(
+      /^\s*(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+`?([A-Za-z0-9_]+)`?/i,
+    );
+    const table = match?.[1]?.toUpperCase();
+
+    if (!table || !RESTORABLE_TABLES.has(table)) {
+      const error = new Error(
+        "El respaldo solo puede modificar datos de tablas autorizadas mediante INSERT, UPDATE o DELETE.",
+      );
+      error.status = 400;
+      throw error;
+    }
+  }
+}
+
 function validateBackupPayload(payload = {}) {
   const { filename, content } = getBackupPayload(payload);
   ensureSqlFile(filename);
@@ -151,6 +177,7 @@ function validateBackupPayload(payload = {}) {
     throw error;
   }
 
+  ensureSafeDataStatements(statements);
   const tables = getAffectedTables(statements);
 
   return {
@@ -286,4 +313,5 @@ module.exports = {
   validateBackup,
   restoreBackup,
   listRestoreHistory,
+  validateBackupPayload,
 };
