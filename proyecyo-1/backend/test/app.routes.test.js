@@ -251,8 +251,13 @@ describe("Rutas reales de NexusResidencial", () => {
       fecha: "2026-07-25",
       hora_inicio: "10:00",
       hora_fin: "11:00",
+      id_usuario: 9,
     });
-    assert.deepEqual(options, { includeUserDetails: false, requireUserId: false });
+    assert.deepEqual(options, {
+      includeUserDetails: false,
+      requireUserId: false,
+      validateUserLimit: true,
+    });
   });
 
   it("impide que un residente consulte las visitas exclusivas de guardia", async () => {
