@@ -10,6 +10,7 @@ import {
   getFrequentVisitorsRequest,
   getVisitsRequest,
 } from "@/services/visitsService";
+import { getVisitScheduleConfigRequest } from "@/services/configurationService";
 
 vi.mock("@/components/layout/AppShell", () => ({
   AppShell: ({ children }: { children: ReactNode }) => <main>{children}</main>,
@@ -27,10 +28,21 @@ vi.mock("@/services/visitsService", () => ({
   getVisitsRequest: vi.fn(),
 }));
 
+vi.mock("@/services/configurationService", () => ({
+  getVisitScheduleConfigRequest: vi.fn(),
+}));
+
 describe("Formulario real de visitas del residente", () => {
   beforeEach(() => {
     vi.mocked(getVisitsRequest).mockResolvedValue([]);
     vi.mocked(getFrequentVisitorsRequest).mockResolvedValue([]);
+    vi.mocked(getVisitScheduleConfigRequest).mockResolvedValue({
+      dias_habilitados: [0, 1, 2, 3, 4, 5, 6],
+      hora_apertura: "00:00",
+      hora_cierre: "23:59",
+      duracion_maxima_horas: 24,
+      activo: true,
+    });
   });
 
   it("valida que el nombre del visitante sea obligatorio", async () => {
