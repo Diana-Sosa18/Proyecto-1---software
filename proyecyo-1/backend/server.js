@@ -13,6 +13,7 @@ const {
   ensureSanctionsSchema,
   ensureConfigurationSchema,
   ensureAutomaticBackupsSchema,
+  ensureDemoRequestsSchema,
   query,
 } = require("./src/database/mysql");
 const { startScheduler } = require("./src/services/automaticBackupsService");
@@ -60,6 +61,7 @@ async function startServer() {
   await ensureSanctionsSchema();
   await ensureConfigurationSchema();
   await ensureAutomaticBackupsSchema();
+  await ensureDemoRequestsSchema();
   startScheduler();
 
   const app = createApp();

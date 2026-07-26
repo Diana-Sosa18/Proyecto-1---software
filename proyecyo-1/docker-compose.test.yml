@@ -1,0 +1,19 @@
+services:
+  db:
+    container_name: !reset null
+    ports: !override
+      - "3318:3306"
+
+  backend:
+    container_name: !reset null
+    environment:
+      FRONTEND_ORIGIN: http://localhost:5183
+    ports: !override
+      - "3010:3000"
+
+  frontend:
+    container_name: !reset null
+    environment:
+      VITE_API_URL: http://localhost:3010
+    ports: !override
+      - "5183:5173"

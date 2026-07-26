@@ -759,6 +759,29 @@ async function ensureAutomaticBackupsSchema() {
   }
 }
 
+async function ensureDemoRequestsSchema() {
+  if (!(await tableExists("SOLICITUD_DEMO"))) {
+    await query(`
+      CREATE TABLE SOLICITUD_DEMO (
+        id_solicitud INT PRIMARY KEY AUTO_INCREMENT,
+        nombre VARCHAR(120) NOT NULL,
+        correo VARCHAR(160) NOT NULL,
+        telefono VARCHAR(25) NOT NULL,
+        residencial VARCHAR(160) NOT NULL,
+        cantidad_viviendas INT NOT NULL,
+        mensaje VARCHAR(1000) NULL,
+        estado VARCHAR(20) NOT NULL DEFAULT 'NUEVA',
+        fecha_creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        fecha_actualizacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_solicitud_demo_estado_fecha (estado, fecha_creacion),
+        INDEX idx_solicitud_demo_correo (correo),
+        CHECK (estado IN ('NUEVA', 'CONTACTADA', 'DESCARTADA', 'CONVERTIDA')),
+        CHECK (cantidad_viviendas BETWEEN 1 AND 100000)
+      )
+    `);
+  }
+}
+
 module.exports = {
   pool,
   query,
@@ -774,4 +797,5 @@ module.exports = {
   ensureSanctionsSchema,
   ensureConfigurationSchema,
   ensureAutomaticBackupsSchema,
+  ensureDemoRequestsSchema,
 };
