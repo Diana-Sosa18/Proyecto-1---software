@@ -1,0 +1,11 @@
+const express = require("express");
+const { requireAdmin } = require("../middlewares/requireAdmin");
+const service = require("../services/automaticBackupsService");
+const router = express.Router();
+router.use("/admin/respaldos", requireAdmin);
+router.get("/admin/respaldos/configuracion", async (_req, res, next) => { try { res.json(await service.getConfig()); } catch (e) { next(e); } });
+router.put("/admin/respaldos/configuracion", async (req, res, next) => { try { res.json(await service.saveConfig(req.body)); } catch (e) { next(e); } });
+router.get("/admin/respaldos", async (_req, res, next) => { try { res.json(await service.listBackups()); } catch (e) { next(e); } });
+router.post("/admin/respaldos/ejecutar", async (req, res, next) => { try { res.status(201).json(await service.executeBackup(req.authUser.id)); } catch (e) { next(e); } });
+router.get("/admin/respaldos/:id/descargar", async (req, res, next) => { try { const item = await service.getDownload(Number(req.params.id)); res.download(item.filePath, item.filename); } catch (e) { next(e); } });
+module.exports = router;

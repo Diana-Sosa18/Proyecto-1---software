@@ -12,8 +12,10 @@ const {
   ensureFinancialRulesSchema,
   ensureSanctionsSchema,
   ensureConfigurationSchema,
+  ensureAutomaticBackupsSchema,
   query,
 } = require("./src/database/mysql");
+const { startScheduler } = require("./src/services/automaticBackupsService");
 
 const DB_READY_RETRIES = 30;
 const DB_READY_DELAY_MS = 2000;
@@ -57,6 +59,8 @@ async function startServer() {
   await ensureFinancialRulesSchema();
   await ensureSanctionsSchema();
   await ensureConfigurationSchema();
+  await ensureAutomaticBackupsSchema();
+  startScheduler();
 
   const app = createApp();
 

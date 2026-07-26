@@ -725,6 +725,40 @@ async function ensureConfigurationSchema() {
   }
 }
 
+async function ensureAutomaticBackupsSchema() {
+  if (!(await tableExists("RESPALDO_AUTOMATICO"))) {
+    await query(`
+      CREATE TABLE RESPALDO_AUTOMATICO (
+        id_respaldo INT PRIMARY KEY AUTO_INCREMENT,
+        nombre_archivo VARCHAR(180) NOT NULL,
+        tipo VARCHAR(20) NOT NULL,
+        estado VARCHAR(20) NOT NULL,
+        tamano_bytes BIGINT NOT NULL DEFAULT 0,
+        duracion_ms INT NOT NULL DEFAULT 0,
+        mensaje VARCHAR(255) NULL,
+        archivo_clave VARCHAR(180) NULL,
+        iniciado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        finalizado_en DATETIME NULL,
+        creado_por INT NULL,
+        FOREIGN KEY (creado_por) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  const defaults = [
+    ["respaldos_activo", "false"],
+    ["respaldos_frecuencia", "DIARIO"],
+    ["respaldos_hora", "02:00"],
+    ["respaldos_retencion", "7"],
+  ];
+  for (const [clave, valor] of defaults) {
+    await query(
+      "INSERT INTO CONFIGURACION (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE clave = clave",
+      [clave, valor],
+    );
+  }
+}
+
 module.exports = {
   pool,
   query,
@@ -739,4 +773,5 @@ module.exports = {
   ensureFinancialRulesSchema,
   ensureSanctionsSchema,
   ensureConfigurationSchema,
+  ensureAutomaticBackupsSchema,
 };
