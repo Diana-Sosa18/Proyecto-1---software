@@ -14,6 +14,8 @@ const adminProvidersRoutes = require("./routes/adminProvidersRoutes");
 const announcementsRoutes = require("./routes/announcementsRoutes");
 const specialAccessesRoutes = require("./routes/specialAccessesRoutes");
 const sprintStoriesRoutes = require("./routes/sprintStoriesRoutes");
+const adminPaymentsRoutes = require("./routes/adminPaymentsRoutes");
+const adminAuthorizedUsersRoutes = require("./routes/adminAuthorizedUsersRoutes");
 
 function createApp() {
   const app = express();
@@ -43,6 +45,8 @@ function createApp() {
   app.use(announcementsRoutes);
   app.use(specialAccessesRoutes);
   app.use(sprintStoriesRoutes);
+  app.use(adminPaymentsRoutes);
+  app.use(adminAuthorizedUsersRoutes);
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;

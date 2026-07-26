@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { rolePaths } from "@/routes/rolePaths";
 import { AdminAmenitiesReservationsView } from "@/views/AdminAmenitiesReservationsView";
 import { AdminAccessesView } from "@/views/AdminAccessesView";
+import { AdminAuthorizedUsersView } from "@/views/AdminAuthorizedUsersView";
 import { AdminCommunicationsView } from "@/views/AdminCommunicationsView";
 import { AdminPaymentsView } from "@/views/AdminPaymentsView";
 import { AdminReportsView } from "@/views/AdminReportsView";
@@ -38,6 +39,7 @@ export function AppRouter() {
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route path="/admin" element={<AdminView />} />
           <Route path="/admin/accesos" element={<AdminAccessesView />} />
+          <Route path="/admin/usuarios-autorizados" element={<AdminAuthorizedUsersView />} />
           <Route path="/admin/proveedores" element={<AdminProvidersView />} />
           <Route path="/admin/accesos-especiales" element={<AdminSpecialAccessView />} />
           <Route path="/admin/comunicados" element={<AdminCommunicationsView />} />
