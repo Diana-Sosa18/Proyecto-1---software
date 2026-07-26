@@ -11,6 +11,7 @@ import {
   UserCheck,
   Wallet,
   BriefcaseBusiness,
+  ShieldAlert,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -67,6 +68,11 @@ const adminMenuItems: AdminMenuItem[] = [
     label: "Pagos",
     icon: Wallet,
     to: "/admin/pagos",
+  },
+  {
+    label: "Sanciones",
+    icon: ShieldAlert,
+    to: "/admin/sanciones",
   },
   {
     label: "Amenidades",

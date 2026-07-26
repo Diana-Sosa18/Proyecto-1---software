@@ -631,6 +631,62 @@ async function ensureSprintUserStoriesSchema() {
   `);
 }
 
+async function ensureSanctionsSchema() {
+  if (!(await tableExists("SANCION"))) {
+    await query(`
+      CREATE TABLE SANCION (
+        id_sancion INT PRIMARY KEY AUTO_INCREMENT,
+        id_casa INT NOT NULL,
+        id_cuota INT NULL,
+        codigo_regla VARCHAR(60) NOT NULL,
+        motivo VARCHAR(120) NOT NULL,
+        detalle VARCHAR(255) NOT NULL,
+        monto DECIMAL(10,2) NOT NULL,
+        estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+        generada_automaticamente BOOLEAN NOT NULL DEFAULT TRUE,
+        fecha_incumplimiento DATE NOT NULL,
+        fecha_generacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        creado_por INT NULL,
+        FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
+        FOREIGN KEY (id_cuota) REFERENCES CUOTA(id_cuota),
+        FOREIGN KEY (creado_por) REFERENCES USUARIO(id_usuario),
+        UNIQUE KEY uq_sancion_regla_cuota (codigo_regla, id_cuota)
+      )
+    `);
+  }
+
+  if (!(await indexExists("SANCION", "idx_sancion_estado_fecha"))) {
+    await query(`
+      ALTER TABLE SANCION
+      ADD INDEX idx_sancion_estado_fecha (estado, fecha_generacion)
+    `);
+  }
+
+  if (!(await tableExists("SANCION_HISTORIAL"))) {
+    await query(`
+      CREATE TABLE SANCION_HISTORIAL (
+        id_historial INT PRIMARY KEY AUTO_INCREMENT,
+        id_sancion INT NOT NULL,
+        accion VARCHAR(40) NOT NULL,
+        estado_anterior VARCHAR(20) NULL,
+        estado_nuevo VARCHAR(20) NOT NULL,
+        detalle VARCHAR(255) NOT NULL,
+        realizado_por INT NULL,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_sancion) REFERENCES SANCION(id_sancion),
+        FOREIGN KEY (realizado_por) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  if (!(await indexExists("SANCION_HISTORIAL", "idx_sancion_historial_fecha"))) {
+    await query(`
+      ALTER TABLE SANCION_HISTORIAL
+      ADD INDEX idx_sancion_historial_fecha (creado_en)
+    `);
+  }
+}
+
 module.exports = {
   pool,
   query,
@@ -642,4 +698,5 @@ module.exports = {
   ensureSpecialAccessSchema,
   ensureSprintUserStoriesSchema,
   ensureRestoreHistorySchema,
+  ensureSanctionsSchema,
 };

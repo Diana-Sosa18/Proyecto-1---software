@@ -17,6 +17,7 @@ const sprintStoriesRoutes = require("./routes/sprintStoriesRoutes");
 const adminPaymentsRoutes = require("./routes/adminPaymentsRoutes");
 const adminAuthorizedUsersRoutes = require("./routes/adminAuthorizedUsersRoutes");
 const restoresRoutes = require("./routes/restoresRoutes");
+const adminSanctionsRoutes = require("./routes/adminSanctionsRoutes");
 
 function createApp() {
   const app = express();
@@ -49,6 +50,7 @@ function createApp() {
   app.use(adminPaymentsRoutes);
   app.use(adminAuthorizedUsersRoutes);
   app.use(restoresRoutes);
+  app.use(adminSanctionsRoutes);
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;
@@ -61,7 +63,10 @@ function createApp() {
       console.error(error);
     }
 
-    res.status(status).json({ message });
+    res.status(status).json({
+      message,
+      ...(error.code ? { code: error.code } : {}),
+    });
   });
 
   return app;

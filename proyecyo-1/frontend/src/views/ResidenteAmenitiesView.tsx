@@ -15,6 +15,7 @@ import {
   getAmenitiesReservationHistoryRequest,
   getAmenitiesReservationsRequest,
   updateAmenitiesReservationRequest,
+  validateAmenityConflictRequest,
 } from "@/services/amenitiesService";
 import type {
   Amenity,
@@ -213,6 +214,26 @@ export function ResidenteAmenitiesView() {
       setIsSubmitting(true);
       setErrorMessage("");
       setSuccessMessage("");
+      const conflict = await validateAmenityConflictRequest({
+        id_amenidad: selectedAmenityId,
+        fecha: selectedDate,
+        hora_inicio: selectedSlot.hora_inicio,
+        hora_fin: selectedSlot.hora_fin,
+      });
+
+      if (conflict.limite_alcanzado) {
+        setErrorMessage(
+          conflict.mensaje_limite ||
+            `Ya alcanzaste el limite de ${conflict.limite_reservas} reservas activas.`,
+        );
+        return;
+      }
+
+      if (conflict.conflicto) {
+        setErrorMessage("Ese horario ya no esta disponible.");
+        return;
+      }
+
       const created = await createAmenitiesReservationRequest({
         id_amenidad: selectedAmenityId,
         fecha: selectedDate,

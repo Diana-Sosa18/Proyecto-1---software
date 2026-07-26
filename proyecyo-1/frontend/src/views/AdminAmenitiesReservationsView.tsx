@@ -659,6 +659,14 @@ export function AdminAmenitiesReservationsView() {
         return;
       }
 
+      if (conflict.limite_alcanzado) {
+        setReservationError(
+          conflict.mensaje_limite ||
+            `El usuario ya alcanzo el limite de ${conflict.limite_reservas} reservas activas.`,
+        );
+        return;
+      }
+
       await createAdminAmenitiesReservationRequest(payload);
       await refreshDashboard();
       setSuccessMessage("La reserva se registro correctamente en la base de datos.");

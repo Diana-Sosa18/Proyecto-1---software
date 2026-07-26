@@ -1,6 +1,9 @@
 const { pool, query } = require("../database/mysql");
 
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
+const MAX_ACTIVE_RESERVATIONS_PER_USER = 3;
+const RESERVATION_LIMIT_MESSAGE =
+  "El usuario ya alcanzo el limite de reservas activas permitidas.";
 
 const DEFAULT_AMENITIES = [
   {
@@ -595,6 +598,7 @@ async function getReservableUserRecord(connection, userId) {
         AND u.activo = 1
         AND tu.nombre IN ('residente', 'inquilino')
       LIMIT 1
+      FOR UPDATE
     `,
     [userId],
   );
@@ -660,6 +664,44 @@ async function findReservationConflict(connection, amenityId, fecha, horaInicio,
   );
 
   return rows[0] || null;
+}
+
+async function countActiveReservationsByUser(connection, userId, lockRows) {
+  const currentDateTime = getCurrentDateTimeInTimezone();
+  const [rows] = await connection.execute(
+    `
+      SELECT
+        id_usuario
+      FROM RESERVA
+      WHERE id_usuario = ?
+        AND COALESCE(estado, 'CONFIRMADA') <> 'CANCELADA'
+        AND (
+          fecha > ?
+          OR (fecha = ? AND hora_fin > ?)
+        )
+      ${lockRows ? "FOR UPDATE" : ""}
+    `,
+    [userId, currentDateTime.date, currentDateTime.date, currentDateTime.time],
+  );
+
+  return rows.length;
+}
+
+async function getReservationLimitStatus(connection, userId, lockRows = false) {
+  const activeReservations = await countActiveReservationsByUser(connection, userId, lockRows);
+
+  return {
+    limite: MAX_ACTIVE_RESERVATIONS_PER_USER,
+    reservas_activas: activeReservations,
+    limite_alcanzado: activeReservations >= MAX_ACTIVE_RESERVATIONS_PER_USER,
+  };
+}
+
+function throwReservationLimitError() {
+  const error = new Error(RESERVATION_LIMIT_MESSAGE);
+  error.status = 409;
+  error.code = "ACTIVE_RESERVATION_LIMIT_REACHED";
+  throw error;
 }
 
 function normalizeReservationPayload(payload, requireUserId) {
@@ -1126,6 +1168,7 @@ async function getAmenityAvailability(amenityIdValue, fechaValue, options = {}) 
 async function validateAmenityReservationConflict(payload, options = {}) {
   const normalizedPayload = normalizeReservationPayload(payload, Boolean(options.requireUserId));
   const includeUserDetails = Boolean(options.includeUserDetails);
+  const shouldValidateLimit = Boolean(options.validateUserLimit) || normalizedPayload.id_usuario != null;
   const connection = await pool.getConnection();
 
   try {
@@ -1148,6 +1191,10 @@ async function validateAmenityReservationConflict(payload, options = {}) {
       normalizedPayload.hora_fin,
       false,
     );
+    const limitStatus =
+      shouldValidateLimit && normalizedPayload.id_usuario != null
+        ? await getReservationLimitStatus(connection, normalizedPayload.id_usuario, false)
+        : null;
 
     await connection.commit();
 
@@ -1156,6 +1203,10 @@ async function validateAmenityReservationConflict(payload, options = {}) {
       reserva: conflictingReservation
         ? mapReservation(conflictingReservation, includeUserDetails)
         : null,
+      limite_alcanzado: Boolean(limitStatus?.limite_alcanzado),
+      limite_reservas: limitStatus?.limite ?? MAX_ACTIVE_RESERVATIONS_PER_USER,
+      reservas_activas_usuario: limitStatus?.reservas_activas ?? null,
+      mensaje_limite: limitStatus?.limite_alcanzado ? RESERVATION_LIMIT_MESSAGE : null,
     };
   } catch (error) {
     await connection.rollback();
@@ -1204,6 +1255,12 @@ async function createAmenityReservation(viewer, payload) {
       const error = new Error("El horario seleccionado ya esta ocupado para esta amenidad.");
       error.status = 409;
       throw error;
+    }
+
+    const limitStatus = await getReservationLimitStatus(connection, userId, true);
+
+    if (limitStatus.limite_alcanzado) {
+      throwReservationLimitError();
     }
 
     await connection.execute(
@@ -1368,6 +1425,8 @@ async function updateAmenitySchedule(amenityIdValue, payload) {
 }
 
 module.exports = {
+  MAX_ACTIVE_RESERVATIONS_PER_USER,
+  RESERVATION_LIMIT_MESSAGE,
   listAmenities,
   listReservableUsers,
   listReservationsByRange,
@@ -1379,4 +1438,9 @@ module.exports = {
   cancelAmenityReservation,
   getAmenityStats,
   updateAmenitySchedule,
+  __private__: {
+    countActiveReservationsByUser,
+    getReservationLimitStatus,
+    throwReservationLimitError,
+  },
 };

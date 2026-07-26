@@ -57,6 +57,10 @@ export interface AmenityAvailabilityResponse {
 export interface AmenityConflictResponse {
   conflicto: boolean;
   reserva: AmenityReservation | null;
+  limite_alcanzado: boolean;
+  limite_reservas: number;
+  reservas_activas_usuario: number | null;
+  mensaje_limite: string | null;
 }
 
 export interface ReservableUserOption {
