@@ -25,6 +25,9 @@ import { ResidenteUnifiedView } from "@/views/ResidenteUnifiedView";
 import { ResidenteView } from "@/views/ResidenteView";
 import { ResidenteVisitsView } from "@/views/ResidenteVisitsView";
 import { ResidentMonthlySummaryView } from "@/views/ResidentMonthlySummaryView";
+import { LandingView } from "@/views/LandingView";
+import { PrivacyView } from "@/views/PrivacyView";
+import { AdminDemoRequestsView } from "@/views/AdminDemoRequestsView";
 
 function FallbackRedirect() {
   const { user } = useAuth();
@@ -35,8 +38,10 @@ export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<LandingView />} />
+        <Route path="/privacidad" element={<PrivacyView />} />
         <Route element={<PublicRoute />}>
-          <Route path="/" element={<LoginView />} />
+          <Route path="/login" element={<LoginView />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
@@ -52,6 +57,7 @@ export function AppRouter() {
           <Route path="/admin/amenidades" element={<AdminAmenitiesReservationsView />} />
           <Route path="/admin/reportes" element={<AdminReportsView />} />
           <Route path="/admin/configuracion" element={<AdminSettingsView />} />
+          <Route path="/admin/solicitudes-demo" element={<AdminDemoRequestsView />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["guardia"]} />}>

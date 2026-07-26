@@ -11,7 +11,7 @@ import {
   UserCheck,
   Wallet,
   BriefcaseBusiness,
-  ShieldAlert,
+  MessageSquareText,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -93,6 +93,11 @@ const adminMenuItems: AdminMenuItem[] = [
     label: "Configuraci\u00f3n",
     icon: Settings,
     to: "/admin/configuracion",
+  },
+  {
+    label: "Solicitudes demo",
+    icon: MessageSquareText,
+    to: "/admin/solicitudes-demo",
   },
 ];
 
