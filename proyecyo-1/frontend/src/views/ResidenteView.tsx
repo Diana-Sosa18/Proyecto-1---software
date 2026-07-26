@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, BriefcaseBusiness, CalendarDays, CheckCheck, Home, ShieldCheck, UserRoundCheck } from "lucide-react";
+import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, CheckCheck, Home, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
@@ -258,6 +258,14 @@ export function ResidenteView() {
           helper="Estado al dia"
           icon={Home}
         />
+
+        <StatCard
+          label="Resumen mensual"
+          value="Ver"
+          helper="Visitas, accesos y reservas"
+          icon={BarChart3}
+          onClick={() => navigate("/residente/resumen-mensual")}
+        />
       </div>
 
       <Card className="border-0 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
@@ -354,6 +362,11 @@ export function ResidenteView() {
             title: "Reglamentos",
             description: "Consulte reglas por categoria con buscador y detalle.",
             path: "/residente/reglamentos",
+          },
+          {
+            title: "Resumen mensual",
+            description: "Consulte sus visitas, accesos, reservas y actividades por mes.",
+            path: "/residente/resumen-mensual",
           },
         ].map((section) => (
           <Card
