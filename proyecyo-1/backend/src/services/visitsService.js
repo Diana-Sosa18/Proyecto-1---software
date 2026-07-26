@@ -283,7 +283,7 @@ async function createVisit(userId, role = "residente", payload) {
     throw error;
   }
 
-  await assertVisitTimesAllowed(horaInicio, horaFin);
+  await assertVisitTimesAllowed(horaInicio, horaFin, fecha);
 
   const connection = await pool.getConnection();
 
@@ -511,7 +511,7 @@ async function updateVisit(userId, role = "residente", accessId, payload = {}) {
     throw error;
   }
 
-  await assertVisitTimesAllowed(horaInicio, horaFin);
+  await assertVisitTimesAllowed(horaInicio, horaFin, fecha);
 
   const connection = await pool.getConnection();
 
@@ -927,4 +927,5 @@ module.exports = {
   getGuardShiftVisits,
   validateQrVisit,
   registerQrEntry,
+  __private__: { ensureVisitType },
 };
