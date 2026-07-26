@@ -1,5 +1,5 @@
 # Usa Node
-FROM node:18
+FROM node:20
 
 # Carpeta de trabajo
 WORKDIR /app
