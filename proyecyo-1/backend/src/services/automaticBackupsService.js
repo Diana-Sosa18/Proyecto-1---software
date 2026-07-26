@@ -74,7 +74,8 @@ async function listBackups() {
 }
 
 async function enforceRetention(retention) {
-  const old = await query("SELECT id_respaldo, archivo_clave FROM RESPALDO_AUTOMATICO WHERE estado='COMPLETADO' ORDER BY id_respaldo DESC LIMIT 100 OFFSET ?", [retention]);
+  const safeRetention = Math.min(30, Math.max(1, Number(retention) || 7));
+  const old = await query(`SELECT id_respaldo, archivo_clave FROM RESPALDO_AUTOMATICO WHERE estado='COMPLETADO' ORDER BY id_respaldo DESC LIMIT 100 OFFSET ${safeRetention}`);
   for (const item of old) {
     if (item.archivo_clave) await fs.unlink(resolveKnownFile(item.archivo_clave)).catch(() => {});
     await query("DELETE FROM RESPALDO_AUTOMATICO WHERE id_respaldo=?", [item.id_respaldo]);
