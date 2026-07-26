@@ -11,3 +11,6 @@ test("HU14 impide traversal en descargas", () => {
   assert.throws(() => resolveKnownFile("../secret.sql"), /invalido/);
   assert.equal(path.basename(resolveKnownFile("nexus-2026.sql")), "nexus-2026.sql");
 });
+test("HU14 limita la retencion a valores seguros", () => {
+  assert.throws(() => validateConfig({ activo: true, frecuencia: "DIARIO", hora: "02:00", retencion: 31 }), /retencion/);
+});
