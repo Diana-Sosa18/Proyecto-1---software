@@ -24,6 +24,7 @@ import { ResidenteRegulationsView } from "@/views/ResidenteRegulationsView";
 import { ResidenteUnifiedView } from "@/views/ResidenteUnifiedView";
 import { ResidenteView } from "@/views/ResidenteView";
 import { ResidenteVisitsView } from "@/views/ResidenteVisitsView";
+import { ResidentMonthlySummaryView } from "@/views/ResidentMonthlySummaryView";
 
 function FallbackRedirect() {
   const { user } = useAuth();
@@ -63,6 +64,7 @@ export function AppRouter() {
           <Route path="/residente/reglamentos" element={<ResidenteRegulationsView />} />
           <Route path="/residente/visitas" element={<ResidenteVisitsView />} />
           <Route path="/residente/amenidades" element={<ResidenteAmenitiesView />} />
+          <Route path="/residente/resumen-mensual" element={<ResidentMonthlySummaryView />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["inquilino"]} />}>
