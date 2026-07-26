@@ -9,6 +9,7 @@ const {
   ensureSpecialAccessSchema,
   ensureSprintUserStoriesSchema,
   ensureRestoreHistorySchema,
+  ensureFinancialRulesSchema,
   ensureSanctionsSchema,
   ensureConfigurationSchema,
   query,
@@ -53,6 +54,7 @@ async function startServer() {
   await ensureSpecialAccessSchema();
   await ensureSprintUserStoriesSchema();
   await ensureRestoreHistorySchema();
+  await ensureFinancialRulesSchema();
   await ensureSanctionsSchema();
   await ensureConfigurationSchema();
 

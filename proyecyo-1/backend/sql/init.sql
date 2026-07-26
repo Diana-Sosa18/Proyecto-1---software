@@ -298,6 +298,20 @@ CREATE TABLE ACCESO_EXCEPCION (
     CHECK (accion IN ('APROBADO', 'RECHAZADO'))
 );
 
+CREATE TABLE RECARGO_APLICADO (
+    id_recargo INT PRIMARY KEY AUTO_INCREMENT,
+    id_cuota INT NOT NULL,
+    id_casa INT NOT NULL,
+    tipo_regla VARCHAR(20) NOT NULL,
+    monto_original DECIMAL(10,2) NOT NULL,
+    monto_recargo DECIMAL(10,2) NOT NULL,
+    fecha_aplicacion DATE NOT NULL,
+    aplicado_por INT NULL,
+    UNIQUE KEY uq_recargo_cuota (id_cuota),
+    FOREIGN KEY (id_cuota) REFERENCES CUOTA(id_cuota),
+    FOREIGN KEY (id_casa) REFERENCES CASA(id_casa)
+);
+
 INSERT INTO CONFIGURACION (clave, valor)
 VALUES
     ('visitas_hora_apertura', '06:00'),

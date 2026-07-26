@@ -199,6 +199,8 @@ export function AdminPaymentsView() {
                   <th className="px-5 py-3 font-semibold">Unidad</th>
                   <th className="px-5 py-3 font-semibold">Residente</th>
                   <th className="px-5 py-3 font-semibold">Monto pendiente</th>
+                  <th className="px-5 py-3 font-semibold">Recargo</th>
+                  <th className="px-5 py-3 font-semibold">Total</th>
                   <th className="px-5 py-3 font-semibold">Vencimiento</th>
                   <th className="px-5 py-3 font-semibold">Estado</th>
                 </tr>
@@ -210,6 +212,9 @@ export function AdminPaymentsView() {
                     <td className="px-5 py-3 text-sm text-slate-950">{payment.propietario_nombre}</td>
                     <td className="px-5 py-3 text-sm text-slate-500">
                       {formatCurrency(payment.monto_pendiente)}
+                    </td>
+                    <td className="px-5 py-3 text-sm">{formatCurrency(payment.recargo_aplicado)}</td>
+                    <td className="px-5 py-3 text-sm font-semibold">{formatCurrency(payment.total_pendiente)}
                     </td>
                     <td className="px-5 py-3 text-sm text-slate-500">{formatDueDate(payment.fecha_limite)}</td>
                     <td className="px-5 py-3">
