@@ -6,6 +6,8 @@ export interface AdminPaymentRecord {
   propietario_nombre: string;
   propietario_correo: string;
   monto_pendiente: number;
+  recargo_aplicado: number;
+  total_pendiente: number;
   fecha_limite: string | null;
   estado: AdminPaymentStatus;
 }

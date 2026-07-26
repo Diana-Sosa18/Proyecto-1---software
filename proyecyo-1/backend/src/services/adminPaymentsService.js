@@ -32,6 +32,8 @@ function mapAdminPayment(row) {
     propietario_nombre: row.propietario_nombre,
     propietario_correo: row.propietario_correo,
     monto_pendiente: Number(row.monto_pendiente),
+    recargo_aplicado: Number(row.recargo_aplicado || 0),
+    total_pendiente: Number(row.monto_pendiente) + Number(row.recargo_aplicado || 0),
     fecha_limite: row.fecha_limite || null,
     estado: row.estado,
   };
@@ -71,6 +73,7 @@ async function listDelinquentResidents(filters = {}) {
           propietario.nombre AS propietario_nombre,
           propietario.correo AS propietario_correo,
           COALESCE(saldo.monto_pendiente, 0) AS monto_pendiente,
+          COALESCE(recargos.total_recargo, 0) AS recargo_aplicado,
           DATE_FORMAT(saldo.proxima_fecha_limite, '%Y-%m-%d') AS fecha_limite,
           CASE
             WHEN COALESCE(saldo.monto_pendiente, 0) <= 0 THEN 'PAGADO'
@@ -99,6 +102,9 @@ async function listDelinquentResidents(filters = {}) {
           ) pg ON pg.id_cuota = cu.id_cuota
           GROUP BY cu.id_casa
         ) saldo ON saldo.id_casa = c.id_casa
+        LEFT JOIN (
+          SELECT id_casa, SUM(monto_recargo) total_recargo FROM RECARGO_APLICADO GROUP BY id_casa
+        ) recargos ON recargos.id_casa = c.id_casa
       ) resumen
       WHERE ${sqlFilters.join(" AND ")}
       ORDER BY (resumen.estado = 'MOROSO') DESC, resumen.monto_pendiente DESC, resumen.propietario_nombre ASC

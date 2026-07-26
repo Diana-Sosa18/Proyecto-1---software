@@ -75,6 +75,11 @@ const adminMenuItems: AdminMenuItem[] = [
     to: "/admin/sanciones",
   },
   {
+    label: "Historial sanciones",
+    icon: FileText,
+    to: "/admin/sanciones/historial-completo",
+  },
+  {
     label: "Amenidades",
     icon: Home,
     to: "/admin/amenidades",

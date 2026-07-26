@@ -12,6 +12,7 @@ import { AdminPaymentsView } from "@/views/AdminPaymentsView";
 import { AdminReportsView } from "@/views/AdminReportsView";
 import { AdminProvidersView } from "@/views/AdminProvidersView";
 import { AdminSanctionsView } from "@/views/AdminSanctionsView";
+import { AdminSanctionHistoryView } from "@/views/AdminSanctionHistoryView";
 import { AdminSettingsView } from "@/views/AdminSettingsView";
 import { AdminSpecialAccessView } from "@/views/AdminSpecialAccessView";
 import { AdminView } from "@/views/AdminView";
@@ -23,6 +24,7 @@ import { ResidenteRegulationsView } from "@/views/ResidenteRegulationsView";
 import { ResidenteUnifiedView } from "@/views/ResidenteUnifiedView";
 import { ResidenteView } from "@/views/ResidenteView";
 import { ResidenteVisitsView } from "@/views/ResidenteVisitsView";
+import { ResidentMonthlySummaryView } from "@/views/ResidentMonthlySummaryView";
 
 function FallbackRedirect() {
   const { user } = useAuth();
@@ -46,6 +48,7 @@ export function AppRouter() {
           <Route path="/admin/comunicados" element={<AdminCommunicationsView />} />
           <Route path="/admin/pagos" element={<AdminPaymentsView />} />
           <Route path="/admin/sanciones" element={<AdminSanctionsView />} />
+          <Route path="/admin/sanciones/historial-completo" element={<AdminSanctionHistoryView />} />
           <Route path="/admin/amenidades" element={<AdminAmenitiesReservationsView />} />
           <Route path="/admin/reportes" element={<AdminReportsView />} />
           <Route path="/admin/configuracion" element={<AdminSettingsView />} />
@@ -61,6 +64,7 @@ export function AppRouter() {
           <Route path="/residente/reglamentos" element={<ResidenteRegulationsView />} />
           <Route path="/residente/visitas" element={<ResidenteVisitsView />} />
           <Route path="/residente/amenidades" element={<ResidenteAmenitiesView />} />
+          <Route path="/residente/resumen-mensual" element={<ResidentMonthlySummaryView />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["inquilino"]} />}>

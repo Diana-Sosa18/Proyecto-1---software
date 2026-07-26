@@ -81,6 +81,14 @@ async function ensureRestoreHistorySchema() {
     `);
   }
 }
+async function ensureFinancialRulesSchema() {
+  if (!(await tableExists("RECARGO_APLICADO"))) await query(`CREATE TABLE RECARGO_APLICADO (
+    id_recargo INT PRIMARY KEY AUTO_INCREMENT, id_cuota INT NOT NULL, id_casa INT NOT NULL,
+    tipo_regla VARCHAR(20) NOT NULL, monto_original DECIMAL(10,2) NOT NULL,
+    monto_recargo DECIMAL(10,2) NOT NULL, fecha_aplicacion DATE NOT NULL, aplicado_por INT NULL,
+    UNIQUE KEY uq_recargo_cuota (id_cuota), FOREIGN KEY (id_cuota) REFERENCES CUOTA(id_cuota),
+    FOREIGN KEY (id_casa) REFERENCES CASA(id_casa))`);
+}
 
 async function ensureVisitQrSchema() {
   const hasTokenQr = await columnExists("ACCESO", "token_qr");
@@ -717,6 +725,40 @@ async function ensureConfigurationSchema() {
   }
 }
 
+async function ensureAutomaticBackupsSchema() {
+  if (!(await tableExists("RESPALDO_AUTOMATICO"))) {
+    await query(`
+      CREATE TABLE RESPALDO_AUTOMATICO (
+        id_respaldo INT PRIMARY KEY AUTO_INCREMENT,
+        nombre_archivo VARCHAR(180) NOT NULL,
+        tipo VARCHAR(20) NOT NULL,
+        estado VARCHAR(20) NOT NULL,
+        tamano_bytes BIGINT NOT NULL DEFAULT 0,
+        duracion_ms INT NOT NULL DEFAULT 0,
+        mensaje VARCHAR(255) NULL,
+        archivo_clave VARCHAR(180) NULL,
+        iniciado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        finalizado_en DATETIME NULL,
+        creado_por INT NULL,
+        FOREIGN KEY (creado_por) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  const defaults = [
+    ["respaldos_activo", "false"],
+    ["respaldos_frecuencia", "DIARIO"],
+    ["respaldos_hora", "02:00"],
+    ["respaldos_retencion", "7"],
+  ];
+  for (const [clave, valor] of defaults) {
+    await query(
+      "INSERT INTO CONFIGURACION (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE clave = clave",
+      [clave, valor],
+    );
+  }
+}
+
 module.exports = {
   pool,
   query,
@@ -728,6 +770,8 @@ module.exports = {
   ensureSpecialAccessSchema,
   ensureSprintUserStoriesSchema,
   ensureRestoreHistorySchema,
+  ensureFinancialRulesSchema,
   ensureSanctionsSchema,
   ensureConfigurationSchema,
+  ensureAutomaticBackupsSchema,
 };
