@@ -298,6 +298,14 @@ CREATE TABLE ACCESO_EXCEPCION (
     CHECK (accion IN ('APROBADO', 'RECHAZADO'))
 );
 
+INSERT INTO CONFIGURACION (clave, valor)
+VALUES
+    ('visitas_hora_apertura', '06:00'),
+    ('visitas_hora_cierre', '22:00'),
+    ('visitas_duracion_maxima_horas', '4'),
+    ('visitas_activo', 'true'),
+    ('visitas_dias_habilitados', '[1,2,3,4,5,6,0]');
+
 CREATE TABLE NOTIFICACION (
     id_notificacion INT PRIMARY KEY AUTO_INCREMENT,
     id_usuario INT NOT NULL,

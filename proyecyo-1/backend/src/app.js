@@ -18,6 +18,7 @@ const adminPaymentsRoutes = require("./routes/adminPaymentsRoutes");
 const adminAuthorizedUsersRoutes = require("./routes/adminAuthorizedUsersRoutes");
 const restoresRoutes = require("./routes/restoresRoutes");
 const adminSanctionsRoutes = require("./routes/adminSanctionsRoutes");
+const configurationRoutes = require("./routes/configurationRoutes");
 
 function createApp() {
   const app = express();
@@ -51,6 +52,7 @@ function createApp() {
   app.use(adminAuthorizedUsersRoutes);
   app.use(restoresRoutes);
   app.use(adminSanctionsRoutes);
+  app.use(configurationRoutes);
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;

@@ -1,4 +1,5 @@
 const { pool, query } = require("../database/mysql");
+const { assertVisitTimesAllowed } = require("./configurationService");
 const crypto = require("crypto");
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 
@@ -301,6 +302,8 @@ async function createVisit(userId, role = "residente", payload) {
     throw error;
   }
 
+  await assertVisitTimesAllowed(horaInicio, horaFin, fecha);
+
   const connection = await pool.getConnection();
 
   try {
@@ -526,6 +529,8 @@ async function updateVisit(userId, role = "residente", accessId, payload = {}) {
     error.status = 400;
     throw error;
   }
+
+  await assertVisitTimesAllowed(horaInicio, horaFin, fecha);
 
   const connection = await pool.getConnection();
 
@@ -1024,4 +1029,5 @@ module.exports = {
   getGuardShiftVisits,
   validateQrVisit,
   registerQrEntry,
+  __private__: { ensureVisitType },
 };

@@ -94,6 +94,11 @@ function getVisitBadge(visit: VisitRecord): { label: string; className: string }
     className: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200",
   };
 }
+const visitTypeBadge = {
+  VISITA: { label: "Visita", className: "bg-blue-50 text-blue-700" },
+  DELIVERY: { label: "Delivery", className: "bg-amber-50 text-amber-700" },
+  PROVEEDOR: { label: "Proveedor", className: "bg-violet-50 text-violet-700" },
+} as const;
 
 export function GuardiaView() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -684,6 +689,9 @@ export function GuardiaView() {
                 >
                   <div>
                     <p className="text-slate-900">{visitor.nombre}</p>
+                    <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${visitTypeBadge[visitor.tipo_visita].className}`}>
+                      {visitTypeBadge[visitor.tipo_visita].label}
+                    </span>
                     <p className="text-sm text-slate-500">
                       {visitor.casa} - {formatDate(visitor.fecha)} - {visitor.hora_inicio} a {visitor.hora_fin}
                     </p>

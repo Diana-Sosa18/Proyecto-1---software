@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { VisitScheduleSettings } from "@/components/admin/VisitScheduleSettings";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/services/api";
@@ -187,6 +188,7 @@ export function AdminSettingsView() {
         </Button>
       }
     >
+      <VisitScheduleSettings />
       <section className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
