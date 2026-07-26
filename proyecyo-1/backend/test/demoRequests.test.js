@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { validateDemoRequest, pagination, adminFilters, DEMO_STATUSES } = require("../src/services/demoRequestsService");
+const { validateDemoRequest, pagination, pageClause, adminFilters, DEMO_STATUSES } = require("../src/services/demoRequestsService");
 
 const valid = {
   nombre: "  María   López ",
@@ -34,6 +34,8 @@ test("landing limita mensaje y bloquea honeypot", () => {
 
 test("administración valida filtros, estados y paginación", () => {
   assert.deepEqual(pagination({ page: "2", limit: "25" }), { page: 2, limit: 25, offset: 25 });
+  assert.equal(pageClause(25, 25), "LIMIT 25 OFFSET 25");
+  assert.throws(() => pageClause(10, -1), /Paginación/);
   assert.equal(pagination({ page: "-2", limit: "999" }).limit, 100);
   assert.deepEqual(DEMO_STATUSES, ["NUEVA", "CONTACTADA", "DESCARTADA", "CONVERTIDA"]);
   assert.throws(() => adminFilters({ estado: "BORRADA" }), /Estado/);

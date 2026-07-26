@@ -57,6 +57,13 @@ function pagination(input = {}) {
   return { page, limit, offset: (page - 1) * limit };
 }
 
+function pageClause(limit, offset) {
+  if (!Number.isInteger(limit) || !Number.isInteger(offset) || limit < 1 || offset < 0) {
+    throw httpError("Paginación inválida.");
+  }
+  return `LIMIT ${limit} OFFSET ${offset}`;
+}
+
 function adminFilters(input = {}) {
   const estado = clean(input.estado).toUpperCase();
   const desde = clean(input.desde);
@@ -86,8 +93,8 @@ async function list(input = {}) {
       cantidad_viviendas AS cantidadViviendas, mensaje, estado,
       fecha_creacion AS fechaCreacion, fecha_actualizacion AS fechaActualizacion
      FROM SOLICITUD_DEMO ${where}
-     ORDER BY fecha_creacion DESC LIMIT ? OFFSET ?`,
-    [...params, limit, offset],
+     ORDER BY fecha_creacion DESC ${pageClause(limit, offset)}`,
+    params,
   );
   return { items, page, limit, total: Number(totals[0]?.total || 0) };
 }
@@ -115,4 +122,4 @@ async function updateStatus(id, status) {
   return detail(id);
 }
 
-module.exports = { DEMO_STATUSES, validateDemoRequest, pagination, adminFilters, create, list, detail, updateStatus };
+module.exports = { DEMO_STATUSES, validateDemoRequest, pagination, pageClause, adminFilters, create, list, detail, updateStatus };
