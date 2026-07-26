@@ -8,6 +8,7 @@ const {
   ensureAnnouncementsSchema,
   ensureSpecialAccessSchema,
   ensureSprintUserStoriesSchema,
+  ensureRestoreHistorySchema,
   query,
 } = require("./src/database/mysql");
 
@@ -49,6 +50,7 @@ async function startServer() {
   await ensureAnnouncementsSchema();
   await ensureSpecialAccessSchema();
   await ensureSprintUserStoriesSchema();
+  await ensureRestoreHistorySchema();
 
   const app = createApp();
 
