@@ -64,6 +64,8 @@ describe("adminAuthorizedUsersService.listAuthorizedTenants", () => {
 
     const [sql, params] = query.mock.calls[0];
     expect(sql).toContain("i.autorizado = TRUE");
+    expect(sql).toContain("fecha_inicio <= CURDATE()");
+    expect(sql).toContain("fecha_fin IS NULL OR fecha_fin >= CURDATE()");
     expect(sql).toContain("WHERE 1 = 1");
     expect(params).toEqual([]);
   });

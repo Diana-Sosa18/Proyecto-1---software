@@ -68,6 +68,8 @@ async function listAuthorizedTenants(filters = {}) {
             COUNT(*) AS total_permisos_activos
           FROM PERMISO_INQUILINO
           WHERE estado = 'ACTIVO'
+            AND fecha_inicio <= CURDATE()
+            AND (fecha_fin IS NULL OR fecha_fin >= CURDATE())
           GROUP BY id_usuario
         ) permisos ON permisos.id_usuario = u.id_usuario
         WHERE i.autorizado = TRUE
