@@ -51,7 +51,10 @@ function createApp() {
       console.error(error);
     }
 
-    res.status(status).json({ message });
+    res.status(status).json({
+      message,
+      ...(error.code ? { code: error.code } : {}),
+    });
   });
 
   return app;

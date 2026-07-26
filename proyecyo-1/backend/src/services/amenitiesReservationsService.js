@@ -475,6 +475,7 @@ async function getReservableUserRecord(connection, userId) {
         AND u.activo = 1
         AND tu.nombre IN ('residente', 'inquilino')
       LIMIT 1
+      FOR UPDATE
     `,
     [userId],
   );
@@ -567,6 +568,7 @@ async function getReservationLimitStatus(connection, userId, lockRows = false) {
 function throwReservationLimitError() {
   const error = new Error(RESERVATION_LIMIT_MESSAGE);
   error.status = 409;
+  error.code = "ACTIVE_RESERVATION_LIMIT_REACHED";
   throw error;
 }
 

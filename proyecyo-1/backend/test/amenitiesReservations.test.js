@@ -14,6 +14,9 @@ test("amenity reservation limit uses the configured active reservation maximum",
 test("reservation limit error exposes a user-facing conflict message", () => {
   assert.throws(
     () => __private__.throwReservationLimitError(),
-    (error) => error.status === 409 && error.message === RESERVATION_LIMIT_MESSAGE,
+    (error) =>
+      error.status === 409 &&
+      error.code === "ACTIVE_RESERVATION_LIMIT_REACHED" &&
+      error.message === RESERVATION_LIMIT_MESSAGE,
   );
 });
