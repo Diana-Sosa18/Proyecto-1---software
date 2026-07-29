@@ -115,8 +115,8 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] text-slate-900">
-      <aside className="flex w-full flex-col border-b border-slate-200 bg-white lg:fixed lg:inset-y-0 lg:left-0 lg:w-[232px] lg:border-b-0 lg:border-r">
-        <div className="border-b border-slate-200 px-5 py-5">
+      <aside className="flex w-full flex-col border-b border-slate-200 bg-white lg:fixed lg:inset-y-0 lg:left-0 lg:h-screen lg:w-[232px] lg:overflow-hidden lg:border-b-0 lg:border-r">
+        <div className="shrink-0 border-b border-slate-200 px-5 py-5">
           <p className="text-[1.34rem] font-semibold leading-none tracking-tight text-blue-600">
             NexusResidencial
           </p>
@@ -125,7 +125,7 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
           </p>
         </div>
 
-        <nav className="px-3 py-4 lg:px-3 lg:py-5">
+        <nav className="px-3 py-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-3 lg:py-5">
           <div className="grid gap-1">
             {adminMenuItems.map(({ label, icon: Icon, to, end }) => (
               <NavLink
@@ -148,7 +148,7 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
           </div>
         </nav>
 
-        <div className="mt-auto border-t border-slate-200 px-5 py-5">
+        <div className="mt-auto shrink-0 border-t border-slate-200 bg-white px-5 py-5">
           <div className="flex items-center gap-2.5">
             <div className="flex size-9 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600">
               {getInitials(user?.email)}

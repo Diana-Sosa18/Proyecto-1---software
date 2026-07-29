@@ -1,10 +1,9 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 
 import { useAuth } from "@/hooks/useAuth";
-import { rolePaths } from "@/routes/rolePaths";
 
 export function PublicRoute() {
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -12,10 +11,6 @@ export function PublicRoute() {
         <p className="text-slate-600">Preparando plataforma...</p>
       </div>
     );
-  }
-
-  if (user) {
-    return <Navigate to={rolePaths[user.role]} replace />;
   }
 
   return <Outlet />;
