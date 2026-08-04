@@ -13,6 +13,7 @@ const {
   ensureSanctionsSchema,
   ensureConfigurationSchema,
   ensureAutomaticBackupsSchema,
+  ensureRemindersSchema,
   ensureDemoRequestsSchema,
   query,
 } = require("./src/database/mysql");
@@ -61,6 +62,7 @@ async function startServer() {
   await ensureSanctionsSchema();
   await ensureConfigurationSchema();
   await ensureAutomaticBackupsSchema();
+  await ensureRemindersSchema();
   await ensureDemoRequestsSchema();
   startScheduler();
 
