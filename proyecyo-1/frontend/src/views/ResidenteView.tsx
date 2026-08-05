@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, CheckCheck, Home, ShieldCheck, UserRoundCheck } from "lucide-react";
+import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, CheckCheck, Home, ShieldCheck, UserRoundCheck, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
@@ -265,6 +265,14 @@ export function ResidenteView() {
           helper="Visitas, accesos y reservas"
           icon={BarChart3}
           onClick={() => navigate("/residente/resumen-mensual")}
+        />
+
+        <StatCard
+          label="Cargos y pagos"
+          value="Ver"
+          helper="Cargos, recargos y pagos de su unidad"
+          icon={Wallet}
+          onClick={() => navigate("/residente/detalle-financiero")}
         />
       </div>
 

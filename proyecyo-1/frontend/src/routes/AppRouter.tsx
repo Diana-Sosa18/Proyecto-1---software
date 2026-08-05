@@ -26,6 +26,7 @@ import { ResidenteUnifiedView } from "@/views/ResidenteUnifiedView";
 import { ResidenteView } from "@/views/ResidenteView";
 import { ResidenteVisitsView } from "@/views/ResidenteVisitsView";
 import { ResidentMonthlySummaryView } from "@/views/ResidentMonthlySummaryView";
+import { ResidenteFinancialDetailView } from "@/views/ResidenteFinancialDetailView";
 import { LandingView } from "@/views/LandingView";
 import { PrivacyView } from "@/views/PrivacyView";
 import { AdminDemoRequestsView } from "@/views/AdminDemoRequestsView";
@@ -73,6 +74,7 @@ export function AppRouter() {
           <Route path="/residente/visitas" element={<ResidenteVisitsView />} />
           <Route path="/residente/amenidades" element={<ResidenteAmenitiesView />} />
           <Route path="/residente/resumen-mensual" element={<ResidentMonthlySummaryView />} />
+          <Route path="/residente/detalle-financiero" element={<ResidenteFinancialDetailView />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["inquilino"]} />}>
