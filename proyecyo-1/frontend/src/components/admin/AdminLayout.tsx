@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  BellRing,
   FileText,
   Home,
   KeyRound,
@@ -68,6 +69,11 @@ const adminMenuItems: AdminMenuItem[] = [
     label: "Pagos",
     icon: Wallet,
     to: "/admin/pagos",
+  },
+  {
+    label: "Recordatorios",
+    icon: BellRing,
+    to: "/admin/recordatorios",
   },
   {
     label: "Sanciones",

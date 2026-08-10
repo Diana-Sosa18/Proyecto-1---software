@@ -759,6 +759,52 @@ async function ensureAutomaticBackupsSchema() {
   }
 }
 
+async function ensureRemindersSchema() {
+  if (!(await tableExists("RECORDATORIO_PAGO"))) {
+    await query(`
+      CREATE TABLE RECORDATORIO_PAGO (
+        id_recordatorio INT PRIMARY KEY AUTO_INCREMENT,
+        id_casa INT NOT NULL,
+        id_cuota INT NOT NULL,
+        id_usuario INT NOT NULL,
+        id_notificacion INT NULL,
+        tipo VARCHAR(30) NOT NULL,
+        titulo VARCHAR(150) NOT NULL,
+        mensaje VARCHAR(255) NOT NULL,
+        monto DECIMAL(10,2) NOT NULL DEFAULT 0,
+        fecha_limite DATE NOT NULL,
+        dias_para_vencer INT NOT NULL DEFAULT 0,
+        fecha_envio DATE NOT NULL,
+        enviado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
+        FOREIGN KEY (id_cuota) REFERENCES CUOTA(id_cuota),
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario),
+        FOREIGN KEY (id_notificacion) REFERENCES NOTIFICACION(id_notificacion),
+        UNIQUE KEY uq_recordatorio_cuota_tipo_dia (id_cuota, tipo, fecha_envio),
+        CHECK (tipo IN ('PROXIMO_VENCIMIENTO', 'VENCIDO'))
+      )
+    `);
+  }
+
+  if (!(await indexExists("RECORDATORIO_PAGO", "idx_recordatorio_envio"))) {
+    await query(`
+      ALTER TABLE RECORDATORIO_PAGO
+      ADD INDEX idx_recordatorio_envio (enviado_en)
+    `);
+  }
+
+  const defaults = [
+    ["recordatorios_activo", "true"],
+    ["recordatorios_dias_antes", "3"],
+  ];
+  for (const [clave, valor] of defaults) {
+    await query(
+      "INSERT INTO CONFIGURACION (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE clave = clave",
+      [clave, valor],
+    );
+  }
+}
+
 async function ensureDemoRequestsSchema() {
   if (!(await tableExists("SOLICITUD_DEMO"))) {
     await query(`
@@ -797,5 +843,6 @@ module.exports = {
   ensureSanctionsSchema,
   ensureConfigurationSchema,
   ensureAutomaticBackupsSchema,
+  ensureRemindersSchema,
   ensureDemoRequestsSchema,
 };

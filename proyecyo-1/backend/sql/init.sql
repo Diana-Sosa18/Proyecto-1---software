@@ -1,6 +1,7 @@
 CREATE DATABASE IF NOT EXISTS nexus_residencial;
 USE nexus_residencial;
 
+DROP TABLE IF EXISTS RECORDATORIO_PAGO;
 DROP TABLE IF EXISTS ACCESO_EXCEPCION;
 DROP TABLE IF EXISTS COMUNICADO_USUARIO;
 DROP TABLE IF EXISTS HISTORIAL_CAMBIO_PROVEEDOR;
@@ -367,10 +368,37 @@ CREATE TABLE HISTORIAL_RESTAURACION (
     finalizado_en DATETIME
 );
 
+CREATE TABLE RECORDATORIO_PAGO (
+    id_recordatorio INT PRIMARY KEY AUTO_INCREMENT,
+    id_casa INT NOT NULL,
+    id_cuota INT NOT NULL,
+    id_usuario INT NOT NULL,
+    id_notificacion INT NULL,
+    tipo VARCHAR(30) NOT NULL,
+    titulo VARCHAR(150) NOT NULL,
+    mensaje VARCHAR(255) NOT NULL,
+    monto DECIMAL(10,2) NOT NULL DEFAULT 0,
+    fecha_limite DATE NOT NULL,
+    dias_para_vencer INT NOT NULL DEFAULT 0,
+    fecha_envio DATE NOT NULL,
+    enviado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
+    FOREIGN KEY (id_cuota) REFERENCES CUOTA(id_cuota),
+    FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario),
+    FOREIGN KEY (id_notificacion) REFERENCES NOTIFICACION(id_notificacion),
+    UNIQUE KEY uq_recordatorio_cuota_tipo_dia (id_cuota, tipo, fecha_envio),
+    CHECK (tipo IN ('PROXIMO_VENCIMIENTO', 'VENCIDO'))
+);
+
+CREATE INDEX idx_recordatorio_envio
+ON RECORDATORIO_PAGO (enviado_en);
+
 INSERT INTO CONFIGURACION (clave, valor)
 VALUES
     ('horario_visita_inicio', '06:00'),
-    ('horario_visita_fin', '22:00');
+    ('horario_visita_fin', '22:00'),
+    ('recordatorios_activo', 'true'),
+    ('recordatorios_dias_antes', '3');
 
 INSERT INTO TIPO_USUARIO (nombre)
 VALUES ('admin'), ('guardia'), ('residente'), ('inquilino');

@@ -9,6 +9,7 @@ import { AdminAccessesView } from "@/views/AdminAccessesView";
 import { AdminAuthorizedUsersView } from "@/views/AdminAuthorizedUsersView";
 import { AdminCommunicationsView } from "@/views/AdminCommunicationsView";
 import { AdminPaymentsView } from "@/views/AdminPaymentsView";
+import { AdminRemindersView } from "@/views/AdminRemindersView";
 import { AdminReportsView } from "@/views/AdminReportsView";
 import { AdminProvidersView } from "@/views/AdminProvidersView";
 import { AdminSanctionsView } from "@/views/AdminSanctionsView";
@@ -25,6 +26,7 @@ import { ResidenteUnifiedView } from "@/views/ResidenteUnifiedView";
 import { ResidenteView } from "@/views/ResidenteView";
 import { ResidenteVisitsView } from "@/views/ResidenteVisitsView";
 import { ResidentMonthlySummaryView } from "@/views/ResidentMonthlySummaryView";
+import { ResidenteFinancialDetailView } from "@/views/ResidenteFinancialDetailView";
 import { LandingView } from "@/views/LandingView";
 import { PrivacyView } from "@/views/PrivacyView";
 import { AdminDemoRequestsView } from "@/views/AdminDemoRequestsView";
@@ -52,6 +54,7 @@ export function AppRouter() {
           <Route path="/admin/accesos-especiales" element={<AdminSpecialAccessView />} />
           <Route path="/admin/comunicados" element={<AdminCommunicationsView />} />
           <Route path="/admin/pagos" element={<AdminPaymentsView />} />
+          <Route path="/admin/recordatorios" element={<AdminRemindersView />} />
           <Route path="/admin/sanciones" element={<AdminSanctionsView />} />
           <Route path="/admin/sanciones/historial-completo" element={<AdminSanctionHistoryView />} />
           <Route path="/admin/amenidades" element={<AdminAmenitiesReservationsView />} />
@@ -71,6 +74,7 @@ export function AppRouter() {
           <Route path="/residente/visitas" element={<ResidenteVisitsView />} />
           <Route path="/residente/amenidades" element={<ResidenteAmenitiesView />} />
           <Route path="/residente/resumen-mensual" element={<ResidentMonthlySummaryView />} />
+          <Route path="/residente/detalle-financiero" element={<ResidenteFinancialDetailView />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["inquilino"]} />}>
