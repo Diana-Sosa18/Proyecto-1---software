@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const { env } = require("./config/env");
 const authRoutes = require("./routes/authRoutes");
@@ -26,8 +28,18 @@ const reportExportRoutes = require("./routes/reportExportRoutes");
 const automaticBackupsRoutes = require("./routes/automaticBackupsRoutes");
 const demoRequestsRoutes = require("./routes/demoRequestsRoutes");
 
+const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Demasiados intentos de inicio de sesion. Intenta de nuevo mas tarde." },
+});
+
 function createApp() {
   const app = express();
+
+  app.use(helmet());
 
   app.use(
     cors({
@@ -42,6 +54,7 @@ function createApp() {
     res.status(200).json({ status: "ok" });
   });
 
+  app.use("/login", loginRateLimiter);
   app.use(authRoutes);
   app.use(usersRoutes);
   app.use(userTypesRoutes);
@@ -68,10 +81,16 @@ function createApp() {
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;
-    const message =
-      status === 413
-        ? "La imagen seleccionada es demasiado grande. Prueba con una foto mas ligera."
-        : error.message || "Error interno del servidor";
+
+    let message;
+    if (status === 413) {
+      message = "La imagen seleccionada es demasiado grande. Prueba con una foto mas ligera.";
+    } else if (status >= 500) {
+      // No exponer detalles internos (mensajes de MySQL, rutas, stack) al cliente.
+      message = "Error interno del servidor";
+    } else {
+      message = error.message || "Solicitud invalida";
+    }
 
     if (status >= 500) {
       console.error(error);
@@ -79,7 +98,7 @@ function createApp() {
 
     res.status(status).json({
       message,
-      ...(error.code ? { code: error.code } : {}),
+      ...(status < 500 && error.code ? { code: error.code } : {}),
     });
   });
 
