@@ -79,3 +79,41 @@ En Windows PowerShell:
 cd backend
 $env:RUN_FUNCTIONAL_TESTS="1"; npm run test:functional
 ```
+
+## HU3 Estado de cuenta del residente
+
+El estado de cuenta esta disponible para residentes en:
+
+```text
+/residente/estado-cuenta
+```
+
+La pantalla muestra saldo pendiente, cuotas pagadas, cuotas vencidas, proximo vencimiento y detalle por servicio. El frontend consulta la API al entrar a la pantalla y vuelve a actualizar la informacion cada 30 segundos. Tambien incluye un boton de actualizacion manual.
+
+### Endpoint
+
+El endpoint requiere headers de residente:
+
+```text
+x-user-role: residente
+x-user-id: <id_usuario>
+```
+
+Endpoint disponible:
+
+```text
+GET /residente/estado-cuenta
+```
+
+La respuesta incluye:
+
+```text
+resumen.saldo_pendiente
+resumen.cuotas_pagadas
+resumen.cuotas_vencidas
+resumen.cuotas_pendientes
+cuotas[].estado
+cuotas[].saldo_pendiente
+```
+
+Los estados se calculan con base en `CUOTA` y `PAGO`: una cuota es `PAGADA` cuando los pagos cubren el monto total, `VENCIDA` cuando aun tiene saldo y la fecha limite ya paso, y `PENDIENTE` cuando aun tiene saldo pero no ha vencido.

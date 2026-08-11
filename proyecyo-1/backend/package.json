@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "test": "node --test test/adminSanctions.test.js test/amenitiesReservations.test.js",
+    "test": "node --test test/adminSanctions.test.js test/amenitiesReservations.test.js test/residentAccount.test.js",
     "test:functional": "node --test test/*.functional.test.js"
   },
   "keywords": [],
