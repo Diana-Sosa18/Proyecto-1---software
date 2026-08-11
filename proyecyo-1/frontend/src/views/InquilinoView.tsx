@@ -22,6 +22,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { StatCard } from "@/components/layout/StatCard";
@@ -44,6 +45,8 @@ import {
   getTenantProvidersRequest,
   updateTenantProviderRequest,
 } from "@/services/providersService";
+import { getTenantAccountStatementRequest } from "@/services/tenantAccountService";
+import type { TenantAccountSummary } from "@/types/tenantAccount";
 import type {
   TenantProvider,
   TenantProviderHistoryRecord,
@@ -175,6 +178,13 @@ function formatDateTime(dateTime: string | null) {
   }).format(new Date(dateTime.replace(" ", "T")));
 }
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("es-GT", {
+    style: "currency",
+    currency: "GTQ",
+  }).format(value);
+}
+
 function getAccessStatus(visit: VisitRecord): Exclude<AccessFilter, "TODOS"> {
   if (visit.estado_acceso === "INGRESO_REGISTRADO" || visit.qr_status === "USED") {
     return "UTILIZADO";
@@ -201,6 +211,7 @@ function isAccessEditable(visit: VisitRecord) {
 }
 
 export function InquilinoView() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<VisitFormState>(createInitialForm);
   const [providerForm, setProviderForm] = useState<VisitFormState>(createInitialProviderForm);
@@ -209,6 +220,7 @@ export function InquilinoView() {
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [frequentVisitors, setFrequentVisitors] = useState<FrequentVisitor[]>([]);
   const [providers, setProviders] = useState<TenantProvider[]>([]);
+  const [accountSummary, setAccountSummary] = useState<TenantAccountSummary | null>(null);
   const [providerHistory, setProviderHistory] = useState<TenantProviderHistoryRecord[]>([]);
   const [providerSearch, setProviderSearch] = useState("");
   const [providerDateFilter, setProviderDateFilter] = useState("");
@@ -235,11 +247,18 @@ export function InquilinoView() {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const [visitsResult, frequentResult, providersResult, providerHistoryResult] = await Promise.allSettled([
+        const [
+          visitsResult,
+          frequentResult,
+          providersResult,
+          providerHistoryResult,
+          accountResult,
+        ] = await Promise.allSettled([
           getVisitsRequest(),
           getFrequentVisitorsRequest(),
           getTenantProvidersRequest(),
           getTenantProviderHistoryRequest(),
+          getTenantAccountStatementRequest(),
         ]);
 
         if (!active) {
@@ -259,6 +278,7 @@ export function InquilinoView() {
         setFrequentVisitors(frequentResult.status === "fulfilled" ? frequentResult.value : []);
         setProviders(providersResult.status === "fulfilled" ? providersResult.value : []);
         setProviderHistory(providerHistoryResult.status === "fulfilled" ? providerHistoryResult.value : []);
+        setAccountSummary(accountResult.status === "fulfilled" ? accountResult.value.resumen : null);
       } finally {
         if (active) {
           setIsLoading(false);
@@ -340,12 +360,14 @@ export function InquilinoView() {
       tipo: "PAGO",
       titulo: "Recordatorio de pago",
       descripcion:
-        "Recuerda revisar tu estado de cuenta para evitar bloqueos o restricciones en tus accesos.",
+        accountSummary?.saldo_pendiente
+          ? `Tienes ${formatCurrency(accountSummary.saldo_pendiente)} pendientes entre alquiler y cuotas adicionales.`
+          : "Recuerda revisar tu estado de cuenta para evitar bloqueos o restricciones en tus accesos.",
       tiempo: "Pendiente",
     });
 
     return alerts;
-  }, [nextVisit]);
+  }, [accountSummary?.saldo_pendiente, nextVisit]);
 
   const filteredVisits = useMemo(
     () =>
@@ -789,7 +811,18 @@ export function InquilinoView() {
   </CardContent>
 </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <StatCard
+          label="Estado de cuenta"
+          value={accountSummary ? formatCurrency(accountSummary.saldo_pendiente) : "Q0.00"}
+          helper={
+            accountSummary?.cuotas_vencidas
+              ? `${accountSummary.cuotas_vencidas} cuotas vencidas`
+              : "Alquiler y cuotas al dia"
+          }
+          icon={CreditCard}
+          onClick={() => navigate("/inquilino/estado-cuenta")}
+        />
         <StatCard
           label="Accesos activos"
           value={String(activeCount)}

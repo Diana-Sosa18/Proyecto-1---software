@@ -13,6 +13,7 @@ const tenantProvidersRoutes = require("./routes/tenantProvidersRoutes");
 const adminProvidersRoutes = require("./routes/adminProvidersRoutes");
 const adminSanctionsRoutes = require("./routes/adminSanctionsRoutes");
 const residentAccountRoutes = require("./routes/residentAccountRoutes");
+const tenantAccountRoutes = require("./routes/tenantAccountRoutes");
 
 function createApp() {
   const app = express();
@@ -41,6 +42,7 @@ function createApp() {
   app.use(adminProvidersRoutes);
   app.use(adminSanctionsRoutes);
   app.use(residentAccountRoutes);
+  app.use(tenantAccountRoutes);
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;

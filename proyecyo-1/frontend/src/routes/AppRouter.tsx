@@ -13,6 +13,7 @@ import { AdminSanctionsView } from "@/views/AdminSanctionsView";
 import { AdminSettingsView } from "@/views/AdminSettingsView";
 import { AdminView } from "@/views/AdminView";
 import { GuardiaView } from "@/views/GuardiaView";
+import { InquilinoAccountView } from "@/views/InquilinoAccountView";
 import { InquilinoView } from "@/views/InquilinoView";
 import { LoginView } from "@/views/LoginView";
 import { ResidenteAccountView } from "@/views/ResidenteAccountView";
@@ -57,6 +58,7 @@ export function AppRouter() {
 
         <Route element={<ProtectedRoute allowedRoles={["inquilino"]} />}>
           <Route path="/inquilino" element={<InquilinoView />} />
+          <Route path="/inquilino/estado-cuenta" element={<InquilinoAccountView />} />
         </Route>
 
         <Route path="*" element={<FallbackRedirect />} />

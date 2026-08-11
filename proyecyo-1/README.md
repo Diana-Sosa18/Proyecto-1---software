@@ -117,3 +117,43 @@ cuotas[].saldo_pendiente
 ```
 
 Los estados se calculan con base en `CUOTA` y `PAGO`: una cuota es `PAGADA` cuando los pagos cubren el monto total, `VENCIDA` cuando aun tiene saldo y la fecha limite ya paso, y `PENDIENTE` cuando aun tiene saldo pero no ha vencido.
+
+## HU7 Estado de cuenta del inquilino
+
+El estado de cuenta del inquilino esta disponible en:
+
+```text
+/inquilino/estado-cuenta
+```
+
+La pantalla muestra saldo pendiente, alquiler, cuotas adicionales, cuotas vencidas, pagos aplicados y proximo vencimiento. El frontend consulta la API al cargar la pantalla, incluye boton de actualizacion manual y refresca la informacion cada 30 segundos.
+
+### Endpoint
+
+El endpoint requiere headers de inquilino:
+
+```text
+x-user-role: inquilino
+x-user-id: <id_usuario>
+```
+
+Endpoint disponible:
+
+```text
+GET /inquilino/estado-cuenta
+```
+
+La respuesta separa:
+
+```text
+resumen.alquiler_pendiente
+resumen.cuotas_adicionales_pendientes
+alquiler[]
+cuotas_adicionales[]
+```
+
+El alquiler se modela con `SERVICIO.tipo_servicio = 'Alquiler'` y cuotas en `CUOTA`. Las cuotas adicionales son el resto de servicios asociados a la unidad. Los estados se calculan con los pagos aplicados en `PAGO`.
+
+### Datos demo
+
+Al iniciar el backend, `ensureTenantAccountSeed` registra el servicio `Alquiler residencial` y crea una cuota demo para casas con inquilino autorizado cuando aun no existe. En bases nuevas, `sql/init.sql` tambien incluye ese servicio y cuota.
