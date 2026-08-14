@@ -16,8 +16,8 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const headers = new Headers(options.headers);
+function getRequestHeaders(initialHeaders?: HeadersInit) {
+  const headers = new Headers(initialHeaders);
   headers.set("Content-Type", "application/json");
 
   const rawSession = window.localStorage.getItem(SESSION_STORAGE_KEY);
@@ -42,22 +42,33 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
   }
 
+  return headers;
+}
+
+async function getErrorPayload(response: Response) {
+  const text = await response.text();
+
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return { message: text };
+  }
+}
+
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const headers = getRequestHeaders(options.headers);
+
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
-  const text = await response.text();
-  let payload = null;
-
-  if (text) {
-    try {
-      payload = JSON.parse(text);
-    } catch {
-      payload = { message: text };
-    }
-  }
+  const payload = await getErrorPayload(response);
 
   if (!response.ok) {
     throw new ApiError(
@@ -68,4 +79,21 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   return payload as T;
+}
+
+export async function apiDownload(path: string): Promise<Blob> {
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: getRequestHeaders(),
+  });
+
+  if (!response.ok) {
+    const payload = await getErrorPayload(response);
+    throw new ApiError(
+      (payload as { message?: string } | null)?.message ?? "No fue posible descargar el archivo.",
+      response.status,
+      payload,
+    );
+  }
+
+  return response.blob();
 }

@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { Download, LoaderCircle } from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { Input } from "@/components/ui/input";
-import { getFinancialDetailRequest } from "@/services/financialDetailService";
+import {
+  downloadPaymentReceiptRequest,
+  getFinancialDetailRequest,
+} from "@/services/financialDetailService";
 import type { ChargeStatus, FinancialDetail } from "@/types/financialDetail";
 
 const chargeStatusStyles: Record<ChargeStatus, string> = {
@@ -37,6 +41,8 @@ export function ResidenteFinancialDetailView() {
   const [hasta, setHasta] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [downloadErrorMessage, setDownloadErrorMessage] = useState("");
+  const [downloadingPaymentId, setDownloadingPaymentId] = useState<number | null>(null);
 
   const loadDetail = useCallback(async () => {
     try {
@@ -56,6 +62,29 @@ export function ResidenteFinancialDetailView() {
   useEffect(() => {
     void loadDetail();
   }, [loadDetail]);
+
+  async function downloadReceipt(paymentId: number, receiptNumber: string) {
+    try {
+      setDownloadingPaymentId(paymentId);
+      setDownloadErrorMessage("");
+      const receipt = await downloadPaymentReceiptRequest(paymentId);
+      const objectUrl = window.URL.createObjectURL(receipt);
+      const link = document.createElement("a");
+
+      link.href = objectUrl;
+      link.download = `comprobante-${receiptNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      setDownloadErrorMessage(
+        error instanceof Error ? error.message : "No fue posible descargar el comprobante.",
+      );
+    } finally {
+      setDownloadingPaymentId(null);
+    }
+  }
 
   return (
     <AppShell
@@ -184,8 +213,15 @@ export function ResidenteFinancialDetailView() {
           <section className="rounded-xl border border-slate-200 bg-white">
             <div className="border-b border-slate-200 px-5 py-4">
               <h3 className="text-lg font-semibold text-slate-950">Pagos realizados</h3>
-              <p className="text-sm text-slate-500">Pagos registrados para su unidad.</p>
+              <p className="text-sm text-slate-500">
+                Consulte la información de cada pago y descargue su comprobante en PDF.
+              </p>
             </div>
+            {downloadErrorMessage ? (
+              <div className="mx-5 mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {downloadErrorMessage}
+              </div>
+            ) : null}
             <div className="overflow-x-auto">
               {detail.pagos.length === 0 ? (
                 <p className="p-5 text-sm text-slate-500">No hay pagos en el periodo seleccionado.</p>
@@ -194,18 +230,45 @@ export function ResidenteFinancialDetailView() {
                   <thead>
                     <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-[0.1em] text-slate-500">
                       <th className="px-5 py-3 font-semibold">Servicio</th>
+                      <th className="px-5 py-3 font-semibold">Comprobante</th>
                       <th className="px-5 py-3 font-semibold">Monto pagado</th>
                       <th className="px-5 py-3 font-semibold">Fecha de pago</th>
+                      <th className="px-5 py-3 font-semibold">Estado</th>
+                      <th className="px-5 py-3 text-right font-semibold">Acción</th>
                     </tr>
                   </thead>
                   <tbody>
                     {detail.pagos.map((pago) => (
                       <tr key={pago.id_pago} className="border-b border-slate-100 last:border-b-0">
                         <td className="px-5 py-3 text-sm text-slate-950">{pago.servicio}</td>
+                        <td className="px-5 py-3 text-sm font-medium text-slate-700">
+                          {pago.numero_comprobante}
+                        </td>
                         <td className="px-5 py-3 text-sm text-emerald-600">
                           {formatCurrency(pago.monto_pagado)}
                         </td>
                         <td className="px-5 py-3 text-sm text-slate-500">{pago.fecha_pago}</td>
+                        <td className="px-5 py-3">
+                          <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[0.7rem] font-medium text-emerald-700">
+                            Aplicado
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => void downloadReceipt(pago.id_pago, pago.numero_comprobante)}
+                            disabled={downloadingPaymentId !== null}
+                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            aria-label={`Descargar comprobante ${pago.numero_comprobante}`}
+                          >
+                            {downloadingPaymentId === pago.id_pago ? (
+                              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                            ) : (
+                              <Download className="size-4" aria-hidden="true" />
+                            )}
+                            {downloadingPaymentId === pago.id_pago ? "Descargando..." : "Descargar PDF"}
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -1,4 +1,4 @@
-import { apiRequest } from "@/services/api";
+import { apiDownload, apiRequest } from "@/services/api";
 import type { FinancialDetail, FinancialDetailFilters } from "@/types/financialDetail";
 
 function buildFinancialQuery(filters: FinancialDetailFilters) {
@@ -19,4 +19,8 @@ export function getFinancialDetailRequest(filters: FinancialDetailFilters = {}) 
   const query = buildFinancialQuery(filters);
   const url = query ? `/residente/detalle-financiero?${query}` : "/residente/detalle-financiero";
   return apiRequest<FinancialDetail>(url);
+}
+
+export function downloadPaymentReceiptRequest(paymentId: number) {
+  return apiDownload(`/residente/pagos/${paymentId}/comprobante`);
 }

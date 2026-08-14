@@ -24,9 +24,11 @@ export interface FinancialSurcharge {
 export interface FinancialPayment {
   id_pago: number;
   id_cuota: number;
+  numero_comprobante: string;
   servicio: string;
   monto_pagado: number;
   fecha_pago: string;
+  estado: "APLICADO";
 }
 
 export interface FinancialSummary {

@@ -29,6 +29,7 @@ const automaticBackupsRoutes = require("./routes/automaticBackupsRoutes");
 const demoRequestsRoutes = require("./routes/demoRequestsRoutes");
 const adminRemindersRoutes = require("./routes/adminRemindersRoutes");
 const residentFinancialDetailRoutes = require("./routes/residentFinancialDetailRoutes");
+const residentPaymentReceiptRoutes = require("./routes/residentPaymentReceiptRoutes");
 
 const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -82,6 +83,7 @@ function createApp() {
   app.use(demoRequestsRoutes);
   app.use(adminRemindersRoutes);
   app.use(residentFinancialDetailRoutes);
+  app.use(residentPaymentReceiptRoutes);
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;

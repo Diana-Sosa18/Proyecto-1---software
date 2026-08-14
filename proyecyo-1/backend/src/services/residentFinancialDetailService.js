@@ -1,4 +1,5 @@
 const { query } = require("../database/mysql");
+const { paymentReference } = require("./residentPaymentReceiptService");
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -56,9 +57,11 @@ function mapPayment(row) {
   return {
     id_pago: Number(row.id_pago),
     id_cuota: Number(row.id_cuota),
+    numero_comprobante: paymentReference(row.id_pago),
     servicio: row.servicio,
     monto_pagado: Number(row.monto_pagado || 0),
     fecha_pago: row.fecha_pago,
+    estado: "APLICADO",
   };
 }
 
