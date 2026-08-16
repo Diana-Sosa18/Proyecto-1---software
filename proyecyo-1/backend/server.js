@@ -18,6 +18,7 @@ const {
   query,
 } = require("./src/database/mysql");
 const { startScheduler } = require("./src/services/automaticBackupsService");
+const { startReminderScheduler } = require("./src/services/adminRemindersService");
 
 const DB_READY_RETRIES = 30;
 const DB_READY_DELAY_MS = 2000;
@@ -65,6 +66,7 @@ async function startServer() {
   await ensureRemindersSchema();
   await ensureDemoRequestsSchema();
   startScheduler();
+  startReminderScheduler();
 
   const app = createApp();
 

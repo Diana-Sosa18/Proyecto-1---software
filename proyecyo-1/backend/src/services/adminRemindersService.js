@@ -14,6 +14,10 @@ const DEFAULT_CONFIG = {
   dias_antes: 3,
 };
 
+const REMINDER_INTERVAL_MS = 60 * 60 * 1000;
+let reminderScheduler = null;
+let schedulerRunInProgress = false;
+
 function normalizeString(value) {
   return String(value || "").trim();
 }
@@ -174,13 +178,31 @@ async function sendPaymentReminders(userId) {
         DATE_FORMAT(cu.fecha_limite, '%Y-%m-%d') AS fecha_limite,
         DATEDIFF(cu.fecha_limite, ?) AS dias_para_vencer,
         srv.nombre AS servicio,
-        propietario.id_usuario AS id_usuario,
+        destinatario.id_usuario AS id_usuario,
         GREATEST(cu.monto - COALESCE(pagos.total_pagado, 0), 0) AS saldo
       FROM CUOTA cu
       INNER JOIN SERVICIO srv ON srv.id_servicio = cu.id_servicio
       INNER JOIN CASA c ON c.id_casa = cu.id_casa
-      INNER JOIN RESIDENTE r ON r.id_residente = c.id_residente
-      INNER JOIN USUARIO propietario ON propietario.id_usuario = r.id_usuario
+      INNER JOIN (
+        SELECT casa_propietario.id_casa, usuario_propietario.id_usuario
+        FROM CASA casa_propietario
+        INNER JOIN RESIDENTE residente_propietario
+          ON residente_propietario.id_residente = casa_propietario.id_residente
+        INNER JOIN USUARIO usuario_propietario
+          ON usuario_propietario.id_usuario = residente_propietario.id_usuario
+        WHERE usuario_propietario.activo = TRUE
+
+        UNION
+
+        SELECT inquilino_casa.id_casa, usuario_inquilino.id_usuario
+        FROM INQUILINO_CASA inquilino_casa
+        INNER JOIN INQUILINO inquilino
+          ON inquilino.id_inquilino = inquilino_casa.id_inquilino
+        INNER JOIN USUARIO usuario_inquilino
+          ON usuario_inquilino.id_usuario = inquilino.id_usuario
+        WHERE inquilino.autorizado = TRUE
+          AND usuario_inquilino.activo = TRUE
+      ) destinatario ON destinatario.id_casa = c.id_casa
       LEFT JOIN (
         SELECT id_cuota, SUM(monto_pagado) AS total_pagado
         FROM PAGO
@@ -218,10 +240,10 @@ async function sendPaymentReminders(userId) {
         `
           SELECT id_recordatorio
           FROM RECORDATORIO_PAGO
-          WHERE id_cuota = ? AND tipo = ? AND fecha_envio = ?
+          WHERE id_cuota = ? AND id_usuario = ? AND tipo = ? AND fecha_envio = ?
           LIMIT 1
         `,
-        [quota.id_cuota, tipo, currentDate],
+        [quota.id_cuota, quota.id_usuario, tipo, currentDate],
       );
 
       if (existing.length > 0) {
@@ -368,12 +390,43 @@ async function listReminders(filters = {}) {
   return rows.map(mapReminder);
 }
 
+async function runScheduledReminders() {
+  if (schedulerRunInProgress) {
+    return;
+  }
+
+  schedulerRunInProgress = true;
+
+  try {
+    await sendPaymentReminders(null);
+  } catch (error) {
+    console.error("No fue posible generar los recordatorios automaticos de pago.", error);
+  } finally {
+    schedulerRunInProgress = false;
+  }
+}
+
+function startReminderScheduler() {
+  if (reminderScheduler) {
+    return reminderScheduler;
+  }
+
+  // Ejecutar al iniciar permite notificar aunque el servidor no estuviera activo
+  // a una hora exacta. La restriccion unica por cuota, tipo y dia evita duplicados.
+  void runScheduledReminders();
+  reminderScheduler = setInterval(runScheduledReminders, REMINDER_INTERVAL_MS);
+  reminderScheduler.unref?.();
+
+  return reminderScheduler;
+}
+
 module.exports = {
   getReminderConfig,
   saveReminderConfig,
   sendPaymentReminders,
   getReminderSummary,
   listReminders,
+  startReminderScheduler,
   __private__: {
     buildHouseLabel,
     buildReminderTemplate,

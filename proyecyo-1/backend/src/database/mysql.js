@@ -780,9 +780,24 @@ async function ensureRemindersSchema() {
         FOREIGN KEY (id_cuota) REFERENCES CUOTA(id_cuota),
         FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario),
         FOREIGN KEY (id_notificacion) REFERENCES NOTIFICACION(id_notificacion),
-        UNIQUE KEY uq_recordatorio_cuota_tipo_dia (id_cuota, tipo, fecha_envio),
+        UNIQUE KEY uq_recordatorio_cuota_usuario_tipo_dia (id_cuota, id_usuario, tipo, fecha_envio),
         CHECK (tipo IN ('PROXIMO_VENCIMIENTO', 'VENCIDO'))
       )
+    `);
+  }
+
+  if (!(await indexExists("RECORDATORIO_PAGO", "uq_recordatorio_cuota_usuario_tipo_dia"))) {
+    if (await indexExists("RECORDATORIO_PAGO", "uq_recordatorio_cuota_tipo_dia")) {
+      await query(`
+        ALTER TABLE RECORDATORIO_PAGO
+        DROP INDEX uq_recordatorio_cuota_tipo_dia
+      `);
+    }
+
+    await query(`
+      ALTER TABLE RECORDATORIO_PAGO
+      ADD UNIQUE INDEX uq_recordatorio_cuota_usuario_tipo_dia
+        (id_cuota, id_usuario, tipo, fecha_envio)
     `);
   }
 

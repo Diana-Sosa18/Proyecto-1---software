@@ -50,6 +50,11 @@ import {
   getTenantAuthorizationRequestsRequest,
   getTenantPermissionsRequest,
 } from "@/services/sprintStoriesService";
+import {
+  getNotificationsRequest,
+  markNotificationAsReadRequest,
+} from "@/services/notificationsService";
+import type { NotificationRecord } from "@/types/notifications";
 import type {
   TenantProvider,
   TenantProviderHistoryRecord,
@@ -65,6 +70,7 @@ type ProviderFilterStatus = TenantProviderStatus | "TODOS";
 
 type TenantAlert = {
   id: string;
+  notificationId?: number;
   tipo: TenantAlertType;
   titulo: string;
   descripcion: string;
@@ -224,6 +230,7 @@ export function InquilinoView() {
   const [providerHistoryDateFilter, setProviderHistoryDateFilter] = useState("");
   const [permissions, setPermissions] = useState<TenantPermission[]>([]);
   const [authorizationRequests, setAuthorizationRequests] = useState<AuthorizationRequest[]>([]);
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [authorizationModalOpen, setAuthorizationModalOpen] = useState(false);
   const [authorizationAction, setAuthorizationAction] = useState("Reserva fuera de horario permitido");
   const [authorizationReason, setAuthorizationReason] = useState("");
@@ -254,6 +261,7 @@ export function InquilinoView() {
           providerHistoryResult,
           permissionsResult,
           authorizationsResult,
+          notificationsResult,
         ] = await Promise.allSettled([
           getVisitsRequest(),
           getFrequentVisitorsRequest(),
@@ -261,6 +269,7 @@ export function InquilinoView() {
           getTenantProviderHistoryRequest(),
           getTenantPermissionsRequest(),
           getTenantAuthorizationRequestsRequest(),
+          getNotificationsRequest(),
         ]);
 
         if (!active) {
@@ -284,6 +293,7 @@ export function InquilinoView() {
         setAuthorizationRequests(
           authorizationsResult.status === "fulfilled" ? authorizationsResult.value : [],
         );
+        setNotifications(notificationsResult.status === "fulfilled" ? notificationsResult.value : []);
       } finally {
         if (active) {
           setIsLoading(false);
@@ -360,17 +370,36 @@ export function InquilinoView() {
       tiempo: "Hoy",
     });
 
-    alerts.push({
-      id: "recordatorio-pago",
-      tipo: "PAGO",
-      titulo: "Recordatorio de pago",
-      descripcion:
-        "Recuerda revisar tu estado de cuenta para evitar bloqueos o restricciones en tus accesos.",
-      tiempo: "Pendiente",
-    });
+    notifications
+      .filter((notification) => notification.tipo === "RECORDATORIO_PAGO" && !notification.leido)
+      .forEach((notification) => {
+        alerts.push({
+          id: `pago-${notification.id_notificacion}`,
+          notificationId: notification.id_notificacion,
+          tipo: "PAGO",
+          titulo: notification.titulo,
+          descripcion: notification.mensaje,
+          tiempo: notification.creado_en,
+        });
+      });
 
     return alerts;
-  }, [nextVisit]);
+  }, [nextVisit, notifications]);
+
+  async function handleReadPaymentAlert(notificationId: number) {
+    try {
+      const updated = await markNotificationAsReadRequest(notificationId);
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id_notificacion === updated.id_notificacion ? updated : notification,
+        ),
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "No fue posible marcar la alerta como leida.",
+      );
+    }
+  }
 
   const filteredVisits = useMemo(
     () =>
@@ -830,6 +859,15 @@ export function InquilinoView() {
         </div>
 
         <p className="mt-4 text-sm leading-relaxed">{alert.descripcion}</p>
+        {alert.notificationId ? (
+          <button
+            type="button"
+            onClick={() => void handleReadPaymentAlert(alert.notificationId!)}
+            className="mt-4 rounded-xl bg-white/80 px-3 py-2 text-xs font-semibold transition hover:bg-white"
+          >
+            Marcar como leida
+          </button>
+        ) : null}
       </div>
     ))}
   </CardContent>
