@@ -828,6 +828,39 @@ async function ensureDemoRequestsSchema() {
   }
 }
 
+async function ensureTenantAccountSeed() {
+  await query(`
+    INSERT INTO SERVICIO (nombre, tipo_servicio, descripcion)
+    SELECT 'Alquiler residencial', 'Alquiler', 'Cuota mensual de alquiler asociada al inquilino.'
+    WHERE NOT EXISTS (
+      SELECT 1 FROM SERVICIO WHERE LOWER(nombre) = 'alquiler residencial' LIMIT 1
+    )
+  `);
+
+  await query(`
+    INSERT IGNORE INTO CASA_SERVICIO (id_casa, id_servicio, activo, estado_validacion)
+    SELECT ic.id_casa, s.id_servicio, TRUE, 'VALIDADO'
+    FROM INQUILINO_CASA ic
+    INNER JOIN INQUILINO i ON i.id_inquilino = ic.id_inquilino
+    INNER JOIN SERVICIO s ON s.nombre = 'Alquiler residencial'
+    WHERE i.autorizado = TRUE
+  `);
+
+  await query(`
+    INSERT INTO CUOTA (id_servicio, id_casa, monto, fecha_limite)
+    SELECT s.id_servicio, ic.id_casa, 2200.00, LAST_DAY(CURDATE())
+    FROM INQUILINO_CASA ic
+    INNER JOIN INQUILINO i ON i.id_inquilino = ic.id_inquilino
+    INNER JOIN SERVICIO s ON s.nombre = 'Alquiler residencial'
+    WHERE i.autorizado = TRUE
+      AND NOT EXISTS (
+        SELECT 1 FROM CUOTA cu
+        WHERE cu.id_casa = ic.id_casa AND cu.id_servicio = s.id_servicio
+        LIMIT 1
+      )
+  `);
+}
+
 module.exports = {
   pool,
   query,
@@ -845,4 +878,5 @@ module.exports = {
   ensureAutomaticBackupsSchema,
   ensureRemindersSchema,
   ensureDemoRequestsSchema,
+  ensureTenantAccountSeed,
 };

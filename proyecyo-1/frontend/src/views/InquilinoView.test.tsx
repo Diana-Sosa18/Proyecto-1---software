@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
 
 import { InquilinoView } from "@/views/InquilinoView";
 import { getVisitsRequest } from "@/services/visitsService";
@@ -36,6 +37,20 @@ vi.mock("@/services/sprintStoriesService", () => ({
   getTenantPermissionsRequest: vi.fn(),
 }));
 
+vi.mock("@/services/tenantAccountService", () => ({
+  getTenantAccountStatementRequest: vi.fn().mockResolvedValue({
+    resumen: { saldo_pendiente: 0, cuotas_vencidas: 0 },
+  }),
+}));
+
+function renderView() {
+  return render(
+    <MemoryRouter>
+      <InquilinoView />
+    </MemoryRouter>,
+  );
+}
+
 const approvedVisit = {
   id_acceso: 1,
   id_visitante: 1,
@@ -68,7 +83,7 @@ describe("Accesos y permisos del inquilino", () => {
 
   it("filtra los accesos por estado utilizado", async () => {
     const user = userEvent.setup();
-    render(<InquilinoView />);
+    renderView();
 
     expect(await screen.findByText("Ana Aprobada")).toBeInTheDocument();
     expect(screen.getByText("Bruno Utilizado")).toBeInTheDocument();
@@ -90,7 +105,7 @@ describe("Accesos y permisos del inquilino", () => {
         estado: "ACTIVO",
       },
     ]);
-    render(<InquilinoView />);
+    renderView();
 
     expect(await screen.findByText("Gestion de visitas")).toBeInTheDocument();
     expect(screen.getByText("ACTIVO")).toBeInTheDocument();

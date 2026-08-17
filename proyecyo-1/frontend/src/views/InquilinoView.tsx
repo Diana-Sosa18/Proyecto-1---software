@@ -23,6 +23,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { StatCard } from "@/components/layout/StatCard";
@@ -50,12 +51,14 @@ import {
   getTenantAuthorizationRequestsRequest,
   getTenantPermissionsRequest,
 } from "@/services/sprintStoriesService";
+import { getTenantAccountStatementRequest } from "@/services/tenantAccountService";
 import type {
   TenantProvider,
   TenantProviderHistoryRecord,
   TenantProviderStatus,
 } from "@/types/providers";
 import type { AuthorizationRequest, TenantPermission } from "@/types/sprintStories";
+import type { TenantAccountSummary } from "@/types/tenantAccount";
 import type { FrequentVisitor, VisitPayload, VisitRecord, VisitType } from "@/types/visits";
 
 type VisitFormState = VisitPayload;
@@ -182,6 +185,10 @@ function formatDateTime(dateTime: string | null) {
   }).format(new Date(dateTime.replace(" ", "T")));
 }
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("es-GT", { style: "currency", currency: "GTQ" }).format(value);
+}
+
 function getAccessStatus(visit: VisitRecord): Exclude<AccessFilter, "TODOS"> {
   if (visit.estado_acceso === "INGRESO_REGISTRADO" || visit.qr_status === "USED") {
     return "UTILIZADO";
@@ -208,6 +215,7 @@ function isAccessEditable(visit: VisitRecord) {
 }
 
 export function InquilinoView() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<VisitFormState>(createInitialForm);
   const [providerForm, setProviderForm] = useState<VisitFormState>(createInitialProviderForm);
@@ -224,6 +232,7 @@ export function InquilinoView() {
   const [providerHistoryDateFilter, setProviderHistoryDateFilter] = useState("");
   const [permissions, setPermissions] = useState<TenantPermission[]>([]);
   const [authorizationRequests, setAuthorizationRequests] = useState<AuthorizationRequest[]>([]);
+  const [accountSummary, setAccountSummary] = useState<TenantAccountSummary | null>(null);
   const [authorizationModalOpen, setAuthorizationModalOpen] = useState(false);
   const [authorizationAction, setAuthorizationAction] = useState("Reserva fuera de horario permitido");
   const [authorizationReason, setAuthorizationReason] = useState("");
@@ -254,6 +263,7 @@ export function InquilinoView() {
           providerHistoryResult,
           permissionsResult,
           authorizationsResult,
+          accountResult,
         ] = await Promise.allSettled([
           getVisitsRequest(),
           getFrequentVisitorsRequest(),
@@ -261,6 +271,7 @@ export function InquilinoView() {
           getTenantProviderHistoryRequest(),
           getTenantPermissionsRequest(),
           getTenantAuthorizationRequestsRequest(),
+          getTenantAccountStatementRequest(),
         ]);
 
         if (!active) {
@@ -284,6 +295,7 @@ export function InquilinoView() {
         setAuthorizationRequests(
           authorizationsResult.status === "fulfilled" ? authorizationsResult.value : [],
         );
+        setAccountSummary(accountResult.status === "fulfilled" ? accountResult.value.resumen : null);
       } finally {
         if (active) {
           setIsLoading(false);
@@ -835,7 +847,14 @@ export function InquilinoView() {
   </CardContent>
 </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <StatCard
+          label="Estado de cuenta"
+          value={accountSummary ? formatCurrency(accountSummary.saldo_pendiente) : "Q0.00"}
+          helper={accountSummary?.cuotas_vencidas ? `${accountSummary.cuotas_vencidas} cuotas vencidas` : "Alquiler y cuotas al dia"}
+          icon={CreditCard}
+          onClick={() => navigate("/inquilino/estado-cuenta")}
+        />
         <StatCard
           label="Accesos activos"
           value={String(activeCount)}

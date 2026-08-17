@@ -19,11 +19,13 @@ import { AdminSpecialAccessView } from "@/views/AdminSpecialAccessView";
 import { AdminView } from "@/views/AdminView";
 import { GuardiaView } from "@/views/GuardiaView";
 import { InquilinoView } from "@/views/InquilinoView";
+import { InquilinoAccountView } from "@/views/InquilinoAccountView";
 import { LoginView } from "@/views/LoginView";
 import { ResidenteAmenitiesView } from "@/views/ResidenteAmenitiesView";
 import { ResidenteRegulationsView } from "@/views/ResidenteRegulationsView";
 import { ResidenteUnifiedView } from "@/views/ResidenteUnifiedView";
 import { ResidenteView } from "@/views/ResidenteView";
+import { ResidenteAccountView } from "@/views/ResidenteAccountView";
 import { ResidenteVisitsView } from "@/views/ResidenteVisitsView";
 import { ResidentMonthlySummaryView } from "@/views/ResidentMonthlySummaryView";
 import { ResidenteFinancialDetailView } from "@/views/ResidenteFinancialDetailView";
@@ -69,6 +71,7 @@ export function AppRouter() {
 
         <Route element={<ProtectedRoute allowedRoles={["residente"]} />}>
           <Route path="/residente" element={<ResidenteView />} />
+          <Route path="/residente/estado-cuenta" element={<ResidenteAccountView />} />
           <Route path="/residente/unificado" element={<ResidenteUnifiedView />} />
           <Route path="/residente/reglamentos" element={<ResidenteRegulationsView />} />
           <Route path="/residente/visitas" element={<ResidenteVisitsView />} />
@@ -79,6 +82,7 @@ export function AppRouter() {
 
         <Route element={<ProtectedRoute allowedRoles={["inquilino"]} />}>
           <Route path="/inquilino" element={<InquilinoView />} />
+          <Route path="/inquilino/estado-cuenta" element={<InquilinoAccountView />} />
         </Route>
 
         <Route path="*" element={<FallbackRedirect />} />

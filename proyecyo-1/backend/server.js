@@ -15,6 +15,7 @@ const {
   ensureAutomaticBackupsSchema,
   ensureRemindersSchema,
   ensureDemoRequestsSchema,
+  ensureTenantAccountSeed,
   query,
 } = require("./src/database/mysql");
 const { startScheduler } = require("./src/services/automaticBackupsService");
@@ -64,6 +65,7 @@ async function startServer() {
   await ensureAutomaticBackupsSchema();
   await ensureRemindersSchema();
   await ensureDemoRequestsSchema();
+  await ensureTenantAccountSeed();
   startScheduler();
 
   const app = createApp();

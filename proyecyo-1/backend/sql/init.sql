@@ -457,7 +457,8 @@ VALUES
     ('Agua potable', 'Basico', 'Servicio de agua potable y control de consumo mensual.'),
     ('Internet residencial', 'Telecomunicaciones', 'Proveedor de conectividad para la vivienda.'),
     ('Limpieza y mantenimiento', 'Mantenimiento', 'Servicio programado de limpieza para areas de apoyo.'),
-    ('Seguridad privada', 'Seguridad', 'Servicio adicional de control y monitoreo residencial.');
+    ('Seguridad privada', 'Seguridad', 'Servicio adicional de control y monitoreo residencial.'),
+    ('Alquiler residencial', 'Alquiler', 'Cuota mensual de alquiler asociada al inquilino.');
 
 INSERT INTO CASA_SERVICIO (id_casa, id_servicio, activo, estado_validacion)
 SELECT
@@ -467,6 +468,15 @@ SELECT
     'VALIDADO'
 FROM SERVICIO
 WHERE nombre IN ('Energia electrica', 'Agua potable', 'Seguridad privada');
+
+INSERT INTO CASA_SERVICIO (id_casa, id_servicio, activo, estado_validacion)
+SELECT
+    (SELECT id_casa FROM CASA WHERE numero = '302' AND torre = 'B'),
+    id_servicio,
+    TRUE,
+    'VALIDADO'
+FROM SERVICIO
+WHERE nombre = 'Alquiler residencial';
 
 INSERT INTO HISTORIAL_CAMBIO_PROVEEDOR (
     id_casa,
@@ -521,6 +531,12 @@ VALUES
         (SELECT id_casa FROM CASA WHERE numero = '302' AND torre = 'B'),
         275.00,
         DATE_ADD(CURDATE(), INTERVAL 8 DAY)
+    ),
+    (
+        (SELECT id_servicio FROM SERVICIO WHERE nombre = 'Alquiler residencial'),
+        (SELECT id_casa FROM CASA WHERE numero = '302' AND torre = 'B'),
+        2200.00,
+        LAST_DAY(CURDATE())
     );
 
 INSERT INTO PAGO (id_cuota, monto_pagado, fecha_pago)

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, CheckCheck, Home, ShieldCheck, UserRoundCheck, Wallet } from "lucide-react";
+import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, CheckCheck, CreditCard, ShieldCheck, UserRoundCheck, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
@@ -16,16 +16,23 @@ import {
   getOwnerProvidersRequest,
   updateOwnerProviderValidationRequest,
 } from "@/services/providersService";
+import { getResidentAccountStatementRequest } from "@/services/accountService";
 import { getVisitsRequest } from "@/services/visitsService";
 import type { NotificationRecord } from "@/types/notifications";
 import type { AdminProviderRecord } from "@/types/providers";
 import type { VisitRecord } from "@/types/visits";
+import type { AccountSummary } from "@/types/account";
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("es-GT", { style: "currency", currency: "GTQ" }).format(value);
+}
 
 export function ResidenteView() {
   const navigate = useNavigate();
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [providers, setProviders] = useState<AdminProviderRecord[]>([]);
+  const [accountSummary, setAccountSummary] = useState<AccountSummary | null>(null);
   const [notificationsError, setNotificationsError] = useState("");
   const [providersError, setProvidersError] = useState("");
   const [validatingProviderId, setValidatingProviderId] = useState<number | null>(null);
@@ -71,6 +78,14 @@ export function ResidenteView() {
             error instanceof Error ? error.message : "No fue posible cargar los proveedores por validar.",
           );
         }
+      });
+
+    getResidentAccountStatementRequest()
+      .then((response) => {
+        if (active) setAccountSummary(response.resumen);
+      })
+      .catch(() => {
+        if (active) setAccountSummary(null);
       });
 
     return () => {
@@ -253,10 +268,11 @@ export function ResidenteView() {
         />
 
         <StatCard
-          label="Unidad"
-          value="B-302"
-          helper="Estado al dia"
-          icon={Home}
+          label="Estado de cuenta"
+          value={accountSummary ? formatCurrency(accountSummary.saldo_pendiente) : "Q0.00"}
+          helper={accountSummary?.cuotas_vencidas ? `${accountSummary.cuotas_vencidas} cuotas vencidas` : "Sin mora activa"}
+          icon={CreditCard}
+          onClick={() => navigate("/residente/estado-cuenta")}
         />
 
         <StatCard
@@ -351,6 +367,11 @@ export function ResidenteView() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         {[
+          {
+            title: "Estado de cuenta",
+            description: "Revise saldo pendiente, cuotas pagadas y vencimientos.",
+            path: "/residente/estado-cuenta",
+          },
           {
             title: "Visitas",
             description: "Autorice ingresos temporales, recurrentes o permanentes.",
