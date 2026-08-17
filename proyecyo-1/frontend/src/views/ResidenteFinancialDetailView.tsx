@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { Download, LoaderCircle } from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { Input } from "@/components/ui/input";
-import { getFinancialDetailRequest } from "@/services/financialDetailService";
+import { downloadResidentPaymentReceiptRequest, getFinancialDetailRequest } from "@/services/financialDetailService";
+import { savePaymentReceipt } from "@/services/paymentReceiptService";
 import type { ChargeStatus, FinancialDetail } from "@/types/financialDetail";
 
 const chargeStatusStyles: Record<ChargeStatus, string> = {
@@ -37,6 +39,17 @@ export function ResidenteFinancialDetailView() {
   const [hasta, setHasta] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [downloadError, setDownloadError] = useState("");
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  async function downloadReceipt(id: number, reference: string) {
+    try {
+      setDownloadingId(id); setDownloadError("");
+      savePaymentReceipt(await downloadResidentPaymentReceiptRequest(id), reference);
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : "No fue posible descargar el comprobante.");
+    } finally { setDownloadingId(null); }
+  }
 
   const loadDetail = useCallback(async () => {
     try {
@@ -186,6 +199,7 @@ export function ResidenteFinancialDetailView() {
               <h3 className="text-lg font-semibold text-slate-950">Pagos realizados</h3>
               <p className="text-sm text-slate-500">Pagos registrados para su unidad.</p>
             </div>
+            {downloadError ? <p className="mx-5 mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{downloadError}</p> : null}
             <div className="overflow-x-auto">
               {detail.pagos.length === 0 ? (
                 <p className="p-5 text-sm text-slate-500">No hay pagos en el periodo seleccionado.</p>
@@ -196,6 +210,7 @@ export function ResidenteFinancialDetailView() {
                       <th className="px-5 py-3 font-semibold">Servicio</th>
                       <th className="px-5 py-3 font-semibold">Monto pagado</th>
                       <th className="px-5 py-3 font-semibold">Fecha de pago</th>
+                      <th className="px-5 py-3 font-semibold">Comprobante</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -206,6 +221,15 @@ export function ResidenteFinancialDetailView() {
                           {formatCurrency(pago.monto_pagado)}
                         </td>
                         <td className="px-5 py-3 text-sm text-slate-500">{pago.fecha_pago}</td>
+                        <td className="px-5 py-3">
+                          <button type="button" disabled={downloadingId !== null}
+                            onClick={() => void downloadReceipt(pago.id_pago, pago.numero_comprobante)}
+                            aria-label={`Descargar comprobante ${pago.numero_comprobante}`}
+                            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs disabled:opacity-60">
+                            {downloadingId === pago.id_pago ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}
+                            {downloadingId === pago.id_pago ? "Descargando..." : "Descargar PDF"}
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

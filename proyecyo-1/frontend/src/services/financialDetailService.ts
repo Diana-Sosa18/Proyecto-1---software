@@ -1,4 +1,4 @@
-import { apiRequest } from "@/services/api";
+import { apiDownload, apiRequest } from "@/services/api";
 import type { FinancialDetail, FinancialDetailFilters } from "@/types/financialDetail";
 
 function buildFinancialQuery(filters: FinancialDetailFilters) {
@@ -13,6 +13,10 @@ function buildFinancialQuery(filters: FinancialDetailFilters) {
   }
 
   return query.toString();
+}
+
+export function downloadResidentPaymentReceiptRequest(paymentId: number) {
+  return apiDownload(`/residente/pagos/${paymentId}/comprobante`);
 }
 
 export function getFinancialDetailRequest(filters: FinancialDetailFilters = {}) {

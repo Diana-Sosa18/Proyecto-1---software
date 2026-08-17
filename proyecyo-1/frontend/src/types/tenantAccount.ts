@@ -39,4 +39,12 @@ export interface TenantAccountStatement {
   resumen: TenantAccountSummary;
   alquiler: TenantAccountQuota[];
   cuotas_adicionales: TenantAccountQuota[];
+  pagos: Array<{
+    id_pago: number;
+    id_cuota: number;
+    servicio: string;
+    monto_pagado: number;
+    fecha_pago: string;
+    numero_comprobante: string;
+  }>;
 }

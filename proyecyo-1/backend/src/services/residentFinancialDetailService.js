@@ -59,6 +59,7 @@ function mapPayment(row) {
     servicio: row.servicio,
     monto_pagado: Number(row.monto_pagado || 0),
     fecha_pago: row.fecha_pago,
+    numero_comprobante: `NXR-${String(row.id_pago).padStart(8, "0")}`,
   };
 }
 

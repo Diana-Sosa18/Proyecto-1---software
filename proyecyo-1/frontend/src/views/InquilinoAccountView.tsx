@@ -7,6 +7,8 @@ import {
   ReceiptText,
   RefreshCw,
   WalletCards,
+  Download,
+  LoaderCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -14,7 +16,8 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getTenantAccountStatementRequest } from "@/services/tenantAccountService";
+import { downloadTenantPaymentReceiptRequest, getTenantAccountStatementRequest } from "@/services/tenantAccountService";
+import { savePaymentReceipt } from "@/services/paymentReceiptService";
 import type { AccountQuotaStatus } from "@/types/account";
 import type { TenantAccountQuota, TenantAccountStatement } from "@/types/tenantAccount";
 
@@ -59,6 +62,7 @@ const emptyStatement: TenantAccountStatement = {
   },
   alquiler: [],
   cuotas_adicionales: [],
+  pagos: [],
 };
 
 function formatCurrency(value: number) {
@@ -193,6 +197,18 @@ export function InquilinoAccountView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [downloadMessage, setDownloadMessage] = useState("");
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  async function downloadReceipt(id: number, reference: string) {
+    try {
+      setDownloadingId(id); setDownloadMessage("");
+      savePaymentReceipt(await downloadTenantPaymentReceiptRequest(id), reference);
+      setDownloadMessage("Comprobante descargado correctamente.");
+    } catch (error) {
+      setDownloadMessage(error instanceof Error ? error.message : "No fue posible descargar el comprobante.");
+    } finally { setDownloadingId(null); }
+  }
 
   async function loadAccount({ silent = false } = {}) {
     if (silent) {
@@ -374,6 +390,25 @@ export function InquilinoAccountView() {
         description="Cuotas de renta mensual registradas para tu unidad."
         quotas={filteredRent}
       />
+
+      <Card className="border-slate-200 bg-white">
+        <CardHeader><CardTitle>Pagos realizados</CardTitle><p className="text-sm text-slate-500">Descarga el comprobante oficial de tus pagos.</p></CardHeader>
+        <CardContent>
+          {downloadMessage ? <p className="mb-3 text-sm text-slate-600">{downloadMessage}</p> : null}
+          {statement.pagos.length === 0 ? <p className="text-sm text-slate-500">No hay pagos registrados.</p> : (
+            <div className="space-y-2">{statement.pagos.map((payment) => (
+              <div key={payment.id_pago} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div><p className="font-medium">{payment.servicio}</p><p className="text-sm text-slate-500">{payment.numero_comprobante} · {formatCurrency(payment.monto_pagado)} · {formatDate(payment.fecha_pago)}</p></div>
+                <Button type="button" variant="outline" disabled={downloadingId !== null}
+                  onClick={() => void downloadReceipt(payment.id_pago, payment.numero_comprobante)}>
+                  {downloadingId === payment.id_pago ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}
+                  {downloadingId === payment.id_pago ? "Descargando..." : "Descargar PDF"}
+                </Button>
+              </div>
+            ))}</div>
+          )}
+        </CardContent>
+      </Card>
 
       <QuotaTable
         title="Cuotas adicionales"

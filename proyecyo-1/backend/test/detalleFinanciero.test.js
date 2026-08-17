@@ -90,5 +90,6 @@ test("mapPayment convierte filas de pago", () => {
     servicio: "Agua potable",
     monto_pagado: 200,
     fecha_pago: "2026-07-15",
+    numero_comprobante: "NXR-00000011",
   });
 });

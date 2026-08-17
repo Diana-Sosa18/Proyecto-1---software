@@ -43,6 +43,11 @@ vi.mock("@/services/tenantAccountService", () => ({
   }),
 }));
 
+vi.mock("@/services/notificationsService", () => ({
+  getNotificationsRequest: vi.fn().mockResolvedValue([]),
+  markNotificationAsReadRequest: vi.fn(),
+}));
+
 function renderView() {
   return render(
     <MemoryRouter>

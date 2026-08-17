@@ -27,6 +27,7 @@ export interface FinancialPayment {
   servicio: string;
   monto_pagado: number;
   fecha_pago: string;
+  numero_comprobante: string;
 }
 
 export interface FinancialSummary {

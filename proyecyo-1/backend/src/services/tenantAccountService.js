@@ -191,6 +191,14 @@ async function listTenantAccountStatement(userId) {
   const cuotas = rows.map((row) => mapQuota(row, currentDate));
   const alquiler = cuotas.filter((quota) => quota.es_alquiler);
   const cuotasAdicionales = cuotas.filter((quota) => !quota.es_alquiler);
+  const paymentRows = await query(
+    `SELECT pg.id_pago, pg.id_cuota, pg.monto_pagado,
+            DATE_FORMAT(pg.fecha_pago, '%Y-%m-%d') AS fecha_pago, srv.nombre AS servicio
+       FROM PAGO pg INNER JOIN CUOTA cu ON cu.id_cuota = pg.id_cuota
+       INNER JOIN SERVICIO srv ON srv.id_servicio = cu.id_servicio
+      WHERE cu.id_casa = ? ORDER BY pg.fecha_pago DESC, pg.id_pago DESC`,
+    [house.id_casa],
+  );
 
   return {
     casa: {
@@ -201,7 +209,16 @@ async function listTenantAccountStatement(userId) {
     resumen: buildSummary(cuotas, currentDate),
     alquiler,
     cuotas_adicionales: cuotasAdicionales,
+    pagos: paymentRows.map((row) => ({
+      id_pago: Number(row.id_pago), id_cuota: Number(row.id_cuota), servicio: row.servicio,
+      monto_pagado: toMoney(row.monto_pagado), fecha_pago: row.fecha_pago,
+      numero_comprobante: paymentReference(row.id_pago),
+    })),
   };
+}
+
+function paymentReference(id) {
+  return `NXR-${String(id).padStart(8, "0")}`;
 }
 
 module.exports = {
