@@ -16,6 +16,8 @@ type ReservationFilters = {
   to: string;
   id_amenidad?: number | null;
   id_usuario?: number | null;
+  estado?: string;
+  unidad?: string;
 };
 
 function buildReservationQuery(filters: ReservationFilters) {
@@ -31,6 +33,8 @@ function buildReservationQuery(filters: ReservationFilters) {
   if (filters.id_usuario) {
     query.set("id_usuario", String(filters.id_usuario));
   }
+  if (filters.estado) query.set("estado", filters.estado);
+  if (filters.unidad) query.set("unidad", filters.unidad);
 
   return query.toString();
 }

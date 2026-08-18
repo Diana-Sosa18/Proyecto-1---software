@@ -797,6 +797,11 @@ async function listReservationsByRange(fromDate, toDate, options = {}) {
   const amenityId = options.id_amenidad == null ? null : Number(options.id_amenidad);
   const userId = options.id_usuario == null ? null : Number(options.id_usuario);
   const includeUserDetails = Boolean(options.includeUserDetails);
+  const estado = normalizeString(options.estado).toUpperCase();
+  const unidad = normalizeString(options.unidad).toLowerCase();
+  if (estado && !["PENDIENTE", "CONFIRMADA", "CANCELADA"].includes(estado)) {
+    const error = new Error("El estado de reserva es invalido."); error.status = 400; throw error;
+  }
 
   if (from > to) {
     const error = new Error("El rango de fechas es invalido.");
@@ -828,6 +833,8 @@ async function listReservationsByRange(fromDate, toDate, options = {}) {
     filtersSql += " AND r.id_usuario = ?";
     params.push(userId);
   }
+  if (estado) { filtersSql += " AND COALESCE(r.estado, 'CONFIRMADA') = ?"; params.push(estado); }
+  if (unidad) { filtersSql += " AND LOWER(COALESCE(unidad.unidad, 'Sin unidad')) LIKE ?"; params.push(`%${unidad}%`); }
 
   const rows = await query(
     `
@@ -852,7 +859,7 @@ async function listReservationsByRange(fromDate, toDate, options = {}) {
       LEFT JOIN (${USER_UNIT_SUBQUERY}) unidad
         ON unidad.id_usuario = u.id_usuario
       WHERE r.fecha BETWEEN ? AND ?
-        AND COALESCE(r.estado, 'CONFIRMADA') <> 'CANCELADA'
+        ${options.includeCanceled ? "" : "AND COALESCE(r.estado, 'CONFIRMADA') <> 'CANCELADA'"}
         ${filtersSql}
       ORDER BY r.fecha ASC, r.hora_inicio ASC, a.id_amenidad ASC, u.nombre ASC
     `,

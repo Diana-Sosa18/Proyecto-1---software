@@ -268,6 +268,9 @@ export function AdminAmenitiesReservationsView() {
   const [users, setUsers] = useState<ReservableUserOption[]>([]);
   const [reservations, setReservations] = useState<AmenityReservation[]>([]);
   const [selectedAmenityFilter, setSelectedAmenityFilter] = useState<number | "all">("all");
+  const [selectedUserFilter, setSelectedUserFilter] = useState<number | "all">("all");
+  const [unitFilter, setUnitFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
   const [isAvailabilityModalOpen, setIsAvailabilityModalOpen] = useState(false);
@@ -319,7 +322,10 @@ export function AdminAmenitiesReservationsView() {
         const [amenitiesResponse, usersResponse, reservationsResponse] = await Promise.all([
           getAdminAmenitiesRequest(),
           getAdminAmenitiesUsersRequest(),
-          getAdminAmenitiesReservationsRequest(fetchRange),
+          getAdminAmenitiesReservationsRequest({ ...fetchRange,
+            id_amenidad: selectedAmenityFilter === "all" ? null : selectedAmenityFilter,
+            id_usuario: selectedUserFilter === "all" ? null : selectedUserFilter,
+            unidad: unitFilter || undefined, estado: statusFilter || undefined }),
         ]);
 
         if (!active) {
@@ -349,7 +355,7 @@ export function AdminAmenitiesReservationsView() {
     return () => {
       active = false;
     };
-  }, [fetchRange]);
+  }, [fetchRange, selectedAmenityFilter, selectedUserFilter, unitFilter, statusFilter]);
 
   useEffect(() => {
     if (amenities.length === 0) {
@@ -718,6 +724,12 @@ export function AdminAmenitiesReservationsView() {
   return (
     <AdminLayout title="Amenidades" subtitle="Gestion de reservas y disponibilidad.">
       <div className="space-y-4">
+        <section className="grid gap-3 rounded-2xl border bg-white p-4 md:grid-cols-4" aria-label="Filtros de historial">
+          <select aria-label="Usuario" value={selectedUserFilter} onChange={e=>setSelectedUserFilter(e.target.value==="all"?"all":Number(e.target.value))} className={FIELD_CLASS_NAME}><option value="all">Todos los usuarios</option>{users.map(u=><option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>)}</select>
+          <Input aria-label="Unidad" placeholder="Unidad/casa" value={unitFilter} onChange={e=>setUnitFilter(e.target.value)} />
+          <select aria-label="Estado" value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} className={FIELD_CLASS_NAME}><option value="">Todos los estados</option><option value="CONFIRMADA">Confirmada</option><option value="PENDIENTE">Pendiente</option><option value="CANCELADA">Cancelada</option></select>
+          <p className="self-center text-sm text-slate-500">El calendario define el rango de fechas.</p>
+        </section>
         {errorMessage ? (
           <Alert variant="destructive">
             <AlertTitle>Error</AlertTitle>

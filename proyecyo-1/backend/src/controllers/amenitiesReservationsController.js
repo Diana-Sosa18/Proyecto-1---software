@@ -67,6 +67,9 @@ async function getAdminAmenitiesReservations(req, res, next) {
       id_amenidad: req.query.id_amenidad,
       id_usuario: req.query.id_usuario,
       includeUserDetails: true,
+      includeCanceled: true,
+      estado: req.query.estado,
+      unidad: req.query.unidad,
     });
     res.status(200).json(reservations);
   } catch (error) {

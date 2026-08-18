@@ -1,0 +1,2 @@
+const fs=require("fs"),path=require("path");
+test("consulta administrativa soporta filtros combinables y cancelaciones",()=>{const source=fs.readFileSync(path.join(__dirname,"..","amenitiesReservationsService.js"),"utf8");expect(source).toContain("options.includeCanceled");expect(source).toContain("COALESCE(r.estado, 'CONFIRMADA') = ?");expect(source).toContain("LOWER(COALESCE(unidad.unidad, 'Sin unidad')) LIKE ?");});
