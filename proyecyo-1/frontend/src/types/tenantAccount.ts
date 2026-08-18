@@ -7,6 +7,8 @@ export interface TenantAccountQuota {
   servicio: string;
   tipo_servicio: string;
   monto: number;
+  monto_base: number;
+  recargo: number;
   monto_pagado: number;
   saldo_pendiente: number;
   fecha_limite: string;

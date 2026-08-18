@@ -22,6 +22,19 @@ test("registra un pago residente con monto y recargo calculados en backend", asy
   expect(mockConnection.commit).toHaveBeenCalledTimes(1);
 });
 
+test("un inquilino autorizado reutiliza el mismo flujo", async () => {
+  successfulPayment();
+  const result = await payObligation(9, "inquilino", 3);
+  expect(result.estado).toBe("APROBADA");
+  expect(mockConnection.execute.mock.calls[0][0]).toContain("titular.autorizado = TRUE");
+  expect(mockConnection.execute.mock.calls[2][1][3]).toBe("inquilino");
+});
+
+test("rechaza al inquilino sin relación autorizada", async () => {
+  mockConnection.execute.mockResolvedValueOnce([[]]).mockResolvedValueOnce([[{ id_cuota: 3 }]]);
+  await expect(payObligation(9, "inquilino", 3)).rejects.toMatchObject({ status: 403 });
+});
+
 test("rechaza un cargo inexistente", async () => {
   mockConnection.execute.mockResolvedValueOnce([[]]).mockResolvedValueOnce([[]]);
   await expect(payObligation(4, "residente", 99)).rejects.toMatchObject({ status: 404 });

@@ -74,6 +74,8 @@ test("mapQuota marks rent and converts monetary fields", () => {
     servicio: "Alquiler residencial",
     tipo_servicio: "Alquiler",
     monto: 2200,
+    monto_base: 2200,
+    recargo: 0,
     monto_pagado: 500,
     saldo_pendiente: 1700,
     fecha_limite: "2026-08-31",

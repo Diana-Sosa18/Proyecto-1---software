@@ -16,7 +16,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { downloadTenantPaymentReceiptRequest, getTenantAccountStatementRequest } from "@/services/tenantAccountService";
+import { downloadTenantPaymentReceiptRequest, getTenantAccountStatementRequest, payTenantObligationRequest } from "@/services/tenantAccountService";
 import { savePaymentReceipt } from "@/services/paymentReceiptService";
 import type { AccountQuotaStatus } from "@/types/account";
 import type { TenantAccountQuota, TenantAccountStatement } from "@/types/tenantAccount";
@@ -117,10 +117,14 @@ function QuotaTable({
   title,
   description,
   quotas,
+  onPay,
+  payingId,
 }: {
   title: string;
   description: string;
   quotas: TenantAccountQuota[];
+  onPay: (quota: TenantAccountQuota) => void;
+  payingId: number | null;
 }) {
   return (
     <Card className="border-slate-200 bg-white">
@@ -144,6 +148,7 @@ function QuotaTable({
                   <th className="px-5 py-3 font-semibold">Pagado</th>
                   <th className="px-5 py-3 font-semibold">Saldo</th>
                   <th className="px-5 py-3 font-semibold">Estado</th>
+                  <th className="px-5 py-3 font-semibold">Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -181,6 +186,9 @@ function QuotaTable({
                         {statusLabels[quota.estado]}
                       </span>
                     </td>
+                    <td className="px-5 py-4">
+                      {quota.estado !== "PAGADA" ? <Button type="button" disabled={payingId !== null} onClick={() => onPay(quota)}>{payingId === quota.id_cuota ? "Procesando..." : "Pagar"}</Button> : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -203,6 +211,20 @@ export function InquilinoAccountView() {
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
+  const [payingId, setPayingId] = useState<number | null>(null);
+  const [paymentMessage, setPaymentMessage] = useState("");
+
+  async function payQuota(quota: TenantAccountQuota) {
+    if (!window.confirm(`Pago simulado para fines académicos.\n\n${quota.servicio}\nMonto base: ${formatCurrency(quota.monto_base)}\nRecargos: ${formatCurrency(quota.recargo)}\nTotal: ${formatCurrency(quota.saldo_pendiente)}\n\n¿Confirmar pago?`)) return;
+    try {
+      setPayingId(quota.id_cuota); setErrorMessage(""); setPaymentMessage("");
+      const payment = await payTenantObligationRequest(quota.id_cuota);
+      setPaymentMessage(`Pago realizado: ${payment.numero_comprobante}`);
+      await loadAccount({ silent: true });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible registrar el pago simulado.");
+    } finally { setPayingId(null); }
+  }
 
   async function downloadReceipt(id: number, reference: string) {
     try {
@@ -342,6 +364,9 @@ export function InquilinoAccountView() {
         </Alert>
       ) : null}
 
+      <Alert className="border-sky-200 bg-sky-50 text-sky-800"><AlertTitle>Pago simulado para fines académicos.</AlertTitle><AlertDescription>No se solicitan ni almacenan datos bancarios.</AlertDescription></Alert>
+      {paymentMessage ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-800"><AlertTitle>Pago realizado</AlertTitle><AlertDescription>{paymentMessage}. El comprobante está disponible en Pagos realizados.</AlertDescription></Alert> : null}
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {summaryCards.map(({ label, value, helper, icon: Icon, iconClassName }) => (
           <Card key={label} className="border-slate-200 bg-white/95">
@@ -393,6 +418,8 @@ export function InquilinoAccountView() {
         title="Alquiler"
         description="Cuotas de renta mensual registradas para tu unidad."
         quotas={filteredRent}
+        onPay={(quota) => void payQuota(quota)}
+        payingId={payingId}
       />
 
       <Card className="border-slate-200 bg-white">
@@ -428,6 +455,8 @@ export function InquilinoAccountView() {
         title="Cuotas adicionales"
         description="Servicios, mantenimientos y cargos complementarios de la unidad."
         quotas={filteredAdditionalQuotas}
+        onPay={(quota) => void payQuota(quota)}
+        payingId={payingId}
       />
     </AppShell>
   );
