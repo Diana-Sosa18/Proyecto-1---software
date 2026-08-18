@@ -12,7 +12,10 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getResidentAccountStatementRequest } from "@/services/accountService";
+import { getResidentAccountStatementRequest, payResidentObligationRequest } from "@/services/accountService";
+import type { SimulatedPaymentResult } from "@/services/accountService";
+import { downloadResidentPaymentReceiptRequest } from "@/services/financialDetailService";
+import { savePaymentReceipt } from "@/services/paymentReceiptService";
 import type { AccountQuota, AccountQuotaStatus, AccountStatement } from "@/types/account";
 
 type AccountFilter = "TODAS" | AccountQuotaStatus;
@@ -95,6 +98,34 @@ export function ResidenteAccountView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [payingQuotaId, setPayingQuotaId] = useState<number | null>(null);
+  const [paymentResult, setPaymentResult] = useState<SimulatedPaymentResult | null>(null);
+
+  async function payQuota(quota: AccountQuota) {
+    const confirmed = window.confirm(
+      `Pago simulado para fines académicos.\n\n${quota.servicio}\nMonto base: ${formatCurrency(quota.monto_base)}\nRecargos: ${formatCurrency(quota.recargo)}\nTotal: ${formatCurrency(quota.saldo_pendiente)}\n\n¿Confirmar pago?`,
+    );
+    if (!confirmed) return;
+    try {
+      setPayingQuotaId(quota.id_cuota);
+      setErrorMessage("");
+      const result = await payResidentObligationRequest(quota.id_cuota);
+      setPaymentResult(result);
+      await loadAccount({ silent: true });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible registrar el pago simulado.");
+    } finally { setPayingQuotaId(null); }
+  }
+
+  async function downloadReceipt() {
+    if (!paymentResult) return;
+    try {
+      const blob = await downloadResidentPaymentReceiptRequest(paymentResult.id_pago);
+      savePaymentReceipt(blob, paymentResult.numero_comprobante);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible descargar el comprobante.");
+    }
+  }
 
   async function loadAccount({ silent = false } = {}) {
     if (silent) {
@@ -211,6 +242,21 @@ export function ResidenteAccountView() {
         </Alert>
       ) : null}
 
+      <Alert className="border-sky-200 bg-sky-50 text-sky-800">
+        <AlertTitle>Pago simulado para fines académicos.</AlertTitle>
+        <AlertDescription>No se solicitan ni almacenan datos bancarios.</AlertDescription>
+      </Alert>
+
+      {paymentResult ? (
+        <Alert className="border-emerald-200 bg-emerald-50 text-emerald-800">
+          <AlertTitle>Pago realizado</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span>{paymentResult.concepto}: {formatCurrency(paymentResult.total)} · {paymentResult.numero_comprobante}</span>
+            <Button type="button" variant="outline" onClick={() => void downloadReceipt()}>Descargar comprobante</Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {statement.resumen.cuotas_vencidas > 0 ? (
         <Alert className="border-rose-200 bg-rose-50 text-rose-800">
           <AlertTriangle className="size-5" />
@@ -281,6 +327,7 @@ export function ResidenteAccountView() {
                     <th className="px-5 py-3 font-semibold">Pagado</th>
                     <th className="px-5 py-3 font-semibold">Saldo</th>
                     <th className="px-5 py-3 font-semibold">Estado</th>
+                    <th className="px-5 py-3 font-semibold">Acción</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -318,6 +365,13 @@ export function ResidenteAccountView() {
                         >
                           {statusLabels[quota.estado]}
                         </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        {quota.estado !== "PAGADA" ? (
+                          <Button type="button" disabled={payingQuotaId !== null} onClick={() => void payQuota(quota)}>
+                            {payingQuotaId === quota.id_cuota ? "Procesando..." : "Pagar"}
+                          </Button>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

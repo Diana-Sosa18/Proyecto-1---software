@@ -66,6 +66,8 @@ test("mapQuota converts numeric fields and house label", () => {
     servicio: "Agua potable",
     tipo_servicio: "Basico",
     monto: 350,
+    monto_base: 350,
+    recargo: 0,
     monto_pagado: 125.5,
     saldo_pendiente: 224.5,
     fecha_limite: "2026-08-01",

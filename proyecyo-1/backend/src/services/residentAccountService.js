@@ -36,7 +36,7 @@ function toMoney(value) {
 }
 
 function getQuotaStatus(row, currentDate = getCurrentDateInTimezone()) {
-  const amount = Number(row.monto || 0);
+  const amount = Number(row.monto || 0) + Number(row.recargo || 0);
   const paid = Number(row.total_pagado || 0);
 
   if (paid >= amount) {
@@ -49,7 +49,9 @@ function getQuotaStatus(row, currentDate = getCurrentDateInTimezone()) {
 }
 
 function mapQuota(row, currentDate = getCurrentDateInTimezone()) {
-  const amount = toMoney(row.monto);
+  const baseAmount = toMoney(row.monto);
+  const surcharge = toMoney(row.recargo);
+  const amount = toMoney(baseAmount + surcharge);
   const paid = toMoney(row.total_pagado);
   const balance = toMoney(Math.max(amount - paid, 0));
   const status = getQuotaStatus(row, currentDate);
@@ -61,6 +63,8 @@ function mapQuota(row, currentDate = getCurrentDateInTimezone()) {
     servicio: row.servicio,
     tipo_servicio: row.tipo_servicio || "General",
     monto: amount,
+    monto_base: baseAmount,
+    recargo: surcharge,
     monto_pagado: paid,
     saldo_pendiente: balance,
     fecha_limite: row.fecha_limite,
@@ -103,6 +107,7 @@ async function listResidentAccountStatement(userId) {
         c.torre,
         srv.nombre AS servicio,
         srv.tipo_servicio,
+        COALESCE(MAX(rec.monto_recargo), 0) AS recargo,
         COALESCE(SUM(p.monto_pagado), 0) AS total_pagado,
         DATE_FORMAT(MAX(p.fecha_pago), '%Y-%m-%d') AS ultimo_pago
       FROM CUOTA cu
@@ -114,6 +119,8 @@ async function listResidentAccountStatement(userId) {
         ON srv.id_servicio = cu.id_servicio
       LEFT JOIN PAGO p
         ON p.id_cuota = cu.id_cuota
+      LEFT JOIN RECARGO_APLICADO rec
+        ON rec.id_cuota = cu.id_cuota
       WHERE r.id_usuario = ?
         AND LOWER(COALESCE(srv.tipo_servicio, '')) <> 'alquiler'
         AND LOWER(srv.nombre) NOT LIKE '%alquiler%'

@@ -759,6 +759,28 @@ async function ensureAutomaticBackupsSchema() {
   }
 }
 
+async function ensureSimulatedPaymentsSchema() {
+  if (!(await tableExists("TRANSACCION_SIMULADA"))) {
+    await query(`
+      CREATE TABLE TRANSACCION_SIMULADA (
+        id_transaccion INT PRIMARY KEY AUTO_INCREMENT,
+        id_pago INT NOT NULL,
+        id_usuario INT NOT NULL,
+        id_casa INT NOT NULL,
+        rol VARCHAR(20) NOT NULL,
+        concepto VARCHAR(100) NOT NULL,
+        monto DECIMAL(10,2) NOT NULL,
+        estado VARCHAR(20) NOT NULL DEFAULT 'APROBADA',
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_pago) REFERENCES PAGO(id_pago),
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario),
+        FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
+        UNIQUE KEY uq_transaccion_simulada_pago (id_pago)
+      )
+    `);
+  }
+}
+
 async function ensureRemindersSchema() {
   if (!(await tableExists("RECORDATORIO_RESERVA"))) {
     await query(`
@@ -904,6 +926,7 @@ module.exports = {
   ensureConfigurationSchema,
   ensureAutomaticBackupsSchema,
   ensureRemindersSchema,
+  ensureSimulatedPaymentsSchema,
   ensureDemoRequestsSchema,
   ensureTenantAccountSeed,
 };

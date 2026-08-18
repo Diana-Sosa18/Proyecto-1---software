@@ -14,6 +14,7 @@ const {
   ensureConfigurationSchema,
   ensureAutomaticBackupsSchema,
   ensureRemindersSchema,
+  ensureSimulatedPaymentsSchema,
   ensureDemoRequestsSchema,
   ensureTenantAccountSeed,
   query,
@@ -65,6 +66,7 @@ async function startServer() {
   await ensureConfigurationSchema();
   await ensureAutomaticBackupsSchema();
   await ensureRemindersSchema();
+  await ensureSimulatedPaymentsSchema();
   await ensureDemoRequestsSchema();
   await ensureTenantAccountSeed();
   startScheduler();

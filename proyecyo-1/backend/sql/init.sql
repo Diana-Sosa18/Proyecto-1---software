@@ -408,6 +408,22 @@ CREATE TABLE RECORDATORIO_RESERVA (
     UNIQUE KEY uq_recordatorio_reserva_usuario_horario (id_usuario, id_amenidad, fecha, hora_inicio)
 );
 
+CREATE TABLE TRANSACCION_SIMULADA (
+    id_transaccion INT PRIMARY KEY AUTO_INCREMENT,
+    id_pago INT NOT NULL,
+    id_usuario INT NOT NULL,
+    id_casa INT NOT NULL,
+    rol VARCHAR(20) NOT NULL,
+    concepto VARCHAR(100) NOT NULL,
+    monto DECIMAL(10,2) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'APROBADA',
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_pago) REFERENCES PAGO(id_pago),
+    FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario),
+    FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
+    UNIQUE KEY uq_transaccion_simulada_pago (id_pago)
+);
+
 INSERT INTO CONFIGURACION (clave, valor)
 VALUES
     ('horario_visita_inicio', '06:00'),
