@@ -4,6 +4,7 @@ const {
   listReservationsByRange,
   listReservationHistory,
   getAmenityAvailability,
+  getUnifiedAmenityAvailability,
   validateAmenityReservationConflict,
   createAmenityReservation,
   updateAmenityReservation,
@@ -110,6 +111,11 @@ async function getAdminAmenitiesAvailability(req, res, next) {
   }
 }
 
+async function getUnifiedAvailability(req, res, next) {
+  try { res.status(200).json(await getUnifiedAmenityAvailability(req.query.fecha)); }
+  catch (error) { next(error); }
+}
+
 async function getAmenitiesConflict(req, res, next) {
   try {
     const conflict = await validateAmenityReservationConflict(
@@ -196,6 +202,7 @@ module.exports = {
   getAdminAmenitiesStats,
   getAmenitiesAvailability,
   getAdminAmenitiesAvailability,
+  getUnifiedAvailability,
   getAmenitiesConflict,
   getAdminAmenitiesConflict,
   postAmenityReservation,

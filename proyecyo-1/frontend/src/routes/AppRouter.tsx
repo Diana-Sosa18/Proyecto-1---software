@@ -23,6 +23,7 @@ import { InquilinoView } from "@/views/InquilinoView";
 import { InquilinoAccountView } from "@/views/InquilinoAccountView";
 import { LoginView } from "@/views/LoginView";
 import { ResidenteAmenitiesView } from "@/views/ResidenteAmenitiesView";
+import { ResidenteUnifiedAmenitiesAvailabilityView } from "@/views/ResidenteUnifiedAmenitiesAvailabilityView";
 import { ResidenteRegulationsView } from "@/views/ResidenteRegulationsView";
 import { ResidenteUnifiedView } from "@/views/ResidenteUnifiedView";
 import { ResidenteView } from "@/views/ResidenteView";
@@ -78,6 +79,7 @@ export function AppRouter() {
           <Route path="/residente/reglamentos" element={<ResidenteRegulationsView />} />
           <Route path="/residente/visitas" element={<ResidenteVisitsView />} />
           <Route path="/residente/amenidades" element={<ResidenteAmenitiesView />} />
+          <Route path="/residente/amenidades/disponibilidad-general" element={<ResidenteUnifiedAmenitiesAvailabilityView />} />
           <Route path="/residente/resumen-mensual" element={<ResidentMonthlySummaryView />} />
           <Route path="/residente/detalle-financiero" element={<ResidenteFinancialDetailView />} />
         </Route>

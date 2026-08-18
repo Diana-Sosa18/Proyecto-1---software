@@ -77,6 +77,12 @@ export function getAmenityAvailabilityRequest(idAmenidad: number, fecha: string)
   );
 }
 
+export function getUnifiedAmenityAvailabilityRequest(fecha: string) {
+  return apiRequest<{ fecha: string; amenidades: AmenityAvailabilityResponse[] }>(
+    `/reservas/amenidades/disponibilidad-general?fecha=${encodeURIComponent(fecha)}`,
+  );
+}
+
 export function validateAmenityConflictRequest(payload: CreateAmenityReservationPayload) {
   return apiRequest<AmenityConflictResponse>(
     `/reservas/amenidades/conflicto?${buildConflictQuery(payload)}`,

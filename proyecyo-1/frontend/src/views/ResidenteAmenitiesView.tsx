@@ -59,15 +59,20 @@ function getWeekDates(baseDate: Date) {
 }
 
 export function ResidenteAmenitiesView() {
+  const initialParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const navigate = useNavigate();
   const { user } = useAuth();
   const [amenities, setAmenities] = useState<Amenity[]>([]);
   const [reservations, setReservations] = useState<AmenityReservation[]>([]);
   const [reservationHistory, setReservationHistory] = useState<AmenityReservationHistory[]>([]);
   const [availability, setAvailability] = useState<AmenityAvailabilityResponse | null>(null);
-  const [selectedAmenityId, setSelectedAmenityId] = useState<number | null>(null);
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedSlot, setSelectedSlot] = useState<SlotSelection | null>(null);
+  const [selectedAmenityId, setSelectedAmenityId] = useState<number | null>(() => Number(initialParams.get("amenidad")) || null);
+  const [selectedDate, setSelectedDate] = useState(() => initialParams.get("fecha") || "");
+  const [selectedSlot, setSelectedSlot] = useState<SlotSelection | null>(() => {
+    const horaInicio = initialParams.get("inicio");
+    const horaFin = initialParams.get("fin");
+    return horaInicio && horaFin ? { hora_inicio: horaInicio, hora_fin: horaFin } : null;
+  });
   const [weekReference, setWeekReference] = useState(new Date());
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
@@ -342,6 +347,14 @@ export function ResidenteAmenitiesView() {
             <p className="text-sm text-slate-600">Disponibilidad real y confirmacion inmediata</p>
           </div>
         </button>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => navigate("/residente/amenidades/disponibilidad-general")}
+        >
+          Comparar todas las amenidades
+        </Button>
 
         {errorMessage ? (
           <Alert variant="destructive">

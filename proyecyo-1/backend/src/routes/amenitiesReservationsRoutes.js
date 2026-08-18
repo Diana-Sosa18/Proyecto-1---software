@@ -9,6 +9,7 @@ const {
   getAdminAmenitiesStats,
   getAmenitiesAvailability,
   getAdminAmenitiesAvailability,
+  getUnifiedAvailability,
   getAmenitiesConflict,
   getAdminAmenitiesConflict,
   postAmenityReservation,
@@ -26,6 +27,7 @@ router.get("/amenidades", requireResident, getAmenities);
 router.get("/reservas/amenidades", requireResident, getAmenitiesReservations);
 router.get("/reservas/amenidades/historial", requireResident, getAmenitiesReservationHistory);
 router.get("/reservas/amenidades/disponibilidad", requireResident, getAmenitiesAvailability);
+router.get("/reservas/amenidades/disponibilidad-general", requireResident, getUnifiedAvailability);
 router.get("/reservas/amenidades/conflicto", requireResident, getAmenitiesConflict);
 router.post("/reservas/amenidades", requireResident, postAmenityReservation);
 router.patch("/reservas/amenidades/:key", requireResident, patchAmenityReservation);

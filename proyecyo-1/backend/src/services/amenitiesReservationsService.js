@@ -1186,6 +1186,24 @@ async function getAmenityAvailability(amenityIdValue, fechaValue, options = {}) 
   }
 }
 
+async function composeUnifiedAvailability(amenities, fecha, availabilityLoader) {
+  const activeAmenities = amenities.filter((amenity) => amenity.activo);
+  const amenidades = await Promise.all(
+    activeAmenities.map((amenity) => availabilityLoader(amenity.id_amenidad, fecha)),
+  );
+
+  return { fecha, amenidades };
+}
+
+async function getUnifiedAmenityAvailability(fechaValue) {
+  const fecha = ensureValidDate(fechaValue);
+  const amenities = await listAmenities();
+
+  return composeUnifiedAvailability(amenities, fecha, (amenityId, selectedDate) =>
+    getAmenityAvailability(amenityId, selectedDate, { includeUserDetails: false }),
+  );
+}
+
 async function validateAmenityReservationConflict(payload, options = {}) {
   const normalizedPayload = normalizeReservationPayload(payload, Boolean(options.requireUserId));
   const includeUserDetails = Boolean(options.includeUserDetails);
@@ -1454,6 +1472,7 @@ module.exports = {
   listReservationsByRange,
   listReservationHistory,
   getAmenityAvailability,
+  getUnifiedAmenityAvailability,
   validateAmenityReservationConflict,
   createAmenityReservation,
   updateAmenityReservation,
@@ -1461,6 +1480,7 @@ module.exports = {
   getAmenityStats,
   updateAmenitySchedule,
   __private__: {
+    composeUnifiedAvailability,
     countActiveReservationsByUser,
     getReservationLimitStatus,
     throwReservationLimitError,
