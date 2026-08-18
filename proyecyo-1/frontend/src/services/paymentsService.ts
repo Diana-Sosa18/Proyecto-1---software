@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api";
-import type { AdminPaymentFilters, AdminPaymentRecord } from "@/types/payments";
+import type { AdminPaymentFilters, AdminPaymentRecord, RecentPaymentFilters, RecentPaymentRecord } from "@/types/payments";
 
 function buildQuery(filters: Record<string, string | number | undefined | null>) {
   const query = new URLSearchParams();
@@ -19,6 +19,11 @@ function buildQuery(filters: Record<string, string | number | undefined | null>)
   });
 
   return query.toString();
+}
+
+export function getRecentPaymentsRequest(filters: RecentPaymentFilters = {}) {
+  const query = buildQuery(filters);
+  return apiRequest<RecentPaymentRecord[]>(`/admin/pagos/recientes${query ? `?${query}` : ""}`);
 }
 
 export function getAdminPaymentsRequest(filters: AdminPaymentFilters = {}) {

@@ -115,6 +115,44 @@ async function listDelinquentResidents(filters = {}) {
   return rows.map(mapAdminPayment);
 }
 
+function validateRecentChoice(value, allowed, label) {
+  const normalized = normalizeString(value).toUpperCase();
+  if (!normalized || normalized === "TODOS") return null;
+  if (!allowed.includes(normalized)) {
+    const error = new Error(`El filtro de ${label} es inválido.`); error.status = 400; throw error;
+  }
+  return normalized;
+}
+
+async function listRecentPayments(filters = {}) {
+  const search = normalizeString(filters.usuario).toLowerCase();
+  const unit = normalizeString(filters.unidad).toLowerCase();
+  const role = validateRecentChoice(filters.rol, ["RESIDENTE", "INQUILINO"], "rol");
+  const status = validateRecentChoice(filters.estado, ["APROBADA", "RECHAZADA"], "estado");
+  const from = filters.desde ? normalizeDate(filters.desde) : "";
+  const to = filters.hasta ? normalizeDate(filters.hasta) : "";
+  if ((filters.desde && !from) || (filters.hasta && !to) || (from && to && from > to)) {
+    const error = new Error("El rango de fechas es inválido."); error.status = 400; throw error;
+  }
+  const where = ["1 = 1"]; const params = [];
+  if (search) { where.push("LOWER(u.nombre) LIKE ?"); params.push(`%${search}%`); }
+  if (unit) { where.push("LOWER(CONCAT(COALESCE(c.torre, ''), IF(COALESCE(c.torre, '') = '', '', '-'), c.numero)) LIKE ?"); params.push(`%${unit}%`); }
+  if (role) { where.push("UPPER(t.rol) = ?"); params.push(role); }
+  if (status) { where.push("UPPER(t.estado) = ?"); params.push(status); }
+  if (from) { where.push("DATE(t.creado_en) >= ?"); params.push(from); }
+  if (to) { where.push("DATE(t.creado_en) <= ?"); params.push(to); }
+  const rows = await query(
+    `SELECT t.id_transaccion, t.id_pago, t.id_usuario, u.nombre usuario, t.rol,
+      CONCAT(COALESCE(c.torre, ''), IF(COALESCE(c.torre, '') = '', '', '-'), c.numero) unidad,
+      t.concepto, t.monto, DATE_FORMAT(t.creado_en, '%Y-%m-%d') fecha,
+      TIME_FORMAT(t.creado_en, '%H:%i:%s') hora, t.estado
+     FROM TRANSACCION_SIMULADA t INNER JOIN USUARIO u ON u.id_usuario = t.id_usuario
+     INNER JOIN CASA c ON c.id_casa = t.id_casa WHERE ${where.join(" AND ")}
+     ORDER BY t.creado_en DESC, t.id_transaccion DESC LIMIT 100`, params,
+  );
+  return rows.map((row) => ({ ...row, id_transaccion: Number(row.id_transaccion), id_pago: Number(row.id_pago), id_usuario: Number(row.id_usuario), monto: Number(row.monto) }));
+}
+
 function normalizePeriod(monthValue, yearValue) {
   const month = Number(monthValue); const year = Number(yearValue);
   if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2000 || year > 2100) {
@@ -154,5 +192,6 @@ async function getMonthlyFinancialReport(monthValue, yearValue) {
 module.exports = {
   listDelinquentResidents,
   getMonthlyFinancialReport,
+  listRecentPayments,
   __private__: { normalizePeriod },
 };
