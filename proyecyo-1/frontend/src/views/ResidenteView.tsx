@@ -185,7 +185,7 @@ export function ResidenteView() {
               <AlertTitle className="flex items-center gap-2 text-lg">
                 <Bell className="size-5" />
                 Tienes {unreadNotifications.length} notificacion
-                {unreadNotifications.length === 1 ? "" : "es"} de llegada
+                {unreadNotifications.length === 1 ? "" : "es"} pendiente
               </AlertTitle>
 
               <AlertDescription className="mt-3 space-y-3 text-green-900">
@@ -251,7 +251,7 @@ export function ResidenteView() {
           helper={
             unreadNotifications.length === 0
               ? "Sin notificaciones pendientes"
-              : "Llegadas sin leer"
+              : "Notificaciones sin leer"
           }
           icon={Bell}
         />

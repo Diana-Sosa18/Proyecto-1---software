@@ -760,6 +760,25 @@ async function ensureAutomaticBackupsSchema() {
 }
 
 async function ensureRemindersSchema() {
+  if (!(await tableExists("RECORDATORIO_RESERVA"))) {
+    await query(`
+      CREATE TABLE RECORDATORIO_RESERVA (
+        id_recordatorio INT PRIMARY KEY AUTO_INCREMENT,
+        id_usuario INT NOT NULL,
+        id_amenidad INT NOT NULL,
+        id_notificacion INT NULL,
+        fecha DATE NOT NULL,
+        hora_inicio TIME NOT NULL,
+        fecha_envio DATE NOT NULL,
+        enviado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario),
+        FOREIGN KEY (id_amenidad) REFERENCES AMENIDAD(id_amenidad),
+        FOREIGN KEY (id_notificacion) REFERENCES NOTIFICACION(id_notificacion),
+        UNIQUE KEY uq_recordatorio_reserva_usuario_horario (id_usuario, id_amenidad, fecha, hora_inicio)
+      )
+    `);
+  }
+
   if (!(await tableExists("RECORDATORIO_PAGO"))) {
     await query(`
       CREATE TABLE RECORDATORIO_PAGO (

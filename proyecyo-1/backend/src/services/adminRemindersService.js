@@ -3,6 +3,8 @@ const { pool, query } = require("../database/mysql");
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 const REMINDER_TYPES = ["PROXIMO_VENCIMIENTO", "VENCIDO"];
 const NOTIFICATION_TYPE = "RECORDATORIO_PAGO";
+const RESERVATION_NOTIFICATION_TYPE = "RECORDATORIO_RESERVA";
+const RESERVATION_REMINDER_MINUTES = 60;
 
 const CONFIG_KEYS = {
   activo: "recordatorios_activo",
@@ -378,11 +380,79 @@ async function listReminders(filters = {}) {
   return rows.map(mapReminder);
 }
 
+async function sendReservationReminders() {
+  const currentDate = getCurrentDateInTimezone();
+  const reservations = await query(
+    `
+      SELECT r.id_usuario, r.id_amenidad,
+        DATE_FORMAT(r.fecha, '%Y-%m-%d') AS fecha,
+        TIME_FORMAT(r.hora_inicio, '%H:%i') AS hora_inicio,
+        a.nombre AS amenidad
+      FROM RESERVA r
+      INNER JOIN AMENIDAD a ON a.id_amenidad = r.id_amenidad AND a.activo = TRUE
+      INNER JOIN USUARIO u ON u.id_usuario = r.id_usuario AND u.activo = TRUE
+      WHERE COALESCE(r.estado, 'CONFIRMADA') NOT IN ('CANCELADA', 'FINALIZADA')
+        AND TIMESTAMP(r.fecha, r.hora_inicio) > NOW()
+        AND TIMESTAMP(r.fecha, r.hora_inicio) <= DATE_ADD(NOW(), INTERVAL ? MINUTE)
+      ORDER BY r.fecha, r.hora_inicio
+    `,
+    [RESERVATION_REMINDER_MINUTES],
+  );
+  let enviados = 0;
+
+  for (const reservation of reservations) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [existing] = await connection.execute(
+        `SELECT id_recordatorio FROM RECORDATORIO_RESERVA
+         WHERE id_usuario = ? AND id_amenidad = ? AND fecha = ? AND hora_inicio = ? LIMIT 1`,
+        [reservation.id_usuario, reservation.id_amenidad, reservation.fecha, reservation.hora_inicio],
+      );
+      if (existing.length) {
+        await connection.rollback();
+        continue;
+      }
+      const titulo = "Tu reserva comienza pronto";
+      const mensaje = `Tu reserva de ${reservation.amenidad} comienza el ${reservation.fecha} a las ${reservation.hora_inicio}.`;
+      const [notification] = await connection.execute(
+        `INSERT INTO NOTIFICACION (id_usuario, id_acceso, tipo, titulo, mensaje, leido)
+         VALUES (?, NULL, ?, ?, ?, FALSE)`,
+        [reservation.id_usuario, RESERVATION_NOTIFICATION_TYPE, titulo, mensaje],
+      );
+      await connection.execute(
+        `INSERT INTO RECORDATORIO_RESERVA
+          (id_usuario, id_amenidad, id_notificacion, fecha, hora_inicio, fecha_envio)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [reservation.id_usuario, reservation.id_amenidad, notification.insertId, reservation.fecha, reservation.hora_inicio, currentDate],
+      );
+      await connection.commit();
+      enviados += 1;
+    } catch (error) {
+      await connection.rollback();
+      if (error?.code !== "ER_DUP_ENTRY") throw error;
+    } finally {
+      connection.release();
+    }
+  }
+  return { enviados, fecha_revision: currentDate };
+}
+
 async function runScheduledReminders() {
   if (schedulerRunInProgress) return;
   schedulerRunInProgress = true;
-  try { await sendPaymentReminders(null); }
-  catch (error) { console.error("No fue posible generar recordatorios automaticos.", error); }
+  try {
+    try {
+      await sendPaymentReminders(null);
+    } catch (error) {
+      console.error("No fue posible generar recordatorios de pago.", error);
+    }
+    try {
+      await sendReservationReminders();
+    } catch (error) {
+      console.error("No fue posible generar recordatorios de reserva.", error);
+    }
+  }
   finally { schedulerRunInProgress = false; }
 }
 
@@ -398,6 +468,7 @@ module.exports = {
   getReminderConfig,
   saveReminderConfig,
   sendPaymentReminders,
+  sendReservationReminders,
   getReminderSummary,
   listReminders,
   startReminderScheduler,
