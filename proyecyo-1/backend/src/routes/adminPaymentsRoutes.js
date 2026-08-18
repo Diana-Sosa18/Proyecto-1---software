@@ -1,10 +1,11 @@
 const express = require("express");
 
-const { getAdminPayments } = require("../controllers/adminPaymentsController");
+const { getAdminPayments, getMonthlyReport } = require("../controllers/adminPaymentsController");
 const { requireAdmin } = require("../middlewares/requireAdmin");
 
 const router = express.Router();
 
 router.get("/admin/pagos", requireAdmin, getAdminPayments);
+router.get("/admin/reportes/financiero-mensual", requireAdmin, getMonthlyReport);
 
 module.exports = router;

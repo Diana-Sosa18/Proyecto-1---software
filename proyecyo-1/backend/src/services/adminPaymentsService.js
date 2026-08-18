@@ -115,6 +115,44 @@ async function listDelinquentResidents(filters = {}) {
   return rows.map(mapAdminPayment);
 }
 
+function normalizePeriod(monthValue, yearValue) {
+  const month = Number(monthValue); const year = Number(yearValue);
+  if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2000 || year > 2100) {
+    const error = new Error("El mes o anio del reporte es invalido."); error.status = 400; throw error;
+  }
+  return { month, year, from: `${year}-${String(month).padStart(2, "0")}-01` };
+}
+
+async function getMonthlyFinancialReport(monthValue, yearValue) {
+  const period = normalizePeriod(monthValue, yearValue);
+  const rows = await query(
+    `SELECT c.id_casa, CONCAT(COALESCE(c.torre, ''), IF(c.torre IS NULL OR c.torre = '', '', '-'), c.numero) AS unidad,
+            u.nombre AS usuario, s.nombre AS concepto, cu.monto,
+            DATE_FORMAT(cu.fecha_limite, '%Y-%m-%d') AS fecha_limite,
+            COALESCE(pg.pagado, 0) AS pagado, COALESCE(ra.recargo, 0) AS recargo
+       FROM CUOTA cu INNER JOIN CASA c ON c.id_casa = cu.id_casa
+       INNER JOIN RESIDENTE r ON r.id_residente = c.id_residente INNER JOIN USUARIO u ON u.id_usuario = r.id_usuario
+       INNER JOIN SERVICIO s ON s.id_servicio = cu.id_servicio
+       LEFT JOIN (SELECT id_cuota, SUM(monto_pagado) pagado FROM PAGO WHERE fecha_pago >= ? AND fecha_pago < DATE_ADD(?, INTERVAL 1 MONTH) GROUP BY id_cuota) pg ON pg.id_cuota = cu.id_cuota
+       LEFT JOIN (SELECT id_cuota, SUM(monto_recargo) recargo FROM RECARGO_APLICADO GROUP BY id_cuota) ra ON ra.id_cuota = cu.id_cuota
+      WHERE cu.fecha_limite >= ? AND cu.fecha_limite < DATE_ADD(?, INTERVAL 1 MONTH)
+      ORDER BY cu.fecha_limite, unidad`,
+    [period.from, period.from, period.from, period.from],
+  );
+  const detalle = rows.map((row) => { const total = Number(row.monto) + Number(row.recargo); const pagado = Number(row.pagado); return {
+    ...row, id_casa: Number(row.id_casa), monto: Number(row.monto), recargo: Number(row.recargo), pagado,
+    pendiente: Math.max(total - pagado, 0), estado: pagado >= total ? "PAGADO" : row.fecha_limite < new Date().toISOString().slice(0, 10) ? "MOROSO" : "PENDIENTE",
+  }; });
+  return { periodo: { mes: period.month, anio: period.year }, resumen: {
+    total_cobrado: detalle.reduce((s, i) => s + i.pagado, 0), total_pendiente: detalle.reduce((s, i) => s + i.pendiente, 0),
+    total_mora: detalle.filter((i) => i.estado === "MOROSO").reduce((s, i) => s + i.pendiente, 0),
+    cantidad_pagos: detalle.filter((i) => i.pagado > 0).length,
+    usuarios_morosos: new Set(detalle.filter((i) => i.estado === "MOROSO").map((i) => i.id_casa)).size,
+  }, detalle };
+}
+
 module.exports = {
   listDelinquentResidents,
+  getMonthlyFinancialReport,
+  __private__: { normalizePeriod },
 };

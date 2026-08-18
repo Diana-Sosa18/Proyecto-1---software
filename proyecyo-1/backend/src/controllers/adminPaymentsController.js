@@ -1,4 +1,4 @@
-const { listDelinquentResidents } = require("../services/adminPaymentsService");
+const { listDelinquentResidents, getMonthlyFinancialReport } = require("../services/adminPaymentsService");
 
 async function getAdminPayments(req, res, next) {
   try {
@@ -11,4 +11,5 @@ async function getAdminPayments(req, res, next) {
 
 module.exports = {
   getAdminPayments,
+  getMonthlyReport: async (req, res, next) => { try { res.json(await getMonthlyFinancialReport(req.query.mes, req.query.anio)); } catch (error) { next(error); } },
 };
