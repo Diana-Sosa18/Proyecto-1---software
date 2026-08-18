@@ -1,0 +1,4 @@
+const { __private__ } = require("../amenitiesReservationsService");
+test("usuario sin sancion puede continuar", async()=>{const c={execute:jest.fn().mockResolvedValue([[]])};await expect(__private__.assertNoActiveAmenitySanction(c,7)).resolves.toBeUndefined();expect(c.execute.mock.calls[0][1]).toEqual([7]);});
+test("sancion pendiente bloquea la reserva", async()=>{const c={execute:jest.fn().mockResolvedValue([[{id_sancion:1,motivo:"Mora"}]])};await expect(__private__.assertNoActiveAmenitySanction(c,7)).rejects.toMatchObject({status:403,code:"ACTIVE_SANCTION"});});
+test("consulta excluye sanciones pagadas y anuladas", async()=>{const c={execute:jest.fn().mockResolvedValue([[]])};await __private__.assertNoActiveAmenitySanction(c,7);expect(c.execute.mock.calls[0][0]).toContain("s.estado='PENDIENTE'");});

@@ -704,6 +704,20 @@ function throwReservationLimitError() {
   throw error;
 }
 
+async function assertNoActiveAmenitySanction(connection, userId) {
+  const [rows] = await connection.execute(
+    `SELECT s.id_sancion, s.motivo FROM SANCION s
+      INNER JOIN (SELECT c.id_casa, r.id_usuario FROM CASA c INNER JOIN RESIDENTE r ON r.id_residente=c.id_residente
+                  UNION SELECT ic.id_casa, i.id_usuario FROM INQUILINO_CASA ic INNER JOIN INQUILINO i ON i.id_inquilino=ic.id_inquilino AND i.autorizado=TRUE) unidad
+        ON unidad.id_casa=s.id_casa
+     WHERE unidad.id_usuario=? AND s.estado='PENDIENTE' LIMIT 1 FOR UPDATE`, [userId],
+  );
+  if (rows[0]) {
+    const error = new Error(`Reserva bloqueada por sancion vigente: ${rows[0].motivo}`);
+    error.status = 403; error.code = "ACTIVE_SANCTION"; throw error;
+  }
+}
+
 function normalizeReservationPayload(payload, requireUserId) {
   const normalized = {
     id_usuario: payload.id_usuario == null ? null : Number(payload.id_usuario),
@@ -1233,6 +1247,7 @@ async function createAmenityReservation(viewer, payload) {
     await ensureAmenityCatalog(connection);
 
     const reservableUser = await getReservableUserRecord(connection, userId);
+    await assertNoActiveAmenitySanction(connection, userId);
     const amenity = await getAmenityRecord(connection, normalizedPayload.id_amenidad);
 
     validateReservationRange(
@@ -1442,5 +1457,6 @@ module.exports = {
     countActiveReservationsByUser,
     getReservationLimitStatus,
     throwReservationLimitError,
+    assertNoActiveAmenitySanction,
   },
 };
