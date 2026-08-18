@@ -28,6 +28,17 @@ function normalizeString(value) {
   return String(value || "").trim();
 }
 
+function normalizeDate(value) {
+  const date = normalizeString(value);
+  if (!date) return "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const error = new Error("La fecha debe tener formato YYYY-MM-DD.");
+    error.status = 400;
+    throw error;
+  }
+  return date;
+}
+
 function buildHouseLabel(row) {
   const tower = normalizeString(row.torre);
   const number = normalizeString(row.numero);
@@ -143,8 +154,13 @@ async function getTenantHouse(userId) {
   return rows[0];
 }
 
-async function listTenantAccountStatement(userId) {
+async function listTenantAccountStatement(userId, filters = {}) {
   const house = await getTenantHouse(userId);
+  const desde = normalizeDate(filters.desde);
+  const hasta = normalizeDate(filters.hasta);
+  if (desde && hasta && desde > hasta) {
+    const error = new Error("El rango de fechas es invalido."); error.status = 400; throw error;
+  }
   const currentDate = getCurrentDateInTimezone();
   const rows = await query(
     `
@@ -166,7 +182,7 @@ async function listTenantAccountStatement(userId) {
         ON srv.id_servicio = cu.id_servicio
       LEFT JOIN PAGO p
         ON p.id_cuota = cu.id_cuota
-      WHERE cu.id_casa = ?
+      WHERE cu.id_casa = ? ${desde ? "AND cu.fecha_limite >= ?" : ""} ${hasta ? "AND cu.fecha_limite <= ?" : ""}
       GROUP BY
         cu.id_cuota,
         cu.id_casa,
@@ -185,7 +201,7 @@ async function listTenantAccountStatement(userId) {
         cu.fecha_limite ASC,
         cu.id_cuota ASC
     `,
-    [house.id_casa],
+    [house.id_casa, ...(desde ? [desde] : []), ...(hasta ? [hasta] : [])],
   );
 
   const cuotas = rows.map((row) => mapQuota(row, currentDate));
@@ -196,8 +212,18 @@ async function listTenantAccountStatement(userId) {
             DATE_FORMAT(pg.fecha_pago, '%Y-%m-%d') AS fecha_pago, srv.nombre AS servicio
        FROM PAGO pg INNER JOIN CUOTA cu ON cu.id_cuota = pg.id_cuota
        INNER JOIN SERVICIO srv ON srv.id_servicio = cu.id_servicio
-      WHERE cu.id_casa = ? ORDER BY pg.fecha_pago DESC, pg.id_pago DESC`,
-    [house.id_casa],
+      WHERE cu.id_casa = ? ${desde ? "AND pg.fecha_pago >= ?" : ""} ${hasta ? "AND pg.fecha_pago <= ?" : ""}
+      ORDER BY pg.fecha_pago DESC, pg.id_pago DESC`,
+    [house.id_casa, ...(desde ? [desde] : []), ...(hasta ? [hasta] : [])],
+  );
+  const surchargeRows = await query(
+    `SELECT ra.id_recargo, ra.id_cuota, srv.nombre AS servicio, ra.monto_recargo,
+            DATE_FORMAT(ra.fecha_aplicacion, '%Y-%m-%d') AS fecha_aplicacion
+       FROM RECARGO_APLICADO ra INNER JOIN CUOTA cu ON cu.id_cuota = ra.id_cuota
+       INNER JOIN SERVICIO srv ON srv.id_servicio = cu.id_servicio
+      WHERE ra.id_casa = ? ${desde ? "AND ra.fecha_aplicacion >= ?" : ""} ${hasta ? "AND ra.fecha_aplicacion <= ?" : ""}
+      ORDER BY ra.fecha_aplicacion DESC`,
+    [house.id_casa, ...(desde ? [desde] : []), ...(hasta ? [hasta] : [])],
   );
 
   return {
@@ -214,6 +240,8 @@ async function listTenantAccountStatement(userId) {
       monto_pagado: toMoney(row.monto_pagado), fecha_pago: row.fecha_pago,
       numero_comprobante: paymentReference(row.id_pago),
     })),
+    recargos: surchargeRows.map((row) => ({ ...row, id_recargo: Number(row.id_recargo), id_cuota: Number(row.id_cuota), monto_recargo: toMoney(row.monto_recargo) })),
+    periodo: { desde: desde || null, hasta: hasta || null },
   };
 }
 
@@ -231,5 +259,6 @@ module.exports = {
     isRentQuota,
     mapQuota,
     toMoney,
+    normalizeDate,
   },
 };

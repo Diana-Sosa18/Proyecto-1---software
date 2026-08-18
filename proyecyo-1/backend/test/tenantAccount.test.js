@@ -3,6 +3,11 @@ const test = require("node:test");
 
 const { __private__ } = require("../src/services/tenantAccountService");
 
+test("normalizeDate valida filtros seguros", () => {
+  assert.equal(__private__.normalizeDate("2026-08-01"), "2026-08-01");
+  assert.throws(() => __private__.normalizeDate("01/08/2026"), /formato YYYY-MM-DD/);
+});
+
 test("isRentQuota detects rent concepts by service name or type", () => {
   assert.equal(__private__.isRentQuota({ servicio: "Alquiler residencial", tipo_servicio: "" }), true);
   assert.equal(__private__.isRentQuota({ servicio: "Cuota mensual", tipo_servicio: "Renta" }), true);

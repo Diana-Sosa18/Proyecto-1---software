@@ -47,4 +47,6 @@ export interface TenantAccountStatement {
     fecha_pago: string;
     numero_comprobante: string;
   }>;
+  recargos: Array<{ id_recargo: number; id_cuota: number; servicio: string; monto_recargo: number; fecha_aplicacion: string }>;
+  periodo: { desde: string | null; hasta: string | null };
 }

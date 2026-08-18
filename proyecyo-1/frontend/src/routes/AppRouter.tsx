@@ -83,6 +83,7 @@ export function AppRouter() {
         <Route element={<ProtectedRoute allowedRoles={["inquilino"]} />}>
           <Route path="/inquilino" element={<InquilinoView />} />
           <Route path="/inquilino/estado-cuenta" element={<InquilinoAccountView />} />
+          <Route path="/inquilino/historial-financiero" element={<InquilinoAccountView />} />
         </Route>
 
         <Route path="*" element={<FallbackRedirect />} />

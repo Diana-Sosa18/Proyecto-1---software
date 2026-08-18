@@ -63,6 +63,8 @@ const emptyStatement: TenantAccountStatement = {
   alquiler: [],
   cuotas_adicionales: [],
   pagos: [],
+  recargos: [],
+  periodo: { desde: null, hasta: null },
 };
 
 function formatCurrency(value: number) {
@@ -199,6 +201,8 @@ export function InquilinoAccountView() {
   const [errorMessage, setErrorMessage] = useState("");
   const [downloadMessage, setDownloadMessage] = useState("");
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
 
   async function downloadReceipt(id: number, reference: string) {
     try {
@@ -218,7 +222,7 @@ export function InquilinoAccountView() {
     }
 
     try {
-      const response = await getTenantAccountStatementRequest();
+      const response = await getTenantAccountStatementRequest({ desde, hasta });
       setStatement(response);
       setErrorMessage("");
     } catch (error) {
@@ -409,6 +413,16 @@ export function InquilinoAccountView() {
           )}
         </CardContent>
       </Card>
+
+      <Card className="border-slate-200 bg-white"><CardHeader><CardTitle>Filtros del historial</CardTitle></CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-3"><input aria-label="Desde" type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="rounded-md border p-2" />
+          <input aria-label="Hasta" type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="rounded-md border p-2" />
+          <Button type="button" onClick={() => void loadAccount()}>Aplicar filtro</Button></CardContent></Card>
+
+      <Card className="border-slate-200 bg-white"><CardHeader><CardTitle>Recargos</CardTitle></CardHeader><CardContent>
+        {statement.recargos.length === 0 ? <p className="text-sm text-slate-500">No hay recargos en el periodo.</p> : statement.recargos.map((item) =>
+          <div key={item.id_recargo} className="flex justify-between border-b py-3 text-sm"><span>{item.servicio} · {formatDate(item.fecha_aplicacion)}</span><strong>{formatCurrency(item.monto_recargo)}</strong></div>)}
+      </CardContent></Card>
 
       <QuotaTable
         title="Cuotas adicionales"
