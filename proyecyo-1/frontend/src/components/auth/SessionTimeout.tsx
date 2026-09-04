@@ -1,12 +1,123 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { ACTIVITY_THROTTLE_MS, LOGOUT_EVENT_KEY, SESSION_TIMEOUT_MS, SESSION_WARNING_MS } from "@/config/session";
-export function SessionTimeout(){
- const{isAuthenticated,logout}=useAuth(),[remaining,setRemaining]=useState(0),[warning,setWarning]=useState(false),last=useRef(0),warningTimer=useRef<number>(),logoutTimer=useRef<number>(),interval=useRef<number>();
- const clear=useCallback(()=>{window.clearTimeout(warningTimer.current);window.clearTimeout(logoutTimer.current);window.clearInterval(interval.current)},[]);
- const end=useCallback(()=>{clear();localStorage.setItem(LOGOUT_EVENT_KEY,String(Date.now()));logout();},[clear,logout]);
- const reset=useCallback(()=>{if(!isAuthenticated)return;clear();setWarning(false);warningTimer.current=window.setTimeout(()=>{setWarning(true);setRemaining(Math.ceil(SESSION_WARNING_MS/1000));interval.current=window.setInterval(()=>setRemaining(v=>Math.max(0,v-1)),1000)},Math.max(0,SESSION_TIMEOUT_MS-SESSION_WARNING_MS));logoutTimer.current=window.setTimeout(end,SESSION_TIMEOUT_MS)},[clear,end,isAuthenticated]);
- useEffect(()=>{if(!isAuthenticated){clear();return}reset();const activity=()=>{const now=Date.now();if(now-last.current>=ACTIVITY_THROTTLE_MS){last.current=now;reset()}};const sync=(e:StorageEvent)=>{if(e.key===LOGOUT_EVENT_KEY)logout()};["click","keydown","pointermove","popstate"].forEach(e=>window.addEventListener(e,activity));window.addEventListener("storage",sync);return()=>{clear();["click","keydown","pointermove","popstate"].forEach(e=>window.removeEventListener(e,activity));window.removeEventListener("storage",sync)}},[clear,isAuthenticated,logout,reset]);
- if(!warning)return null;return <div role="dialog" aria-label="Sesión próxima a expirar" className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/50"><div className="rounded-2xl bg-white p-6 shadow-xl"><h2 className="text-lg font-semibold">Sesión próxima a expirar</h2><p className="mt-2">Se cerrará en {remaining} segundos por inactividad.</p><div className="mt-5 flex gap-3"><Button onClick={reset}>Continuar sesión</Button><Button variant="outline" onClick={end}>Cerrar sesión</Button></div></div></div>;
+import {
+  ACTIVITY_THROTTLE_MS,
+  LOGOUT_EVENT_KEY,
+  SESSION_TIMEOUT_MS,
+  SESSION_WARNING_MS,
+} from "@/config/session";
+
+// Eventos que se consideran "actividad" del usuario y reinician el temporizador.
+const ACTIVITY_EVENTS = ["click", "keydown", "pointermove", "popstate"];
+
+/**
+ * Cierra la sesion automaticamente tras un periodo de inactividad.
+ * Muestra un aviso previo con cuenta regresiva y sincroniza el cierre entre pestañas.
+ */
+export function SessionTimeout() {
+  const { isAuthenticated, logout } = useAuth();
+  const [showWarning, setShowWarning] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
+
+  const lastActivityRef = useRef(0);
+  const warningTimerRef = useRef<number>();
+  const logoutTimerRef = useRef<number>();
+  const countdownRef = useRef<number>();
+
+  const clearTimers = useCallback(() => {
+    window.clearTimeout(warningTimerRef.current);
+    window.clearTimeout(logoutTimerRef.current);
+    window.clearInterval(countdownRef.current);
+  }, []);
+
+  // Cierra la sesion y avisa a las demas pestañas.
+  const endSession = useCallback(() => {
+    clearTimers();
+    setShowWarning(false);
+    localStorage.setItem(LOGOUT_EVENT_KEY, String(Date.now()));
+    logout();
+  }, [clearTimers, logout]);
+
+  // Reinicia el temporizador de inactividad (por actividad o al continuar la sesion).
+  const resetTimer = useCallback(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    clearTimers();
+    setShowWarning(false);
+
+    // Aviso previo antes de cerrar la sesion.
+    warningTimerRef.current = window.setTimeout(() => {
+      setShowWarning(true);
+      setRemainingSeconds(Math.ceil(SESSION_WARNING_MS / 1000));
+      countdownRef.current = window.setInterval(() => {
+        setRemainingSeconds((value) => Math.max(0, value - 1));
+      }, 1000);
+    }, Math.max(0, SESSION_TIMEOUT_MS - SESSION_WARNING_MS));
+
+    // Cierre efectivo de la sesion.
+    logoutTimerRef.current = window.setTimeout(endSession, SESSION_TIMEOUT_MS);
+  }, [clearTimers, endSession, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      clearTimers();
+      return;
+    }
+
+    resetTimer();
+
+    // Detecta la actividad del usuario (limitada por un intervalo para no reiniciar en exceso).
+    const handleActivity = () => {
+      const now = Date.now();
+      if (now - lastActivityRef.current >= ACTIVITY_THROTTLE_MS) {
+        lastActivityRef.current = now;
+        resetTimer();
+      }
+    };
+
+    // Sincroniza el cierre de sesion entre pestañas abiertas.
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === LOGOUT_EVENT_KEY) {
+        logout();
+      }
+    };
+
+    ACTIVITY_EVENTS.forEach((eventName) => window.addEventListener(eventName, handleActivity));
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      clearTimers();
+      ACTIVITY_EVENTS.forEach((eventName) => window.removeEventListener(eventName, handleActivity));
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [clearTimers, isAuthenticated, logout, resetTimer]);
+
+  if (!showWarning) {
+    return null;
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-label="Sesion proxima a expirar"
+      className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/50"
+    >
+      <div className="mx-4 max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+        <h2 className="text-lg font-semibold text-slate-900">Sesion proxima a expirar</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          Tu sesion se cerrara en {remainingSeconds} segundos por inactividad.
+        </p>
+        <div className="mt-5 flex gap-3">
+          <Button onClick={resetTimer}>Continuar sesion</Button>
+          <Button variant="outline" onClick={endSession}>
+            Cerrar sesion ahora
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
