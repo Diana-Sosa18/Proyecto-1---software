@@ -83,6 +83,36 @@ async function getTenantHouse(userId) {
   return house;
 }
 
+async function getOwnerHouses(userId) {
+  const rows = await query(
+    `
+      SELECT
+        c.id_casa,
+        c.numero,
+        c.torre,
+        r.id_residente,
+        propietario.id_usuario AS propietario_usuario_id,
+        propietario.nombre AS propietario_nombre
+      FROM RESIDENTE r
+      INNER JOIN CASA c
+        ON c.id_residente = r.id_residente
+      INNER JOIN USUARIO propietario
+        ON propietario.id_usuario = r.id_usuario
+      WHERE r.id_usuario = ?
+      ORDER BY c.torre ASC, c.numero ASC
+    `,
+    [userId],
+  );
+
+  if (rows.length === 0) {
+    const error = new Error("No se encontraron unidades asociadas al propietario.");
+    error.status = 404;
+    throw error;
+  }
+
+  return rows;
+}
+
 function mapProvider(row) {
   const isLinked = row.id_casa !== null && row.id_casa !== undefined;
 
@@ -97,6 +127,23 @@ function mapProvider(row) {
     fecha_registro: row.fecha_registro || null,
     actualizado_en: row.actualizado_en || null,
     registrado_por: row.registrado_por || null,
+  };
+}
+
+function mapOwnerProvider(row) {
+  return {
+    id_servicio: Number(row.id_servicio),
+    id_casa: Number(row.id_casa),
+    nombre: row.nombre,
+    tipo_servicio: row.tipo_servicio || "General",
+    descripcion: row.descripcion || "Servicio residencial disponible para tu unidad.",
+    activo: Number(row.activo) === 1,
+    estado: row.estado_validacion || "PENDIENTE",
+    casa_unidad: row.torre ? `${row.torre}-${row.numero}` : row.numero,
+    fecha_registro: row.fecha_registro || null,
+    actualizado_en: row.actualizado_en || null,
+    registrado_por: row.registrado_por || null,
+    propietario_nombre: row.propietario_nombre,
   };
 }
 
@@ -277,6 +324,169 @@ async function getTenantProvidersHistory(userId, filters = {}) {
   return rows.map(mapProviderHistory);
 }
 
+async function listOwnerProviders(userId, filters = {}) {
+  const houses = await getOwnerHouses(userId);
+  const houseIds = houses.map((house) => Number(house.id_casa));
+  const search = normalizeString(filters.search).toLowerCase();
+  const onlyStatus = normalizeString(filters.status).toUpperCase();
+  const registeredDate = normalizeDate(filters.date);
+  const sqlFilters = [`cs.id_casa IN (${houseIds.map(() => "?").join(", ")})`];
+  const params = [...houseIds];
+
+  if (search) {
+    sqlFilters.push(`
+      (
+        LOWER(s.nombre) LIKE ?
+        OR LOWER(COALESCE(s.tipo_servicio, '')) LIKE ?
+        OR LOWER(COALESCE(s.descripcion, '')) LIKE ?
+      )
+    `);
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+
+  if (["VALIDADO", "PENDIENTE"].includes(onlyStatus)) {
+    sqlFilters.push("cs.estado_validacion = ?");
+    params.push(onlyStatus);
+  }
+
+  if (registeredDate) {
+    sqlFilters.push("DATE(cs.fecha_registro) = ?");
+    params.push(registeredDate);
+  }
+
+  const rows = await query(
+    `
+      SELECT
+        s.id_servicio,
+        s.nombre,
+        s.tipo_servicio,
+        s.descripcion,
+        cs.id_casa,
+        cs.activo,
+        cs.estado_validacion,
+        DATE_FORMAT(cs.fecha_registro, '%Y-%m-%d %H:%i:%s') AS fecha_registro,
+        DATE_FORMAT(cs.actualizado_en, '%Y-%m-%d %H:%i:%s') AS actualizado_en,
+        c.numero,
+        c.torre,
+        propietario.nombre AS propietario_nombre,
+        creador.realizado_por_nombre AS registrado_por
+      FROM CASA_SERVICIO cs
+      INNER JOIN SERVICIO s
+        ON s.id_servicio = cs.id_servicio
+      INNER JOIN CASA c
+        ON c.id_casa = cs.id_casa
+      INNER JOIN RESIDENTE r
+        ON r.id_residente = c.id_residente
+      INNER JOIN USUARIO propietario
+        ON propietario.id_usuario = r.id_usuario
+      LEFT JOIN HISTORIAL_CAMBIO_PROVEEDOR creador
+        ON creador.id_casa = c.id_casa
+        AND creador.id_servicio = s.id_servicio
+        AND creador.accion = 'CREACION'
+      WHERE ${sqlFilters.join(" AND ")}
+      ORDER BY cs.estado_validacion ASC, cs.actualizado_en DESC, s.nombre ASC
+    `,
+    params,
+  );
+
+  return rows.map(mapOwnerProvider);
+}
+
+async function updateOwnerProviderValidation(userId, serviceId, payload = {}) {
+  const normalizedServiceId = Number(serviceId);
+  const normalizedHouseId = Number(payload.id_casa);
+
+  if (!Number.isInteger(normalizedServiceId) || normalizedServiceId <= 0) {
+    const error = new Error("El proveedor indicado no es valido.");
+    error.status = 400;
+    throw error;
+  }
+
+  if (!Number.isInteger(normalizedHouseId) || normalizedHouseId <= 0) {
+    const error = new Error("La unidad del proveedor es obligatoria.");
+    error.status = 400;
+    throw error;
+  }
+
+  const owner = await getUserContext(userId);
+  const houseRows = await query(
+    `
+      SELECT c.id_casa
+      FROM CASA c
+      INNER JOIN RESIDENTE r
+        ON r.id_residente = c.id_residente
+      WHERE c.id_casa = ?
+        AND r.id_usuario = ?
+      LIMIT 1
+    `,
+    [normalizedHouseId, userId],
+  );
+
+  if (!houseRows[0]) {
+    const error = new Error("No tienes permisos para validar proveedores de esta unidad.");
+    error.status = 403;
+    throw error;
+  }
+
+  const currentRows = await query(
+    `
+      SELECT
+        cs.activo,
+        cs.estado_validacion,
+        s.nombre
+      FROM CASA_SERVICIO cs
+      INNER JOIN SERVICIO s
+        ON s.id_servicio = cs.id_servicio
+      WHERE cs.id_casa = ?
+        AND cs.id_servicio = ?
+      LIMIT 1
+    `,
+    [normalizedHouseId, normalizedServiceId],
+  );
+  const current = currentRows[0];
+
+  if (!current) {
+    const error = new Error("No se encontro el proveedor asociado a tu unidad.");
+    error.status = 404;
+    throw error;
+  }
+
+  const nextStatus = payload.estado === "VALIDADO" ? "VALIDADO" : "PENDIENTE";
+  const nextActive = payload.activo === undefined ? Number(current.activo) === 1 : normalizeBoolean(payload.activo);
+
+  await query(
+    `
+      UPDATE CASA_SERVICIO
+      SET
+        activo = ?,
+        estado_validacion = ?,
+        actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_casa = ?
+        AND id_servicio = ?
+    `,
+    [nextActive, nextStatus, normalizedHouseId, normalizedServiceId],
+  );
+
+  await createProviderHistoryEntry({
+    idCasa: normalizedHouseId,
+    idServicio: normalizedServiceId,
+    accion: "VALIDACION_PROPIETARIO",
+    detalle: `${owner.nombre} valido el proveedor ${current.nombre} como ${nextStatus}.`,
+    activoAnterior: Number(current.activo) === 1,
+    activoNuevo: nextActive,
+    estadoAnterior: current.estado_validacion || "PENDIENTE",
+    estadoNuevo: nextStatus,
+    realizadoPorUsuario: owner.id_usuario,
+    realizadoPorNombre: owner.nombre,
+    realizadoPorRol: owner.rol,
+  });
+
+  const providers = await listOwnerProviders(userId, {});
+  return providers.find(
+    (provider) => provider.id_servicio === normalizedServiceId && provider.id_casa === normalizedHouseId,
+  );
+}
+
 async function updateTenantProvider(userId, serviceId, payload = {}) {
   const normalizedServiceId = Number(serviceId);
 
@@ -455,6 +665,8 @@ async function createTenantProvider(userId, payload = {}) {
 module.exports = {
   listTenantProviders,
   getTenantProvidersHistory,
+  listOwnerProviders,
   createTenantProvider,
   updateTenantProvider,
+  updateOwnerProviderValidation,
 };

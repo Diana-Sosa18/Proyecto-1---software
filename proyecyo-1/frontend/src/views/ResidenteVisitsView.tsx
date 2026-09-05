@@ -27,7 +27,13 @@ import {
   getFrequentVisitorsRequest,
   getVisitsRequest,
 } from "@/services/visitsService";
+import { getVisitScheduleConfigRequest } from "@/services/configurationService";
 import type { FrequentVisitor, VisitPayload, VisitRecord, VisitType } from "@/types/visits";
+import type { VisitScheduleConfig } from "@/types/configuration";
+import {
+  formatVisitScheduleSummary,
+  validateVisitTimesAgainstSchedule,
+} from "@/utils/visitSchedule";
 
 type VisitFormState = VisitPayload;
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
@@ -60,6 +66,7 @@ function createInitialForm(): VisitFormState {
     hora_inicio: startTime,
     hora_fin: finishTime,
     tipo_visita: "VISITA",
+    observaciones: "",
   };
 }
 
@@ -126,6 +133,7 @@ export function ResidenteVisitsView() {
   const [successMessage, setSuccessMessage] = useState("");
   const [photoPreview, setPhotoPreview] = useState("");
   const [authorizingVisitorId, setAuthorizingVisitorId] = useState<number | null>(null);
+  const [visitSchedule, setVisitSchedule] = useState<VisitScheduleConfig | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -133,9 +141,10 @@ export function ResidenteVisitsView() {
     async function loadData() {
       try {
         setIsLoading(true);
-        const [visitsResult, frequentResult] = await Promise.allSettled([
+        const [visitsResult, frequentResult, scheduleResult] = await Promise.allSettled([
           getVisitsRequest(),
           getFrequentVisitorsRequest(),
+          getVisitScheduleConfigRequest(),
         ]);
 
         if (!active) {
@@ -156,6 +165,10 @@ export function ResidenteVisitsView() {
           setFrequentVisitors(frequentResult.value);
         } else {
           setFrequentVisitors([]);
+        }
+
+        if (scheduleResult.status === "fulfilled") {
+          setVisitSchedule(scheduleResult.value);
         }
       } finally {
         if (active) {
@@ -189,6 +202,21 @@ export function ResidenteVisitsView() {
     }));
   }
 
+  function validateVisitTimes(horaInicio: string, horaFin: string) {
+    if (!visitSchedule) {
+      return true;
+    }
+
+    const scheduleError = validateVisitTimesAgainstSchedule(horaInicio, horaFin, visitSchedule);
+
+    if (scheduleError) {
+      setErrorMessage(scheduleError);
+      return false;
+    }
+
+    return true;
+  }
+
   function validateStep() {
     if (step === 1 && !form.nombre.trim()) {
       setErrorMessage("El nombre del visitante es obligatorio.");
@@ -201,8 +229,12 @@ export function ResidenteVisitsView() {
         return false;
       }
 
-      if (form.hora_inicio >= form.hora_fin) {
-        setErrorMessage("La hora de fin debe ser mayor a la hora de inicio.");
+      if (!validateVisitTimes(form.hora_inicio, form.hora_fin)) {
+        return false;
+      }
+
+      if ((form.observaciones || "").length > 255) {
+        setErrorMessage("Las observaciones no pueden superar 255 caracteres.");
         return false;
       }
     }
@@ -234,6 +266,10 @@ export function ResidenteVisitsView() {
   }
 
   async function createVisit(payload: VisitPayload, message: string) {
+    if (!validateVisitTimes(payload.hora_inicio, payload.hora_fin)) {
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorMessage("");
@@ -260,8 +296,14 @@ export function ResidenteVisitsView() {
       return;
     }
 
+    if (!validateStep()) {
+      return;
+    }
+
     await createVisit(form, "Visita autorizada correctamente.");
   }
+
+  const visitsDisabled = visitSchedule !== null && !visitSchedule.activo;
 
   async function handleQuickAuthorize(visitor: FrequentVisitor) {
     setAuthorizingVisitorId(visitor.id_visitante);
@@ -278,6 +320,7 @@ export function ResidenteVisitsView() {
         hora_inicio: getTimeInTimezone(now),
         hora_fin: getTimeInTimezone(finish),
         tipo_visita: "VISITA",
+        observaciones: "",
       },
       `Visita rapida autorizada para ${visitor.nombre}.`,
     );
@@ -389,6 +432,15 @@ export function ResidenteVisitsView() {
           </Alert>
         ) : null}
 
+        {visitSchedule && !visitSchedule.activo ? (
+          <Alert variant="destructive">
+            <AlertTitle>Autorizaciones pausadas</AlertTitle>
+            <AlertDescription>
+              Las autorizaciones de visita estan temporalmente deshabilitadas por el administrador.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
         <Card className="overflow-hidden border-0 shadow-[0_18px_40px_rgba(30,41,59,0.12)]">
           <div className="bg-[linear-gradient(90deg,#a855f7_0%,#9333ea_45%,#9d00ff_100%)] px-5 py-6 text-white">
             <div className="flex items-center gap-3">
@@ -433,7 +485,7 @@ export function ResidenteVisitsView() {
                   <div className="flex gap-2">
                     <Button
                       onClick={() => handleQuickAuthorize(visitor)}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || visitsDisabled}
                       className="rounded-2xl bg-[linear-gradient(90deg,#a855f7_0%,#8b2cf5_100%)] px-6 text-base text-white hover:opacity-95"
                     >
                       {authorizingVisitorId === visitor.id_visitante ? (
@@ -560,7 +612,13 @@ export function ResidenteVisitsView() {
 
             {step === 2 ? (
               <>
-                <div className="rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                {visitSchedule ? (
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                    Horario permitido:{" "}
+                    <span className="font-medium">{formatVisitScheduleSummary(visitSchedule)}</span>
+                  </div>
+                ) : null}
+                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   La fecha y hora se completaron automaticamente con la hora actual. Puedes modificarlos si lo necesitas.
                 </div>
                 <div className="grid gap-5 md:grid-cols-2">
@@ -594,6 +652,8 @@ export function ResidenteVisitsView() {
                     <Input
                       type="time"
                       value={form.hora_inicio}
+                      min={visitSchedule?.hora_apertura}
+                      max={visitSchedule?.hora_cierre}
                       onChange={(event) => updateForm("hora_inicio", event.target.value)}
                       className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
                     />
@@ -604,11 +664,29 @@ export function ResidenteVisitsView() {
                     <Input
                       type="time"
                       value={form.hora_fin}
+                      min={visitSchedule?.hora_apertura}
+                      max={visitSchedule?.hora_cierre}
                       onChange={(event) => updateForm("hora_fin", event.target.value)}
                       className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
                     />
                   </label>
                 </div>
+
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-slate-800">
+                    Observaciones adicionales (Opcional)
+                  </span>
+                  <textarea
+                    value={form.observaciones || ""}
+                    onChange={(event) => updateForm("observaciones", event.target.value)}
+                    maxLength={255}
+                    placeholder="Ej. trae equipo de trabajo, paquete pequeno, requiere autorizacion en recepcion"
+                    className="min-h-28 w-full resize-none rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-300"
+                  />
+                  <span className="block text-right text-xs text-slate-400">
+                    {(form.observaciones || "").length}/255
+                  </span>
+                </label>
               </>
             ) : null}
 
@@ -621,6 +699,7 @@ export function ResidenteVisitsView() {
                   { label: "Fecha", value: form.fecha ? formatDate(form.fecha) : "No definida" },
                   { label: "Hora", value: `${form.hora_inicio || "--:--"} - ${form.hora_fin || "--:--"}` },
                   { label: "Tipo", value: visitTypeLabels[form.tipo_visita] },
+                  { label: "Observaciones", value: form.observaciones || "Sin informacion adicional" },
                 ].map((item) => (
                   <div key={item.label} className="rounded-3xl bg-slate-50 p-5">
                     <p className="text-sm text-slate-500">{item.label}</p>
@@ -646,7 +725,7 @@ export function ResidenteVisitsView() {
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || visitsDisabled}
             className="h-14 rounded-2xl bg-[linear-gradient(90deg,#3b82f6_0%,#1d4ed8_100%)] text-xl text-white hover:opacity-95"
           >
             {step === steps.length ? "Autorizar Visita" : "Siguiente"}
@@ -710,6 +789,9 @@ export function ResidenteVisitsView() {
                           Hora: {visit.hora_inicio} - {visit.hora_fin}
                         </p>
                         <p>Tipo de acceso: {visitTypeLabels[visit.tipo_visita]}</p>
+                        {visit.observaciones ? (
+                          <p>Observaciones: {visit.observaciones}</p>
+                        ) : null}
                       </div>
                       <span className="mt-4 inline-flex rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">
                         {visitTypeLabels[visit.tipo_visita]}

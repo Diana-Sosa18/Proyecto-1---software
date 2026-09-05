@@ -4,6 +4,8 @@ import type {
   AmenityAvailabilityResponse,
   AmenityConflictResponse,
   AmenityReservation,
+  AmenityReservationHistory,
+  AmenityStatsResponse,
   CreateAmenityReservationPayload,
   ReservableUserOption,
   UpdateAmenitySchedulePayload,
@@ -84,6 +86,27 @@ export function createAmenitiesReservationRequest(payload: CreateAmenityReservat
   });
 }
 
+export function updateAmenitiesReservationRequest(
+  reservationKey: string,
+  payload: CreateAmenityReservationPayload,
+) {
+  return apiRequest<AmenityReservation>(`/reservas/amenidades/${encodeURIComponent(reservationKey)}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export function cancelAmenitiesReservationRequest(reservationKey: string) {
+  return apiRequest<AmenityReservation>(
+    `/reservas/amenidades/${encodeURIComponent(reservationKey)}/cancelar`,
+    { method: "PATCH" },
+  );
+}
+
+export function getAmenitiesReservationHistoryRequest() {
+  return apiRequest<AmenityReservationHistory[]>("/reservas/amenidades/historial");
+}
+
 export function getAdminAmenitiesRequest() {
   return apiRequest<Amenity[]>("/admin/amenidades");
 }
@@ -125,4 +148,10 @@ export function createAdminAmenitiesReservationRequest(payload: CreateAmenityRes
     method: "POST",
     body: payload,
   });
+}
+
+export function getAdminAmenityStatsRequest(filters: ReservationFilters) {
+  return apiRequest<AmenityStatsResponse>(
+    `/admin/amenidades/estadisticas?${buildReservationQuery(filters)}`,
+  );
 }

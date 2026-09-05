@@ -109,11 +109,36 @@ async function ensureAccessStatusCheckConstraint() {
     await query(`
       ALTER TABLE ACCESO
       ADD CONSTRAINT chk_acceso_estado
-      CHECK (estado_acceso IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'CANCELADA'))
+      CHECK (estado_acceso IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'CANCELADA', 'PENDIENTE_APROBACION', 'RECHAZADA'))
     `);
   } catch (error) {
     console.warn("No fue posible actualizar el CHECK de estado_acceso.", error.message);
   }
+}
+async function ensureRestoreHistorySchema() {
+  if (!(await tableExists("HISTORIAL_RESTAURACION"))) {
+    await query(`
+      CREATE TABLE HISTORIAL_RESTAURACION (
+        id_restauracion INT PRIMARY KEY AUTO_INCREMENT,
+        nombre_archivo VARCHAR(180) NOT NULL,
+        estado VARCHAR(20) NOT NULL,
+        total_sentencias INT NOT NULL DEFAULT 0,
+        tablas_afectadas VARCHAR(500) NULL,
+        mensaje VARCHAR(255) NOT NULL,
+        realizado_por INT NOT NULL,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        finalizado_en DATETIME NULL
+      )
+    `);
+  }
+}
+async function ensureFinancialRulesSchema() {
+  if (!(await tableExists("RECARGO_APLICADO"))) await query(`CREATE TABLE RECARGO_APLICADO (
+    id_recargo INT PRIMARY KEY AUTO_INCREMENT, id_cuota INT NOT NULL, id_casa INT NOT NULL,
+    tipo_regla VARCHAR(20) NOT NULL, monto_original DECIMAL(10,2) NOT NULL,
+    monto_recargo DECIMAL(10,2) NOT NULL, fecha_aplicacion DATE NOT NULL, aplicado_por INT NULL,
+    UNIQUE KEY uq_recargo_cuota (id_cuota), FOREIGN KEY (id_cuota) REFERENCES CUOTA(id_cuota),
+    FOREIGN KEY (id_casa) REFERENCES CASA(id_casa))`);
 }
 
 async function ensureVisitQrSchema() {
@@ -419,6 +444,254 @@ async function ensureTenantProvidersSchema() {
   `);
 }
 
+async function ensureAnnouncementsSchema() {
+  if (!(await tableExists("COMUNICADO"))) {
+    await query(`
+      CREATE TABLE COMUNICADO (
+        id_comunicado INT PRIMARY KEY AUTO_INCREMENT,
+        titulo VARCHAR(200),
+        descripcion TEXT,
+        fecha DATE,
+        creado_por INT,
+        tipo_destinatario VARCHAR(20) NOT NULL DEFAULT 'todos',
+        enviado_en DATETIME NULL,
+        total_destinatarios INT NOT NULL DEFAULT 0,
+        FOREIGN KEY (creado_por) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  if (!(await tableExists("COMUNICADO_USUARIO"))) {
+    await query(`
+      CREATE TABLE COMUNICADO_USUARIO (
+        id_comunicado INT,
+        id_usuario INT,
+        leido BOOLEAN,
+        PRIMARY KEY (id_comunicado, id_usuario),
+        FOREIGN KEY (id_comunicado) REFERENCES COMUNICADO(id_comunicado),
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  const comunicadoColumns = [
+    {
+      column: "tipo_destinatario",
+      ddl: `
+        ALTER TABLE COMUNICADO
+        ADD COLUMN tipo_destinatario VARCHAR(20) NOT NULL DEFAULT 'todos' AFTER creado_por
+      `,
+    },
+    {
+      column: "enviado_en",
+      ddl: `
+        ALTER TABLE COMUNICADO
+        ADD COLUMN enviado_en DATETIME NULL AFTER tipo_destinatario
+      `,
+    },
+    {
+      column: "total_destinatarios",
+      ddl: `
+        ALTER TABLE COMUNICADO
+        ADD COLUMN total_destinatarios INT NOT NULL DEFAULT 0 AFTER enviado_en
+      `,
+    },
+  ];
+
+  for (const definition of comunicadoColumns) {
+    if (!(await columnExists("COMUNICADO", definition.column))) {
+      await query(definition.ddl);
+    }
+  }
+}
+
+async function ensureSpecialAccessSchema() {
+  const accessColumns = [
+    {
+      column: "motivo_excepcion",
+      ddl: `
+        ALTER TABLE ACCESO
+        ADD COLUMN motivo_excepcion VARCHAR(255) NULL AFTER observaciones
+      `,
+    },
+    {
+      column: "es_acceso_especial",
+      ddl: `
+        ALTER TABLE ACCESO
+        ADD COLUMN es_acceso_especial BOOLEAN NOT NULL DEFAULT FALSE AFTER estado_acceso
+      `,
+    },
+    {
+      column: "fuera_horario",
+      ddl: `
+        ALTER TABLE ACCESO
+        ADD COLUMN fuera_horario BOOLEAN NOT NULL DEFAULT FALSE AFTER es_acceso_especial
+      `,
+    },
+  ];
+
+  for (const definition of accessColumns) {
+    if (!(await columnExists("ACCESO", definition.column))) {
+      await query(definition.ddl);
+    }
+  }
+
+  if (!(await tableExists("ACCESO_EXCEPCION"))) {
+    await query(`
+      CREATE TABLE ACCESO_EXCEPCION (
+        id_excepcion INT PRIMARY KEY AUTO_INCREMENT,
+        id_acceso INT NOT NULL,
+        aprobado_por INT NOT NULL,
+        motivo TEXT,
+        hora_solicitada_inicio TIME,
+        hora_solicitada_fin TIME,
+        accion VARCHAR(20) NOT NULL,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_acceso) REFERENCES ACCESO(id_acceso),
+        FOREIGN KEY (aprobado_por) REFERENCES USUARIO(id_usuario),
+        CHECK (accion IN ('APROBADO', 'RECHAZADO'))
+      )
+    `);
+  }
+
+  const configRows = await query(
+    `
+      SELECT COUNT(*) AS total
+      FROM CONFIGURACION
+      WHERE clave IN ('horario_visita_inicio', 'horario_visita_fin')
+    `,
+  );
+
+  if (Number(configRows[0]?.total || 0) < 2) {
+    await query(`
+      INSERT IGNORE INTO CONFIGURACION (clave, valor)
+      VALUES
+        ('horario_visita_inicio', '06:00'),
+        ('horario_visita_fin', '22:00')
+    `);
+  }
+}
+
+async function ensureSprintUserStoriesSchema() {
+  if (!(await tableExists("HISTORIAL_RESERVA"))) {
+    await query(`
+      CREATE TABLE HISTORIAL_RESERVA (
+        id_historial INT PRIMARY KEY AUTO_INCREMENT,
+        id_usuario INT NOT NULL,
+        id_amenidad INT NOT NULL,
+        fecha_anterior DATE NULL,
+        hora_inicio_anterior TIME NULL,
+        hora_fin_anterior TIME NULL,
+        fecha_nueva DATE NULL,
+        hora_inicio_nueva TIME NULL,
+        hora_fin_nueva TIME NULL,
+        estado_anterior VARCHAR(20) NULL,
+        estado_nuevo VARCHAR(20) NULL,
+        accion VARCHAR(40) NOT NULL,
+        detalle VARCHAR(255) NOT NULL,
+        realizado_por INT NOT NULL,
+        realizado_por_nombre VARCHAR(100) NOT NULL,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario),
+        FOREIGN KEY (id_amenidad) REFERENCES AMENIDAD(id_amenidad),
+        FOREIGN KEY (realizado_por) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  if (!(await tableExists("PERMISO_INQUILINO"))) {
+    await query(`
+      CREATE TABLE PERMISO_INQUILINO (
+        id_permiso_inquilino INT PRIMARY KEY AUTO_INCREMENT,
+        id_usuario INT NOT NULL,
+        nombre VARCHAR(120) NOT NULL,
+        descripcion VARCHAR(255) NOT NULL,
+        restriccion VARCHAR(255) NULL,
+        fecha_inicio DATE NOT NULL,
+        fecha_fin DATE NULL,
+        estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVO',
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  if (!(await tableExists("SOLICITUD_AUTORIZACION_DIGITAL"))) {
+    await query(`
+      CREATE TABLE SOLICITUD_AUTORIZACION_DIGITAL (
+        id_solicitud INT PRIMARY KEY AUTO_INCREMENT,
+        id_inquilino_usuario INT NOT NULL,
+        id_propietario_usuario INT NOT NULL,
+        id_casa INT NOT NULL,
+        accion VARCHAR(120) NOT NULL,
+        motivo VARCHAR(255) NOT NULL,
+        estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+        respuesta VARCHAR(255) NULL,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_inquilino_usuario) REFERENCES USUARIO(id_usuario),
+        FOREIGN KEY (id_propietario_usuario) REFERENCES USUARIO(id_usuario),
+        FOREIGN KEY (id_casa) REFERENCES CASA(id_casa)
+      )
+    `);
+  }
+
+  if (!(await tableExists("REGLAMENTO"))) {
+    await query(`
+      CREATE TABLE REGLAMENTO (
+        id_reglamento INT PRIMARY KEY AUTO_INCREMENT,
+        categoria VARCHAR(80) NOT NULL,
+        titulo VARCHAR(150) NOT NULL,
+        contenido TEXT NOT NULL,
+        activo BOOLEAN NOT NULL DEFAULT TRUE,
+        actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
+
+  await query(`
+    INSERT INTO PERMISO_INQUILINO (id_usuario, nombre, descripcion, restriccion, fecha_inicio, fecha_fin, estado)
+    SELECT u.id_usuario, 'Gestion de visitas', 'Puede crear accesos temporales para visitas autorizadas.', 'No aplica para accesos fuera del horario permitido por el residencial.', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 1 YEAR), 'ACTIVO'
+    FROM USUARIO u
+    INNER JOIN TIPO_USUARIO tu ON tu.id_tipo_usuario = u.id_tipo_usuario
+    WHERE tu.nombre = 'inquilino'
+      AND NOT EXISTS (
+        SELECT 1 FROM PERMISO_INQUILINO pi
+        WHERE pi.id_usuario = u.id_usuario AND pi.nombre = 'Gestion de visitas'
+      )
+  `);
+
+  await query(`
+    INSERT INTO PERMISO_INQUILINO (id_usuario, nombre, descripcion, restriccion, fecha_inicio, fecha_fin, estado)
+    SELECT u.id_usuario, 'Reservas de amenidades', 'Puede solicitar reservas segun disponibilidad de la unidad.', 'Requiere autorizacion digital para horarios o acciones restringidas.', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 1 YEAR), 'ACTIVO'
+    FROM USUARIO u
+    INNER JOIN TIPO_USUARIO tu ON tu.id_tipo_usuario = u.id_tipo_usuario
+    WHERE tu.nombre = 'inquilino'
+      AND NOT EXISTS (
+        SELECT 1 FROM PERMISO_INQUILINO pi
+        WHERE pi.id_usuario = u.id_usuario AND pi.nombre = 'Reservas de amenidades'
+      )
+  `);
+
+  await query(`
+    INSERT INTO REGLAMENTO (categoria, titulo, contenido)
+    SELECT 'Amenidades', 'Uso de amenidades', 'Las amenidades deben reservarse dentro de los horarios configurados. El uso queda sujeto a disponibilidad, estado de cuenta y normas de convivencia.'
+    WHERE NOT EXISTS (SELECT 1 FROM REGLAMENTO WHERE titulo = 'Uso de amenidades')
+  `);
+
+  await query(`
+    INSERT INTO REGLAMENTO (categoria, titulo, contenido)
+    SELECT 'Accesos', 'Ingreso de visitantes', 'Todo visitante debe contar con una autorizacion vigente, QR valido y registro en garita. Los accesos vencidos o cancelados no pueden utilizarse.'
+    WHERE NOT EXISTS (SELECT 1 FROM REGLAMENTO WHERE titulo = 'Ingreso de visitantes')
+  `);
+
+  await query(`
+    INSERT INTO REGLAMENTO (categoria, titulo, contenido)
+    SELECT 'Convivencia', 'Normas de convivencia', 'Se debe evitar ruido excesivo, respetar areas comunes y atender las indicaciones administrativas o de seguridad del residencial.'
+    WHERE NOT EXISTS (SELECT 1 FROM REGLAMENTO WHERE titulo = 'Normas de convivencia')
+  `);
+}
+
 async function ensureSanctionsSchema() {
   if (!(await tableExists("SANCION"))) {
     await query(`
@@ -473,32 +746,137 @@ async function ensureSanctionsSchema() {
       ADD INDEX idx_sancion_historial_fecha (creado_en)
     `);
   }
+}
 
-  const feeRows = await query("SELECT COUNT(*) AS total FROM CUOTA");
-
-  if (Number(feeRows[0]?.total || 0) === 0) {
+async function ensureConfigurationSchema() {
+  if (!(await tableExists("CONFIGURACION"))) {
     await query(`
-      INSERT INTO CUOTA (id_servicio, id_casa, monto, fecha_limite)
-      SELECT s.id_servicio, c.id_casa, seed.monto, seed.fecha_limite
-      FROM CASA c
-      CROSS JOIN (
-        SELECT 'Agua potable' AS servicio, 350.00 AS monto, DATE_SUB(CURDATE(), INTERVAL 12 DAY) AS fecha_limite
-        UNION ALL
-        SELECT 'Seguridad privada', 500.00, DATE_SUB(CURDATE(), INTERVAL 5 DAY)
-        UNION ALL
-        SELECT 'Energia electrica', 275.00, DATE_ADD(CURDATE(), INTERVAL 8 DAY)
-      ) seed
-      INNER JOIN SERVICIO s
-        ON s.nombre = seed.servicio
-      LIMIT 3
+      CREATE TABLE CONFIGURACION (
+        id_configuracion INT PRIMARY KEY AUTO_INCREMENT,
+        clave VARCHAR(100) UNIQUE NOT NULL,
+        valor VARCHAR(200)
+      )
     `);
+  }
 
+  const defaultEntries = [
+    ["visitas_hora_apertura", "06:00"],
+    ["visitas_hora_cierre", "22:00"],
+    ["visitas_duracion_maxima_horas", "4"],
+    ["visitas_activo", "true"],
+  ];
+
+  for (const [clave, valor] of defaultEntries) {
+    await query(
+      `
+        INSERT INTO CONFIGURACION (clave, valor)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE clave = clave
+      `,
+      [clave, valor],
+    );
+  }
+}
+
+async function ensureAutomaticBackupsSchema() {
+  if (!(await tableExists("RESPALDO_AUTOMATICO"))) {
     await query(`
-      INSERT INTO PAGO (id_cuota, monto_pagado, fecha_pago)
-      SELECT id_cuota, monto, DATE_SUB(CURDATE(), INTERVAL 2 DAY)
-      FROM CUOTA
-      WHERE monto = 500.00
-      LIMIT 1
+      CREATE TABLE RESPALDO_AUTOMATICO (
+        id_respaldo INT PRIMARY KEY AUTO_INCREMENT,
+        nombre_archivo VARCHAR(180) NOT NULL,
+        tipo VARCHAR(20) NOT NULL,
+        estado VARCHAR(20) NOT NULL,
+        tamano_bytes BIGINT NOT NULL DEFAULT 0,
+        duracion_ms INT NOT NULL DEFAULT 0,
+        mensaje VARCHAR(255) NULL,
+        archivo_clave VARCHAR(180) NULL,
+        iniciado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        finalizado_en DATETIME NULL,
+        creado_por INT NULL,
+        FOREIGN KEY (creado_por) REFERENCES USUARIO(id_usuario)
+      )
+    `);
+  }
+
+  const defaults = [
+    ["respaldos_activo", "false"],
+    ["respaldos_frecuencia", "DIARIO"],
+    ["respaldos_hora", "02:00"],
+    ["respaldos_retencion", "7"],
+  ];
+  for (const [clave, valor] of defaults) {
+    await query(
+      "INSERT INTO CONFIGURACION (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE clave = clave",
+      [clave, valor],
+    );
+  }
+}
+
+async function ensureRemindersSchema() {
+  if (!(await tableExists("RECORDATORIO_PAGO"))) {
+    await query(`
+      CREATE TABLE RECORDATORIO_PAGO (
+        id_recordatorio INT PRIMARY KEY AUTO_INCREMENT,
+        id_casa INT NOT NULL,
+        id_cuota INT NOT NULL,
+        id_usuario INT NOT NULL,
+        id_notificacion INT NULL,
+        tipo VARCHAR(30) NOT NULL,
+        titulo VARCHAR(150) NOT NULL,
+        mensaje VARCHAR(255) NOT NULL,
+        monto DECIMAL(10,2) NOT NULL DEFAULT 0,
+        fecha_limite DATE NOT NULL,
+        dias_para_vencer INT NOT NULL DEFAULT 0,
+        fecha_envio DATE NOT NULL,
+        enviado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
+        FOREIGN KEY (id_cuota) REFERENCES CUOTA(id_cuota),
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario),
+        FOREIGN KEY (id_notificacion) REFERENCES NOTIFICACION(id_notificacion),
+        UNIQUE KEY uq_recordatorio_cuota_tipo_dia (id_cuota, tipo, fecha_envio),
+        CHECK (tipo IN ('PROXIMO_VENCIMIENTO', 'VENCIDO'))
+      )
+    `);
+  }
+
+  if (!(await indexExists("RECORDATORIO_PAGO", "idx_recordatorio_envio"))) {
+    await query(`
+      ALTER TABLE RECORDATORIO_PAGO
+      ADD INDEX idx_recordatorio_envio (enviado_en)
+    `);
+  }
+
+  const defaults = [
+    ["recordatorios_activo", "true"],
+    ["recordatorios_dias_antes", "3"],
+  ];
+  for (const [clave, valor] of defaults) {
+    await query(
+      "INSERT INTO CONFIGURACION (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE clave = clave",
+      [clave, valor],
+    );
+  }
+}
+
+async function ensureDemoRequestsSchema() {
+  if (!(await tableExists("SOLICITUD_DEMO"))) {
+    await query(`
+      CREATE TABLE SOLICITUD_DEMO (
+        id_solicitud INT PRIMARY KEY AUTO_INCREMENT,
+        nombre VARCHAR(120) NOT NULL,
+        correo VARCHAR(160) NOT NULL,
+        telefono VARCHAR(25) NOT NULL,
+        residencial VARCHAR(160) NOT NULL,
+        cantidad_viviendas INT NOT NULL,
+        mensaje VARCHAR(1000) NULL,
+        estado VARCHAR(20) NOT NULL DEFAULT 'NUEVA',
+        fecha_creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        fecha_actualizacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_solicitud_demo_estado_fecha (estado, fecha_creacion),
+        INDEX idx_solicitud_demo_correo (correo),
+        CHECK (estado IN ('NUEVA', 'CONTACTADA', 'DESCARTADA', 'CONVERTIDA')),
+        CHECK (cantidad_viviendas BETWEEN 1 AND 100000)
+      )
     `);
   }
 }
@@ -552,6 +930,15 @@ module.exports = {
   ensureAmenityReservationsSchema,
   ensureNotificationsSchema,
   ensureTenantProvidersSchema,
+  ensureAnnouncementsSchema,
+  ensureSpecialAccessSchema,
+  ensureSprintUserStoriesSchema,
+  ensureRestoreHistorySchema,
+  ensureFinancialRulesSchema,
   ensureSanctionsSchema,
   ensureTenantAccountSeed,
+  ensureConfigurationSchema,
+  ensureAutomaticBackupsSchema,
+  ensureRemindersSchema,
+  ensureDemoRequestsSchema,
 };

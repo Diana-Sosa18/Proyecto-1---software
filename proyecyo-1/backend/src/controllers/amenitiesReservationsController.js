@@ -2,9 +2,13 @@ const {
   listAmenities,
   listReservableUsers,
   listReservationsByRange,
+  listReservationHistory,
   getAmenityAvailability,
   validateAmenityReservationConflict,
   createAmenityReservation,
+  updateAmenityReservation,
+  cancelAmenityReservation,
+  getAmenityStats,
   updateAmenitySchedule,
 } = require("../services/amenitiesReservationsService");
 
@@ -48,6 +52,15 @@ async function getAmenitiesReservations(req, res, next) {
   }
 }
 
+async function getAmenitiesReservationHistory(req, res, next) {
+  try {
+    const history = await listReservationHistory(req.authUser.id);
+    res.status(200).json(history);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function getAdminAmenitiesReservations(req, res, next) {
   try {
     const reservations = await listReservationsByRange(req.query.from, req.query.to, {
@@ -56,6 +69,17 @@ async function getAdminAmenitiesReservations(req, res, next) {
       includeUserDetails: true,
     });
     res.status(200).json(reservations);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getAdminAmenitiesStats(req, res, next) {
+  try {
+    const stats = await getAmenityStats(req.query.from, req.query.to, {
+      id_amenidad: req.query.id_amenidad,
+    });
+    res.status(200).json(stats);
   } catch (error) {
     next(error);
   }
@@ -124,6 +148,24 @@ async function postAmenityReservation(req, res, next) {
   }
 }
 
+async function patchAmenityReservation(req, res, next) {
+  try {
+    const reservation = await updateAmenityReservation(req.authUser, req.params.key, req.body || {});
+    res.status(200).json(reservation);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function patchCancelAmenityReservation(req, res, next) {
+  try {
+    const reservation = await cancelAmenityReservation(req.authUser, req.params.key);
+    res.status(200).json(reservation);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function postAdminAmenityReservation(req, res, next) {
   try {
     const reservation = await createAmenityReservation(getAdminViewer(req), req.body || {});
@@ -146,12 +188,16 @@ module.exports = {
   getAmenities,
   getReservableAmenitiesUsers,
   getAmenitiesReservations,
+  getAmenitiesReservationHistory,
   getAdminAmenitiesReservations,
+  getAdminAmenitiesStats,
   getAmenitiesAvailability,
   getAdminAmenitiesAvailability,
   getAmenitiesConflict,
   getAdminAmenitiesConflict,
   postAmenityReservation,
+  patchAmenityReservation,
+  patchCancelAmenityReservation,
   postAdminAmenityReservation,
   putAdminAmenitySchedule,
 };

@@ -1,0 +1,1 @@
+const r=require("express").Router(),{requireResident}=require("../middlewares/requireResident"),s=require("../services/residentMonthlySummaryService");r.get("/residente/resumen-mensual",requireResident,async(q,x,n)=>{try{x.json(await s.get(q.authUser.id,q.query.year,q.query.month))}catch(e){n(e)}});module.exports=r;

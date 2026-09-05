@@ -1,0 +1,220 @@
+import { useCallback, useEffect, useState } from "react";
+
+import { AppShell } from "@/components/layout/AppShell";
+import { Input } from "@/components/ui/input";
+import { getFinancialDetailRequest } from "@/services/financialDetailService";
+import type { ChargeStatus, FinancialDetail } from "@/types/financialDetail";
+
+const chargeStatusStyles: Record<ChargeStatus, string> = {
+  PAGADO: "bg-emerald-100 text-emerald-700",
+  PARCIAL: "bg-amber-100 text-amber-700",
+  PENDIENTE: "bg-rose-100 text-rose-700",
+};
+
+const chargeStatusLabels: Record<ChargeStatus, string> = {
+  PAGADO: "Pagado",
+  PARCIAL: "Parcial",
+  PENDIENTE: "Pendiente",
+};
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("es-GT", {
+    style: "currency",
+    currency: "GTQ",
+  }).format(value);
+}
+
+const summaryCards: Array<{ key: keyof FinancialDetail["resumen"]; label: string; accent: string }> = [
+  { key: "total_cargos", label: "Total cargos", accent: "text-slate-950" },
+  { key: "total_recargos", label: "Total recargos", accent: "text-amber-600" },
+  { key: "total_pagado", label: "Total pagado", accent: "text-emerald-600" },
+  { key: "saldo_pendiente", label: "Saldo pendiente", accent: "text-rose-600" },
+];
+
+export function ResidenteFinancialDetailView() {
+  const [detail, setDetail] = useState<FinancialDetail | null>(null);
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const loadDetail = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setErrorMessage("");
+      const response = await getFinancialDetailRequest({ desde, hasta });
+      setDetail(response);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "No fue posible cargar el detalle financiero.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [desde, hasta]);
+
+  useEffect(() => {
+    void loadDetail();
+  }, [loadDetail]);
+
+  return (
+    <AppShell
+      role="residente"
+      title="Detalle de cargos y pagos"
+      subtitle="Historial financiero de su unidad: cargos, recargos y pagos realizados."
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="desde" className="text-xs font-medium text-slate-500">
+            Desde
+          </label>
+          <Input id="desde" type="date" value={desde} onChange={(event) => setDesde(event.target.value)} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="hasta" className="text-xs font-medium text-slate-500">
+            Hasta
+          </label>
+          <Input id="hasta" type="date" value={hasta} onChange={(event) => setHasta(event.target.value)} />
+        </div>
+      </div>
+
+      {errorMessage ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {errorMessage}
+        </div>
+      ) : isLoading || !detail ? (
+        <p className="text-sm text-slate-500">Cargando detalle financiero...</p>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {summaryCards.map((card) => (
+              <div key={card.key} className="rounded-xl border border-slate-200 bg-white p-5">
+                <p className="text-sm text-slate-500">{card.label}</p>
+                <p className={`mt-2 text-2xl font-semibold ${card.accent}`}>
+                  {formatCurrency(detail.resumen[card.key])}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <section className="rounded-xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h3 className="text-lg font-semibold text-slate-950">Cargos</h3>
+              <p className="text-sm text-slate-500">Cuotas asignadas a su unidad {detail.unidad}.</p>
+            </div>
+            <div className="overflow-x-auto">
+              {detail.cargos.length === 0 ? (
+                <p className="p-5 text-sm text-slate-500">No hay cargos en el periodo seleccionado.</p>
+              ) : (
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-[0.1em] text-slate-500">
+                      <th className="px-5 py-3 font-semibold">Servicio</th>
+                      <th className="px-5 py-3 font-semibold">Monto</th>
+                      <th className="px-5 py-3 font-semibold">Recargo</th>
+                      <th className="px-5 py-3 font-semibold">Pagado</th>
+                      <th className="px-5 py-3 font-semibold">Saldo</th>
+                      <th className="px-5 py-3 font-semibold">Vencimiento</th>
+                      <th className="px-5 py-3 font-semibold">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.cargos.map((cargo) => (
+                      <tr key={cargo.id_cuota} className="border-b border-slate-100 last:border-b-0">
+                        <td className="px-5 py-3 text-sm text-slate-950">{cargo.servicio}</td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{formatCurrency(cargo.monto)}</td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{formatCurrency(cargo.recargo)}</td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{formatCurrency(cargo.pagado)}</td>
+                        <td className="px-5 py-3 text-sm text-slate-700">{formatCurrency(cargo.saldo)}</td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{cargo.fecha_limite}</td>
+                        <td className="px-5 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${chargeStatusStyles[cargo.estado]}`}
+                          >
+                            {chargeStatusLabels[cargo.estado]}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h3 className="text-lg font-semibold text-slate-950">Recargos</h3>
+              <p className="text-sm text-slate-500">Recargos aplicados por cuotas vencidas.</p>
+            </div>
+            <div className="overflow-x-auto">
+              {detail.recargos.length === 0 ? (
+                <p className="p-5 text-sm text-slate-500">No hay recargos en el periodo seleccionado.</p>
+              ) : (
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-[0.1em] text-slate-500">
+                      <th className="px-5 py-3 font-semibold">Servicio</th>
+                      <th className="px-5 py-3 font-semibold">Tipo</th>
+                      <th className="px-5 py-3 font-semibold">Monto original</th>
+                      <th className="px-5 py-3 font-semibold">Recargo</th>
+                      <th className="px-5 py-3 font-semibold">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.recargos.map((recargo) => (
+                      <tr key={recargo.id_recargo} className="border-b border-slate-100 last:border-b-0">
+                        <td className="px-5 py-3 text-sm text-slate-950">{recargo.servicio}</td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{recargo.tipo_regla}</td>
+                        <td className="px-5 py-3 text-sm text-slate-500">
+                          {formatCurrency(recargo.monto_original)}
+                        </td>
+                        <td className="px-5 py-3 text-sm text-amber-600">
+                          {formatCurrency(recargo.monto_recargo)}
+                        </td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{recargo.fecha_aplicacion}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h3 className="text-lg font-semibold text-slate-950">Pagos realizados</h3>
+              <p className="text-sm text-slate-500">Pagos registrados para su unidad.</p>
+            </div>
+            <div className="overflow-x-auto">
+              {detail.pagos.length === 0 ? (
+                <p className="p-5 text-sm text-slate-500">No hay pagos en el periodo seleccionado.</p>
+              ) : (
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-[0.1em] text-slate-500">
+                      <th className="px-5 py-3 font-semibold">Servicio</th>
+                      <th className="px-5 py-3 font-semibold">Monto pagado</th>
+                      <th className="px-5 py-3 font-semibold">Fecha de pago</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.pagos.map((pago) => (
+                      <tr key={pago.id_pago} className="border-b border-slate-100 last:border-b-0">
+                        <td className="px-5 py-3 text-sm text-slate-950">{pago.servicio}</td>
+                        <td className="px-5 py-3 text-sm text-emerald-600">
+                          {formatCurrency(pago.monto_pagado)}
+                        </td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{pago.fecha_pago}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </section>
+        </>
+      )}
+    </AppShell>
+  );
+}

@@ -14,6 +14,7 @@ import {
   KeyRound,
   Pencil,
   Power,
+  ShieldAlert,
   ShieldCheck,
   Trash2,
   UserCheck,
@@ -47,11 +48,17 @@ import {
 } from "@/services/providersService";
 import { getTenantAccountStatementRequest } from "@/services/tenantAccountService";
 import type { TenantAccountSummary } from "@/types/tenantAccount";
+import {
+  createTenantAuthorizationRequest,
+  getTenantAuthorizationRequestsRequest,
+  getTenantPermissionsRequest,
+} from "@/services/sprintStoriesService";
 import type {
   TenantProvider,
   TenantProviderHistoryRecord,
   TenantProviderStatus,
 } from "@/types/providers";
+import type { AuthorizationRequest, TenantPermission } from "@/types/sprintStories";
 import type { FrequentVisitor, VisitPayload, VisitRecord, VisitType } from "@/types/visits";
 
 type VisitFormState = VisitPayload;
@@ -232,6 +239,11 @@ export function InquilinoView() {
   const [providerStatusFilter, setProviderStatusFilter] = useState<ProviderFilterStatus>("TODOS");
   const [providerHistoryUserFilter, setProviderHistoryUserFilter] = useState("");
   const [providerHistoryDateFilter, setProviderHistoryDateFilter] = useState("");
+  const [permissions, setPermissions] = useState<TenantPermission[]>([]);
+  const [authorizationRequests, setAuthorizationRequests] = useState<AuthorizationRequest[]>([]);
+  const [authorizationModalOpen, setAuthorizationModalOpen] = useState(false);
+  const [authorizationAction, setAuthorizationAction] = useState("Reserva fuera de horario permitido");
+  const [authorizationReason, setAuthorizationReason] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<AccessFilter>("TODOS");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -258,12 +270,16 @@ export function InquilinoView() {
           providersResult,
           providerHistoryResult,
           accountResult,
+          permissionsResult,
+          authorizationsResult,
         ] = await Promise.allSettled([
           getVisitsRequest(),
           getFrequentVisitorsRequest(),
           getTenantProvidersRequest(),
           getTenantProviderHistoryRequest(),
           getTenantAccountStatementRequest(),
+          getTenantPermissionsRequest(),
+          getTenantAuthorizationRequestsRequest(),
         ]);
 
         if (!active) {
@@ -284,6 +300,10 @@ export function InquilinoView() {
         setProviders(providersResult.status === "fulfilled" ? providersResult.value : []);
         setProviderHistory(providerHistoryResult.status === "fulfilled" ? providerHistoryResult.value : []);
         setAccountSummary(accountResult.status === "fulfilled" ? accountResult.value.resumen : null);
+        setPermissions(permissionsResult.status === "fulfilled" ? permissionsResult.value : []);
+        setAuthorizationRequests(
+          authorizationsResult.status === "fulfilled" ? authorizationsResult.value : [],
+        );
       } finally {
         if (active) {
           setIsLoading(false);
@@ -564,6 +584,27 @@ export function InquilinoView() {
       setErrorMessage(error instanceof Error ? error.message : "No fue posible registrar el proveedor.");
     } finally {
       setIsRegisteringProvider(false);
+    }
+  }
+
+  async function handleAuthorizationSubmit() {
+    if (!authorizationAction.trim() || !authorizationReason.trim()) {
+      setErrorMessage("Completa la accion restringida y el motivo de autorizacion.");
+      return;
+    }
+
+    try {
+      setErrorMessage("");
+      const created = await createTenantAuthorizationRequest({
+        accion: authorizationAction,
+        motivo: authorizationReason,
+      });
+      setAuthorizationRequests((current) => [created, ...current]);
+      setAuthorizationReason("");
+      setAuthorizationModalOpen(false);
+      setSuccessMessage("Solicitud digital enviada al propietario.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible enviar la solicitud.");
     }
   }
 
@@ -867,6 +908,78 @@ export function InquilinoView() {
           <AlertDescription>{successMessage}</AlertDescription>
         </Alert>
       ) : null}
+
+      <Card className="border-0 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+        <CardHeader>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-2xl text-slate-900">
+                <ShieldCheck className="size-6 text-blue-600" />
+                Permisos asignados
+              </CardTitle>
+              <CardDescription className="mt-2">
+                Permisos activos, restricciones y vigencias conectadas a la base de datos.
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              onClick={() => setAuthorizationModalOpen(true)}
+              className="rounded-2xl bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <ShieldAlert className="size-4" />
+              Solicitar autorizacion
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.7fr)]">
+          <div className="grid gap-3 md:grid-cols-2">
+            {permissions.length === 0 ? (
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
+                No hay permisos asignados.
+              </div>
+            ) : (
+              permissions.map((permission) => (
+                <article key={permission.id_permiso} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-900">{permission.nombre}</h3>
+                      <p className="mt-1 text-sm text-slate-500">{permission.descripcion}</p>
+                    </div>
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                      {permission.estado}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-xs text-slate-500">Restriccion: {permission.restriccion}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Vigencia: {permission.fecha_inicio} - {permission.fecha_fin || "Indefinida"}
+                  </p>
+                </article>
+              ))
+            )}
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="font-semibold text-slate-900">Solicitudes digitales</p>
+            <div className="mt-3 space-y-2">
+              {authorizationRequests.length === 0 ? (
+                <p className="text-sm text-slate-500">Sin solicitudes registradas.</p>
+              ) : (
+                authorizationRequests.slice(0, 5).map((request) => (
+                  <div key={request.id_solicitud} className="rounded-xl bg-white p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-slate-800">{request.accion}</p>
+                      <span className="rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-700">
+                        {request.estado}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">{request.motivo}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-0 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
         <CardHeader>
@@ -1751,6 +1864,69 @@ export function InquilinoView() {
                     Si, cancelar
                   </>
                 )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {authorizationModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="authorization-request-title"
+        >
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 id="authorization-request-title" className="text-xl font-semibold text-slate-900">
+                  Solicitud digital de autorizacion
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Se notificara al propietario y quedara registrada en historial.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAuthorizationModalOpen(false)}
+                className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Cerrar"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-800">Accion restringida</span>
+                <Input
+                  value={authorizationAction}
+                  onChange={(event) => setAuthorizationAction(event.target.value)}
+                  className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-800">Motivo</span>
+                <Input
+                  value={authorizationReason}
+                  onChange={(event) => setAuthorizationReason(event.target.value)}
+                  placeholder="Describe por que necesitas esta autorizacion"
+                  className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
+                />
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setAuthorizationModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleAuthorizationSubmit()}
+                className="bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Enviar solicitud
               </Button>
             </div>
           </div>

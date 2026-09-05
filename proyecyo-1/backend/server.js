@@ -5,10 +5,20 @@ const {
   ensureAmenityReservationsSchema,
   ensureNotificationsSchema,
   ensureTenantProvidersSchema,
+  ensureAnnouncementsSchema,
+  ensureSpecialAccessSchema,
+  ensureSprintUserStoriesSchema,
+  ensureRestoreHistorySchema,
+  ensureFinancialRulesSchema,
   ensureSanctionsSchema,
   ensureTenantAccountSeed,
+  ensureConfigurationSchema,
+  ensureAutomaticBackupsSchema,
+  ensureRemindersSchema,
+  ensureDemoRequestsSchema,
   query,
 } = require("./src/database/mysql");
+const { startScheduler } = require("./src/services/automaticBackupsService");
 
 const DB_READY_RETRIES = 30;
 const DB_READY_DELAY_MS = 2000;
@@ -45,8 +55,18 @@ async function startServer() {
   await ensureAmenityReservationsSchema();
   await ensureNotificationsSchema();
   await ensureTenantProvidersSchema();
+  await ensureAnnouncementsSchema();
+  await ensureSpecialAccessSchema();
+  await ensureSprintUserStoriesSchema();
+  await ensureRestoreHistorySchema();
+  await ensureFinancialRulesSchema();
   await ensureSanctionsSchema();
   await ensureTenantAccountSeed();
+  await ensureConfigurationSchema();
+  await ensureAutomaticBackupsSchema();
+  await ensureRemindersSchema();
+  await ensureDemoRequestsSchema();
+  startScheduler();
 
   const app = createApp();
 

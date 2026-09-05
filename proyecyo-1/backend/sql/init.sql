@@ -1,6 +1,8 @@
 CREATE DATABASE IF NOT EXISTS nexus_residencial;
 USE nexus_residencial;
 
+DROP TABLE IF EXISTS RECORDATORIO_PAGO;
+DROP TABLE IF EXISTS ACCESO_EXCEPCION;
 DROP TABLE IF EXISTS COMUNICADO_USUARIO;
 DROP TABLE IF EXISTS HISTORIAL_CAMBIO_PROVEEDOR;
 DROP TABLE IF EXISTS TIPO_USUARIO_PERMISO;
@@ -26,11 +28,30 @@ DROP TABLE IF EXISTS TIPO_USUARIO;
 DROP TABLE IF EXISTS AMENIDAD;
 DROP TABLE IF EXISTS CONFIGURACION;
 DROP TABLE IF EXISTS NOTIFICACION;
+DROP TABLE IF EXISTS HISTORIAL_RESTAURACION;
+DROP TABLE IF EXISTS SOLICITUD_DEMO;
 
 
 CREATE TABLE TIPO_USUARIO (
     id_tipo_usuario INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(50) UNIQUE NOT NULL
+);
+
+CREATE TABLE SOLICITUD_DEMO (
+    id_solicitud INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(120) NOT NULL,
+    correo VARCHAR(160) NOT NULL,
+    telefono VARCHAR(25) NOT NULL,
+    residencial VARCHAR(160) NOT NULL,
+    cantidad_viviendas INT NOT NULL,
+    mensaje VARCHAR(1000),
+    estado VARCHAR(20) NOT NULL DEFAULT 'NUEVA',
+    fecha_creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_solicitud_demo_estado_fecha (estado, fecha_creacion),
+    INDEX idx_solicitud_demo_correo (correo),
+    CHECK (estado IN ('NUEVA', 'CONTACTADA', 'DESCARTADA', 'CONVERTIDA')),
+    CHECK (cantidad_viviendas BETWEEN 1 AND 100000)
 );
 
 CREATE TABLE PERMISO (
@@ -198,13 +219,16 @@ CREATE TABLE ACCESO (
     tipo_visita VARCHAR(20),
     motivo_servicio VARCHAR(120),
     observaciones VARCHAR(255),
+    motivo_excepcion VARCHAR(255),
     token_qr VARCHAR(64) UNIQUE,
     estado_acceso VARCHAR(30) NOT NULL DEFAULT 'AUTORIZADA',
+    es_acceso_especial BOOLEAN NOT NULL DEFAULT FALSE,
+    fuera_horario BOOLEAN NOT NULL DEFAULT FALSE,
     FOREIGN KEY (id_visitante) REFERENCES VISITANTE(id_visitante),
     FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
     FOREIGN KEY (id_usuario_autoriza) REFERENCES USUARIO(id_usuario),
     CHECK (tipo_visita IN ('VISITA', 'DELIVERY', 'PROVEEDOR')),
-    CHECK (estado_acceso IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'CANCELADA'))
+    CHECK (estado_acceso IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'CANCELADA', 'PENDIENTE_APROBACION', 'RECHAZADA'))
 );
 
 CREATE TABLE REGISTRO_ACCESO (
@@ -247,6 +271,9 @@ CREATE TABLE COMUNICADO (
     descripcion TEXT,
     fecha DATE,
     creado_por INT,
+    tipo_destinatario VARCHAR(20) NOT NULL DEFAULT 'todos',
+    enviado_en DATETIME,
+    total_destinatarios INT NOT NULL DEFAULT 0,
     FOREIGN KEY (creado_por) REFERENCES USUARIO(id_usuario)
 );
 
@@ -276,6 +303,42 @@ CREATE TABLE CONFIGURACION (
     valor VARCHAR(200)
 );
 
+CREATE TABLE ACCESO_EXCEPCION (
+    id_excepcion INT PRIMARY KEY AUTO_INCREMENT,
+    id_acceso INT NOT NULL,
+    aprobado_por INT NOT NULL,
+    motivo TEXT,
+    hora_solicitada_inicio TIME,
+    hora_solicitada_fin TIME,
+    accion VARCHAR(20) NOT NULL,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_acceso) REFERENCES ACCESO(id_acceso),
+    FOREIGN KEY (aprobado_por) REFERENCES USUARIO(id_usuario),
+    CHECK (accion IN ('APROBADO', 'RECHAZADO'))
+);
+
+CREATE TABLE RECARGO_APLICADO (
+    id_recargo INT PRIMARY KEY AUTO_INCREMENT,
+    id_cuota INT NOT NULL,
+    id_casa INT NOT NULL,
+    tipo_regla VARCHAR(20) NOT NULL,
+    monto_original DECIMAL(10,2) NOT NULL,
+    monto_recargo DECIMAL(10,2) NOT NULL,
+    fecha_aplicacion DATE NOT NULL,
+    aplicado_por INT NULL,
+    UNIQUE KEY uq_recargo_cuota (id_cuota),
+    FOREIGN KEY (id_cuota) REFERENCES CUOTA(id_cuota),
+    FOREIGN KEY (id_casa) REFERENCES CASA(id_casa)
+);
+
+INSERT INTO CONFIGURACION (clave, valor)
+VALUES
+    ('visitas_hora_apertura', '06:00'),
+    ('visitas_hora_cierre', '22:00'),
+    ('visitas_duracion_maxima_horas', '4'),
+    ('visitas_activo', 'true'),
+    ('visitas_dias_habilitados', '[1,2,3,4,5,6,0]');
+
 CREATE TABLE NOTIFICACION (
     id_notificacion INT PRIMARY KEY AUTO_INCREMENT,
     id_usuario INT NOT NULL,
@@ -292,6 +355,50 @@ CREATE TABLE NOTIFICACION (
 
 CREATE INDEX idx_notificacion_usuario_leido 
 ON NOTIFICACION (id_usuario, leido, creado_en);
+
+CREATE TABLE HISTORIAL_RESTAURACION (
+    id_restauracion INT PRIMARY KEY AUTO_INCREMENT,
+    nombre_archivo VARCHAR(180) NOT NULL,
+    estado VARCHAR(20) NOT NULL,
+    total_sentencias INT NOT NULL DEFAULT 0,
+    tablas_afectadas VARCHAR(500),
+    mensaje VARCHAR(255) NOT NULL,
+    realizado_por INT NOT NULL,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finalizado_en DATETIME
+);
+
+CREATE TABLE RECORDATORIO_PAGO (
+    id_recordatorio INT PRIMARY KEY AUTO_INCREMENT,
+    id_casa INT NOT NULL,
+    id_cuota INT NOT NULL,
+    id_usuario INT NOT NULL,
+    id_notificacion INT NULL,
+    tipo VARCHAR(30) NOT NULL,
+    titulo VARCHAR(150) NOT NULL,
+    mensaje VARCHAR(255) NOT NULL,
+    monto DECIMAL(10,2) NOT NULL DEFAULT 0,
+    fecha_limite DATE NOT NULL,
+    dias_para_vencer INT NOT NULL DEFAULT 0,
+    fecha_envio DATE NOT NULL,
+    enviado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_casa) REFERENCES CASA(id_casa),
+    FOREIGN KEY (id_cuota) REFERENCES CUOTA(id_cuota),
+    FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario),
+    FOREIGN KEY (id_notificacion) REFERENCES NOTIFICACION(id_notificacion),
+    UNIQUE KEY uq_recordatorio_cuota_tipo_dia (id_cuota, tipo, fecha_envio),
+    CHECK (tipo IN ('PROXIMO_VENCIMIENTO', 'VENCIDO'))
+);
+
+CREATE INDEX idx_recordatorio_envio
+ON RECORDATORIO_PAGO (enviado_en);
+
+INSERT INTO CONFIGURACION (clave, valor)
+VALUES
+    ('horario_visita_inicio', '06:00'),
+    ('horario_visita_fin', '22:00'),
+    ('recordatorios_activo', 'true'),
+    ('recordatorios_dias_antes', '3');
 
 INSERT INTO TIPO_USUARIO (nombre)
 VALUES ('admin'), ('guardia'), ('residente'), ('inquilino');

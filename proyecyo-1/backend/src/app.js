@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const { env } = require("./config/env");
 const authRoutes = require("./routes/authRoutes");
@@ -11,12 +13,37 @@ const adminAccessesRoutes = require("./routes/adminAccessesRoutes");
 const notificationsRoutes = require("./routes/notificationsRoutes");
 const tenantProvidersRoutes = require("./routes/tenantProvidersRoutes");
 const adminProvidersRoutes = require("./routes/adminProvidersRoutes");
+const announcementsRoutes = require("./routes/announcementsRoutes");
+const specialAccessesRoutes = require("./routes/specialAccessesRoutes");
+const sprintStoriesRoutes = require("./routes/sprintStoriesRoutes");
+const adminPaymentsRoutes = require("./routes/adminPaymentsRoutes");
+const adminAuthorizedUsersRoutes = require("./routes/adminAuthorizedUsersRoutes");
+const restoresRoutes = require("./routes/restoresRoutes");
 const adminSanctionsRoutes = require("./routes/adminSanctionsRoutes");
 const residentAccountRoutes = require("./routes/residentAccountRoutes");
 const tenantAccountRoutes = require("./routes/tenantAccountRoutes");
+const configurationRoutes = require("./routes/configurationRoutes");
+const financialRulesRoutes = require("./routes/financialRulesRoutes");
+const sanctionHistoryRoutes = require("./routes/sanctionHistoryRoutes");
+const residentMonthlySummaryRoutes = require("./routes/residentMonthlySummaryRoutes");
+const reportExportRoutes = require("./routes/reportExportRoutes");
+const automaticBackupsRoutes = require("./routes/automaticBackupsRoutes");
+const demoRequestsRoutes = require("./routes/demoRequestsRoutes");
+const adminRemindersRoutes = require("./routes/adminRemindersRoutes");
+const residentFinancialDetailRoutes = require("./routes/residentFinancialDetailRoutes");
+
+const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Demasiados intentos de inicio de sesion. Intenta de nuevo mas tarde." },
+});
 
 function createApp() {
   const app = express();
+
+  app.use(helmet());
 
   app.use(
     cors({
@@ -31,6 +58,7 @@ function createApp() {
     res.status(200).json({ status: "ok" });
   });
 
+  app.use("/login", loginRateLimiter);
   app.use(authRoutes);
   app.use(usersRoutes);
   app.use(userTypesRoutes);
@@ -40,22 +68,46 @@ function createApp() {
   app.use(notificationsRoutes);
   app.use(tenantProvidersRoutes);
   app.use(adminProvidersRoutes);
+  app.use(announcementsRoutes);
+  app.use(specialAccessesRoutes);
+  app.use(sprintStoriesRoutes);
+  app.use(adminPaymentsRoutes);
+  app.use(adminAuthorizedUsersRoutes);
+  app.use(restoresRoutes);
   app.use(adminSanctionsRoutes);
   app.use(residentAccountRoutes);
   app.use(tenantAccountRoutes);
+  app.use(configurationRoutes);
+  app.use(financialRulesRoutes);
+  app.use(sanctionHistoryRoutes);
+  app.use(residentMonthlySummaryRoutes);
+  app.use(reportExportRoutes);
+  app.use(automaticBackupsRoutes);
+  app.use(demoRequestsRoutes);
+  app.use(adminRemindersRoutes);
+  app.use(residentFinancialDetailRoutes);
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;
-    const message =
-      status === 413
-        ? "La imagen seleccionada es demasiado grande. Prueba con una foto mas ligera."
-        : error.message || "Error interno del servidor";
+
+    let message;
+    if (status === 413) {
+      message = "La imagen seleccionada es demasiado grande. Prueba con una foto mas ligera.";
+    } else if (status >= 500) {
+      // No exponer detalles internos (mensajes de MySQL, rutas, stack) al cliente.
+      message = "Error interno del servidor";
+    } else {
+      message = error.message || "Solicitud invalida";
+    }
 
     if (status >= 500) {
       console.error(error);
     }
 
-    res.status(status).json({ message });
+    res.status(status).json({
+      message,
+      ...(status < 500 && error.code ? { code: error.code } : {}),
+    });
   });
 
   return app;

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "test": "node --test test/adminSanctions.test.js test/amenitiesReservations.test.js test/residentAccount.test.js test/tenantAccount.test.js test/visits.test.js",
+    "test": "node --test --test-concurrency=1 test/app.routes.test.js test/restores.test.js test/adminSanctions.test.js test/amenitiesReservations.test.js test/configuration.test.js test/visitorType.test.js test/financialRules.test.js test/sanctionHistory.test.js test/residentMonthlySummary.test.js test/reportExport.test.js test/automaticBackups.test.js test/demoRequests.test.js test/recordatoriosPago.test.js test/detalleFinanciero.test.js test/visits.test.js && jest --runInBand",
     "test:functional": "node --test test/*.functional.test.js"
   },
   "keywords": [],
@@ -16,7 +16,20 @@
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.6",
     "dotenv": "^16.4.7",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
-    "mysql2": "^3.14.1"
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
+    "mysql2": "^3.14.1",
+    "pdfkit": "^0.19.1"
+  },
+  "devDependencies": {
+    "jest": "^30.4.2",
+    "supertest": "^7.2.2"
+  },
+  "jest": {
+    "testMatch": [
+      "**/src/**/__tests__/**/*.test.js"
+    ]
   }
 }

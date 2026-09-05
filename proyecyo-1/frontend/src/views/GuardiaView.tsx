@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import jsQR from "jsqr";
 import {
+  BellRing,
   Camera,
+  CheckCheck,
   CircleAlert,
   LogIn,
   LogOut,
@@ -9,8 +11,10 @@ import {
   RefreshCw,
   ScanLine,
   Shield,
+  ShieldAlert,
   UserCheck,
   Users,
+  XCircle,
 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
@@ -24,6 +28,15 @@ import {
   registerQrExitRequest,
   validateQrRequest,
 } from "@/services/visitsService";
+import {
+  getGuardNotificationsRequest,
+  getNotificationsRequest,
+  markAllGuardNotificationsAsReadRequest,
+  markGuardNotificationAsReadRequest,
+} from "@/services/notificationsService";
+import { getGuardAccessHistoryRequest } from "@/services/sprintStoriesService";
+import type { NotificationRecord } from "@/types/notifications";
+import type { GuardAccessHistoryRecord } from "@/types/sprintStories";
 import type { VisitRecord } from "@/types/visits";
 
 type GuardScanAction = "INGRESO" | "SALIDA";
@@ -48,21 +61,57 @@ function canUseCamera() {
   return Boolean(navigator.mediaDevices?.getUserMedia) && (window.isSecureContext || isLocalhost);
 }
 
-function getVisitBadge(visit: VisitRecord) {
+function getVisitBadge(visit: VisitRecord): { label: string; className: string } {
   if (visit.qr_status === "EXIT_REGISTERED" || visit.estado_acceso === "SALIDA_REGISTRADA") {
-    return "Salida registrada";
+    return {
+      label: "Salida registrada",
+      className: "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200",
+    };
+  }
+  if (visit.estado_acceso === "CANCELADA" || visit.qr_status === "CANCELLED") {
+    return {
+      label: "Cancelado",
+      className: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200",
+    };
+  }
+
+  if (visit.es_acceso_especial) {
+    if (visit.qr_status === "PENDING_APPROVAL" || visit.estado_acceso === "PENDIENTE_APROBACION") {
+      return {
+        label: "Acceso especial pendiente",
+        className: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200",
+      };
+    }
+    return {
+      label: "Acceso especial",
+      className: "bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200",
+    };
   }
 
   if (visit.qr_status === "EXPIRED") {
-    return "QR expirado";
+    return {
+      label: "QR expirado",
+      className: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200",
+    };
   }
 
   if (visit.qr_status === "USED" || visit.estado_acceso === "INGRESO_REGISTRADO") {
-    return "Ingreso registrado";
+    return {
+      label: "Ingreso registrado",
+      className: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200",
+    };
   }
 
-  return "Autorizada";
+  return {
+    label: "Autorizada",
+    className: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200",
+  };
 }
+const visitTypeBadge = {
+  VISITA: { label: "Visita", className: "bg-blue-50 text-blue-700" },
+  DELIVERY: { label: "Delivery", className: "bg-amber-50 text-amber-700" },
+  PROVEEDOR: { label: "Proveedor", className: "bg-violet-50 text-violet-700" },
+} as const;
 
 function formatRefreshTime(date: Date | null) {
   if (!date) {
@@ -92,6 +141,12 @@ export function GuardiaView() {
   const frameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [visits, setVisits] = useState<VisitRecord[]>([]);
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [specialNotifications, setSpecialNotifications] = useState<NotificationRecord[]>([]);
+  const [accessHistory, setAccessHistory] = useState<GuardAccessHistoryRecord[]>([]);
+  const [historyDate, setHistoryDate] = useState(new Date().toISOString().slice(0, 10));
+  const [historyStatus, setHistoryStatus] = useState("TODOS");
+  const [historySearch, setHistorySearch] = useState("");
   const [validatedVisit, setValidatedVisit] = useState<VisitRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
@@ -130,16 +185,69 @@ export function GuardiaView() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+
+    async function loadNotifications() {
+      try {
+        const [guardData, allData] = await Promise.all([
+          getGuardNotificationsRequest(),
+          getNotificationsRequest(),
+        ]);
+        if (active) {
+          setNotifications(guardData);
+          setSpecialNotifications(allData.filter((item) => item.tipo === "ACCESO_ESPECIAL"));
+        }
+      } catch {
+        if (active) {
+          setSpecialNotifications([]);
+        }
+      }
+    }
+
     void loadGuardVisits();
+    void loadNotifications();
 
     const intervalId = window.setInterval(() => {
       void loadGuardVisits({ silent: true });
+      void loadNotifications();
     }, REFRESH_INTERVAL_MS);
 
     return () => {
+      active = false;
       window.clearInterval(intervalId);
     };
   }, [loadGuardVisits]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadHistory() {
+      try {
+        const response = await getGuardAccessHistoryRequest({
+          date: historyDate,
+          status: historyStatus,
+          search: historySearch,
+        });
+        if (active) {
+          setAccessHistory(response);
+        }
+      } catch {
+        if (active) {
+          setAccessHistory([]);
+        }
+      }
+    }
+
+    void loadHistory();
+    const timer = window.setInterval(() => {
+      void loadHistory();
+    }, 15000);
+
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [historyDate, historySearch, historyStatus]);
 
   useEffect(() => {
     return () => {
@@ -147,11 +255,14 @@ export function GuardiaView() {
     };
   }, []);
 
+  const cancellationAlerts = useMemo(
+    () => notifications.filter((notification) => notification.tipo === "ACCESO_CANCELADO" && !notification.leido),
+    [notifications],
+  );
   const pendingCount = useMemo(
     () => visits.filter((visit) => visit.qr_status === "VALID").length,
     [visits],
   );
-
   const registeredCount = useMemo(
     () =>
       visits.filter(
@@ -196,6 +307,28 @@ export function GuardiaView() {
     setIsScanning(false);
   }
 
+  async function handleMarkAlertRead(notificationId: number) {
+    try {
+      await markGuardNotificationAsReadRequest(notificationId);
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id_notificacion === notificationId ? { ...notification, leido: true } : notification,
+        ),
+      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible marcar la alerta como leida.");
+    }
+  }
+
+  async function handleMarkAllAlertsRead() {
+    try {
+      await markAllGuardNotificationsAsReadRequest();
+      setNotifications((current) => current.map((notification) => ({ ...notification, leido: true })));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible marcar las alertas como leidas.");
+    }
+  }
+
   async function handleValidateToken(qrToken: string) {
     try {
       setErrorMessage("");
@@ -224,12 +357,25 @@ export function GuardiaView() {
           : scanAction === "SALIDA"
             ? "No fue posible registrar la salida."
             : "No fue posible validar el QR.";
+      const apiError = error as { status?: number; message?: string; payload?: { code?: string } };
+      const isCancelled =
+        apiError?.status === 410 &&
+        (message.toLowerCase().includes("cancelado") || apiError?.payload?.code === "ACCESS_CANCELLED");
+
       setValidationResult({
         status: "rejected",
-        title: "Acceso rechazado",
+        title: isCancelled ? "ACCESO CANCELADO - NO AUTORIZAR" : "Acceso rechazado",
         message,
       });
       setErrorMessage(message);
+
+      if (isCancelled) {
+        try {
+          setNotifications(await getGuardNotificationsRequest());
+        } catch {
+          // Mantiene el resultado de validacion aunque falle el refresco de alertas.
+        }
+      }
     }
   }
 
@@ -280,7 +426,6 @@ export function GuardiaView() {
     try {
       setErrorMessage("");
       setSuccessMessage("");
-
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: "environment" },
@@ -444,6 +589,91 @@ export function GuardiaView() {
         </Alert>
       ) : null}
 
+      {cancellationAlerts.length > 0 ? (
+        <Card className="border-rose-200 bg-rose-50/60 shadow-[0_10px_30px_rgba(244,63,94,0.08)]">
+          <CardHeader>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-full bg-rose-100 text-rose-700">
+                  <BellRing className="size-5 animate-pulse" />
+                </div>
+                <div>
+                  <CardTitle className="text-rose-900">
+                    {cancellationAlerts.length} alerta{cancellationAlerts.length !== 1 ? "s" : ""} de cancelacion
+                  </CardTitle>
+                  <CardDescription className="text-rose-700">
+                    Accesos cancelados por residentes/inquilinos. Verifica que el QR ya no sea valido.
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleMarkAllAlertsRead}
+                className="border-rose-200 bg-white text-rose-700 hover:bg-rose-100"
+              >
+                <CheckCheck className="size-4" />
+                Marcar todas
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {cancellationAlerts.slice(0, 5).map((alert) => (
+              <div
+                key={alert.id_notificacion}
+                className="flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-white px-4 py-3"
+              >
+                <div className="flex items-start gap-3">
+                  <XCircle className="mt-0.5 size-4 shrink-0 text-rose-600" />
+                  <div className="text-sm">
+                    <p className="font-medium text-slate-900">{alert.titulo}</p>
+                    <p className="text-slate-600">{alert.mensaje}</p>
+                    <p className="mt-1 text-xs text-slate-400">{alert.creado_en}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleMarkAlertRead(alert.id_notificacion)}
+                  className="text-xs font-medium text-rose-600 hover:underline"
+                  aria-label="Marcar como leida"
+                >
+                  Leida
+                </button>
+              </div>
+            ))}
+            {cancellationAlerts.length > 5 ? (
+              <p className="px-1 text-xs text-rose-700">+{cancellationAlerts.length - 5} alertas mas pendientes.</p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {specialNotifications.length > 0 ? (
+        <Card className="border-violet-200 bg-violet-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-violet-900">
+              <ShieldAlert className="size-5" />
+              Notificar al guardia
+            </CardTitle>
+            <CardDescription className="text-violet-700">
+              Accesos especiales aprobados por administracion.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {specialNotifications.slice(0, 5).map((notification) => (
+              <div
+                key={notification.id_notificacion}
+                className="rounded-xl border border-violet-200 bg-white px-4 py-3 text-sm text-violet-900"
+              >
+                <p className="font-medium">{notification.titulo}</p>
+                <p className="mt-1 text-violet-700">{notification.mensaje}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <Card className="border-slate-200">
           <CardHeader>
@@ -536,6 +766,12 @@ export function GuardiaView() {
                   <p>Salida: {validatedVisit.hora_salida || "Sin registro"}</p>
                   <p>Tipo: {validatedVisit.tipo_visita}</p>
                   <p>Estado: {validatedVisit.estado_acceso}</p>
+                  {validatedVisit.observaciones ? (
+                    <p>Observaciones: {validatedVisit.observaciones}</p>
+                  ) : null}
+                  {validatedVisit.es_acceso_especial ? (
+                    <p className="font-medium text-violet-700">Mostrar estado especial: autorizado</p>
+                  ) : null}
                 </div>
                 {canRegisterExit(validatedVisit) ? (
                   <Button
@@ -631,13 +867,105 @@ export function GuardiaView() {
                       {exitingAccessId === visitor.id_acceso ? "Registrando..." : "Registrar salida"}
                     </Button>
                   ) : null}
-                  <span className="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">
-                    {getVisitBadge(visitor)}
-                  </span>
+                  {(() => {
+                    const badge = getVisitBadge(visitor);
+                    return (
+                      <span className={`rounded-full px-3 py-1 text-sm ${badge.className}`}>
+                        {badge.label}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             ))
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle>Historial diario de ingresos y salidas</CardTitle>
+              <CardDescription>Tabla sincronizada con garita y actualizacion cada 15 segundos.</CardDescription>
+            </div>
+            <div className="grid gap-2 md:grid-cols-3">
+              <input
+                type="date"
+                value={historyDate}
+                onChange={(event) => setHistoryDate(event.target.value)}
+                className="h-10 rounded-xl border border-slate-200 px-3 text-sm"
+              />
+              <select
+                value={historyStatus}
+                onChange={(event) => setHistoryStatus(event.target.value)}
+                className="h-10 rounded-xl border border-slate-200 px-3 text-sm"
+              >
+                <option value="TODOS">Todos</option>
+                <option value="PENDIENTE">Pendientes</option>
+                <option value="INGRESO">Ingresos</option>
+                <option value="SALIDA">Salidas</option>
+                <option value="CANCELADA">Canceladas</option>
+              </select>
+              <input
+                value={historySearch}
+                onChange={(event) => setHistorySearch(event.target.value)}
+                placeholder="Visitante o casa"
+                className="h-10 rounded-xl border border-slate-200 px-3 text-sm"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-2xl border border-slate-200">
+            <table className="min-w-full text-left">
+              <thead className="bg-slate-50 text-xs uppercase tracking-[0.1em] text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Visitante</th>
+                  <th className="px-4 py-3">Casa</th>
+                  <th className="px-4 py-3">Ingreso</th>
+                  <th className="px-4 py-3">Salida</th>
+                  <th className="px-4 py-3">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accessHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-sm text-slate-500">
+                      Sin registros para los filtros actuales.
+                    </td>
+                  </tr>
+                ) : (
+                  accessHistory.map((record) => (
+                    <tr key={record.id_acceso} className="border-t border-slate-100">
+                      <td className="px-4 py-3 text-sm text-slate-900">
+                        <p className="font-medium">{record.visitante}</p>
+                        <p className="text-xs text-slate-500">{record.placa}</p>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-500">{record.casa}</td>
+                      <td className="px-4 py-3 text-sm text-slate-500">{record.hora_ingreso || record.hora_programada}</td>
+                      <td className="px-4 py-3 text-sm text-slate-500">{record.hora_salida || "--:--"}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            record.estado === "INGRESO"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : record.estado === "SALIDA"
+                                ? "bg-blue-50 text-blue-700"
+                                : record.estado === "CANCELADA"
+                                  ? "bg-rose-50 text-rose-700"
+                                  : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {record.estado}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </AppShell>

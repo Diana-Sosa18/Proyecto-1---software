@@ -4,12 +4,16 @@ const {
   getAmenities,
   getReservableAmenitiesUsers,
   getAmenitiesReservations,
+  getAmenitiesReservationHistory,
   getAdminAmenitiesReservations,
+  getAdminAmenitiesStats,
   getAmenitiesAvailability,
   getAdminAmenitiesAvailability,
   getAmenitiesConflict,
   getAdminAmenitiesConflict,
   postAmenityReservation,
+  patchAmenityReservation,
+  patchCancelAmenityReservation,
   postAdminAmenityReservation,
   putAdminAmenitySchedule,
 } = require("../controllers/amenitiesReservationsController");
@@ -20,12 +24,16 @@ const router = express.Router();
 
 router.get("/amenidades", requireResident, getAmenities);
 router.get("/reservas/amenidades", requireResident, getAmenitiesReservations);
+router.get("/reservas/amenidades/historial", requireResident, getAmenitiesReservationHistory);
 router.get("/reservas/amenidades/disponibilidad", requireResident, getAmenitiesAvailability);
 router.get("/reservas/amenidades/conflicto", requireResident, getAmenitiesConflict);
 router.post("/reservas/amenidades", requireResident, postAmenityReservation);
+router.patch("/reservas/amenidades/:key", requireResident, patchAmenityReservation);
+router.patch("/reservas/amenidades/:key/cancelar", requireResident, patchCancelAmenityReservation);
 
 router.get("/admin/amenidades", requireAdmin, getAmenities);
 router.get("/admin/amenidades/usuarios", requireAdmin, getReservableAmenitiesUsers);
+router.get("/admin/amenidades/estadisticas", requireAdmin, getAdminAmenitiesStats);
 router.put("/admin/amenidades/:id/horario", requireAdmin, putAdminAmenitySchedule);
 router.get("/admin/reservas/amenidades", requireAdmin, getAdminAmenitiesReservations);
 router.get(

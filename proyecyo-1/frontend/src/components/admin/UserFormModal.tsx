@@ -144,7 +144,7 @@ export function UserFormModal({
       <Card className="w-full max-w-2xl border-slate-200 shadow-2xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>{title}</CardTitle>
-          <button type="button" className="text-slate-400 hover:text-slate-700" onClick={onClose}>
+          <button type="button" aria-label="Cerrar" className="text-slate-400 hover:text-slate-700" onClick={onClose}>
             <X className="size-5" />
           </button>
         </CardHeader>
@@ -159,23 +159,24 @@ export function UserFormModal({
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm text-slate-700">Nombre</label>
-                <Input value={values.nombre} onChange={(event) => handleChange("nombre", event.target.value)} />
+                <label htmlFor="user-name" className="mb-2 block text-sm text-slate-700">Nombre</label>
+                <Input id="user-name" value={values.nombre} onChange={(event) => handleChange("nombre", event.target.value)} />
                 {errors.nombre ? <p className="mt-2 text-sm text-red-600">{errors.nombre}</p> : null}
               </div>
 
               <div>
-                <label className="mb-2 block text-sm text-slate-700">Correo</label>
-                <Input type="email" value={values.correo} onChange={(event) => handleChange("correo", event.target.value)} />
+                <label htmlFor="user-email" className="mb-2 block text-sm text-slate-700">Correo</label>
+                <Input id="user-email" type="email" value={values.correo} onChange={(event) => handleChange("correo", event.target.value)} />
                 {errors.correo ? <p className="mt-2 text-sm text-red-600">{errors.correo}</p> : null}
               </div>
 
               <div>
-                <label className="mb-2 block text-sm text-slate-700">
+                <label htmlFor="user-password" className="mb-2 block text-sm text-slate-700">
                   {editingUser ? "Nueva contrasena (opcional)" : "Contrasena"}
                 </label>
                 <Input
                   type="password"
+                  id="user-password"
                   value={values.password}
                   onChange={(event) => handleChange("password", event.target.value)}
                 />
@@ -183,13 +184,14 @@ export function UserFormModal({
               </div>
 
               <div>
-                <label className="mb-2 block text-sm text-slate-700">Telefono</label>
-                <Input value={values.telefono} onChange={(event) => handleChange("telefono", event.target.value)} />
+                <label htmlFor="user-phone" className="mb-2 block text-sm text-slate-700">Telefono</label>
+                <Input id="user-phone" value={values.telefono} onChange={(event) => handleChange("telefono", event.target.value)} />
               </div>
 
               <div className="md:col-span-2">
-                <label className="mb-2 block text-sm text-slate-700">Tipo de usuario</label>
+                <label htmlFor="user-role" className="mb-2 block text-sm text-slate-700">Tipo de usuario</label>
                 <select
+                  id="user-role"
                   value={values.id_tipo_usuario}
                   onChange={(event) => {
                     const nextRoleId = event.target.value;
@@ -219,8 +221,9 @@ export function UserFormModal({
               {requiresHouse ? (
                 <>
                   <div>
-                    <label className="mb-2 block text-sm text-slate-700">Numero de casa</label>
+                    <label htmlFor="user-house" className="mb-2 block text-sm text-slate-700">Numero de casa</label>
                     <Input
+                      id="user-house"
                       value={values.numero_casa}
                       onChange={(event) => handleChange("numero_casa", event.target.value)}
                       placeholder={selectedRole === "inquilino" ? "Ej. 302" : "Ej. 101"}
@@ -231,8 +234,9 @@ export function UserFormModal({
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-slate-700">Torre (opcional)</label>
+                    <label htmlFor="user-tower" className="mb-2 block text-sm text-slate-700">Torre (opcional)</label>
                     <Input
+                      id="user-tower"
                       value={values.torre}
                       onChange={(event) => handleChange("torre", event.target.value)}
                       placeholder="Ej. B"

@@ -12,11 +12,13 @@ import {
 
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
+  getAdminAccessDailyChartRequest,
   getAdminAccessHourlyChartRequest,
   getAdminAccessesRequest,
   getAdminAccessSummaryRequest,
 } from "@/services/adminAccessesService";
 import type {
+  AdminAccessDailyPoint,
   AdminAccessFilterStatus,
   AdminAccessFilterType,
   AdminAccessHourlyPoint,
@@ -235,6 +237,128 @@ function AdminAccessHourlyChart({
     </section>
   );
 }
+
+// SCRUM-174: Grafica estadistica diaria (ultimos 7 dias)
+function formatDayLabel(fecha: string) {
+  // Devuelve formato "Lun 14" para etiquetas compactas en el eje X
+  try {
+    const date = new Date(`${fecha}T00:00:00`);
+    const day = new Intl.DateTimeFormat("es-GT", { weekday: "short" }).format(date);
+    const num = new Intl.DateTimeFormat("es-GT", { day: "numeric" }).format(date);
+    const cleanDay = day.replace(/\.$/, "");
+    return `${cleanDay.charAt(0).toUpperCase()}${cleanDay.slice(1)} ${num}`;
+  } catch {
+    return fecha;
+  }
+}
+
+function AccessDailyTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: AdminAccessDailyPoint & { etiqueta: string } }>;
+}) {
+  if (!active || !payload?.length) {
+    return null;
+  }
+
+  const point = payload[0].payload;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
+      <p className="font-semibold text-slate-900">{point.etiqueta}</p>
+      <p className="mt-1 text-slate-600">Total: {point.total}</p>
+      <div className="mt-1.5 grid gap-1 text-[0.72rem]">
+        <span className="text-emerald-600">Aprobados: {point.aprobados}</span>
+        <span className="text-amber-600">Pendientes: {point.pendientes}</span>
+        <span className="text-rose-600">Rechazados: {point.rechazados}</span>
+      </div>
+    </div>
+  );
+}
+
+function AdminAccessDailyChart({
+  data,
+  isLoading,
+}: {
+  data: AdminAccessDailyPoint[];
+  isLoading: boolean;
+}) {
+  const chartData = useMemo(
+    () => data.map((point) => ({ ...point, etiqueta: formatDayLabel(point.fecha) })),
+    [data],
+  );
+
+  const totalSemana = useMemo(
+    () => data.reduce((sum, point) => sum + point.total, 0),
+    [data],
+  );
+
+  return (
+    <section
+      className="mt-5 rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+      aria-labelledby="admin-accesses-daily-chart-heading"
+    >
+      <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+            <BarChart3 className="size-5" />
+          </div>
+          <div>
+            <h2
+              id="admin-accesses-daily-chart-heading"
+              className="text-[0.98rem] font-semibold text-slate-900"
+            >
+              Accesos por dia (ultimos 7 dias)
+            </h2>
+            <p className="mt-1 text-[0.8rem] text-slate-500">
+              Tendencia diaria para identificar patrones semanales.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-slate-50 px-3 py-2 text-right">
+          <p className="text-[0.72rem] font-medium uppercase tracking-[0.08em] text-slate-500">
+            Total de la semana
+          </p>
+          <p className="mt-1 text-sm font-semibold text-slate-950">
+            {totalSemana} accesos
+          </p>
+        </div>
+      </div>
+
+      <div className="h-[260px] pt-4">
+        {isLoading ? (
+          <div className="flex h-full items-center justify-center text-sm text-slate-500">
+            Cargando grafica diaria...
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
+              <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="etiqueta"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: "#64748b", fontSize: 12 }}
+              />
+              <YAxis
+                allowDecimals={false}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: "#64748b", fontSize: 12 }}
+              />
+              <Tooltip content={<AccessDailyTooltip />} cursor={{ fill: "#ecfdf5" }} />
+              <Bar dataKey="total" name="Accesos" fill="#10b981" radius={[8, 8, 0, 0]} maxBarSize={48} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </section>
+  );
+}
+
 const REFRESH_INTERVAL_MS = 10000;
 
 export function AdminAccessesView() {
@@ -253,6 +377,9 @@ export function AdminAccessesView() {
       rechazados: 0,
     })),
   );
+  // SCRUM-174: estado para la grafica diaria (ultimos 7 dias)
+  const [dailyChartData, setDailyChartData] = useState<AdminAccessDailyPoint[]>([]);
+  const [isDailyChartLoading, setIsDailyChartLoading] = useState(true);
   const [accesses, setAccesses] = useState<AdminAccessRecord[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -301,17 +428,26 @@ export function AdminAccessesView() {
         } else {
           setIsLoading(true);
           setIsChartLoading(true);
+          setIsDailyChartLoading(true);
         }
         setErrorMessage("");
 
-        const [summaryResponse, hourlyChartResponse, accessesResponse] = await Promise.all([
+        // SCRUM-174: cargar grafica diaria en paralelo con el resto
+        const [
+          summaryResponse,
+          hourlyChartResponse,
+          dailyChartResponse,
+          accessesResponse,
+        ] = await Promise.all([
           getAdminAccessSummaryRequest(),
           getAdminAccessHourlyChartRequest(),
+          getAdminAccessDailyChartRequest(),
           getAdminAccessesRequest(filters),
         ]);
 
         setSummary(summaryResponse);
         setHourlyChartData(hourlyChartResponse);
+        setDailyChartData(dailyChartResponse);
         setAccesses(accessesResponse);
         setLastUpdatedAt(new Date());
       } catch (error) {
@@ -324,6 +460,7 @@ export function AdminAccessesView() {
         setIsLoading(false);
         setIsRefreshing(false);
         setIsChartLoading(false);
+        setIsDailyChartLoading(false);
       }
     },
     [filters],
@@ -395,6 +532,7 @@ export function AdminAccessesView() {
       </section>
 
       <AdminAccessHourlyChart data={hourlyChartData} isLoading={isChartLoading} />
+      <AdminAccessDailyChart data={dailyChartData} isLoading={isDailyChartLoading} />
 
       <section
         className="mt-5 rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
@@ -526,7 +664,16 @@ export function AdminAccessesView() {
                           {typeLabels[access.tipo]}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-950">{access.nombre}</td>
+                      <td className="px-5 py-3 text-sm text-slate-950">
+                        <div className="flex items-center gap-2">
+                          <span>{access.nombre}</span>
+                          {access.es_acceso_especial ? (
+                            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[0.65rem] font-medium text-violet-700">
+                              Especial
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="px-5 py-3 text-sm text-slate-500">{access.casa_unidad}</td>
                       <td className="px-5 py-3 text-sm text-slate-500">{access.placa}</td>
                       <td className="px-5 py-3">

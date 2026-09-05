@@ -1,19 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Clock3 } from "lucide-react";
+import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Clock3, History, Pencil, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { useAuth } from "@/hooks/useAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   createAmenitiesReservationRequest,
+  cancelAmenitiesReservationRequest,
   getAmenityAvailabilityRequest,
   getAmenitiesRequest,
+  getAmenitiesReservationHistoryRequest,
   getAmenitiesReservationsRequest,
+  updateAmenitiesReservationRequest,
   validateAmenityConflictRequest,
 } from "@/services/amenitiesService";
-import type { Amenity, AmenityAvailabilityResponse, AmenityReservation } from "@/types/amenities";
+import type {
+  Amenity,
+  AmenityAvailabilityResponse,
+  AmenityReservation,
+  AmenityReservationHistory,
+} from "@/types/amenities";
 
 type SlotSelection = {
   hora_inicio: string;
@@ -51,8 +60,10 @@ function getWeekDates(baseDate: Date) {
 
 export function ResidenteAmenitiesView() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [amenities, setAmenities] = useState<Amenity[]>([]);
   const [reservations, setReservations] = useState<AmenityReservation[]>([]);
+  const [reservationHistory, setReservationHistory] = useState<AmenityReservationHistory[]>([]);
   const [availability, setAvailability] = useState<AmenityAvailabilityResponse | null>(null);
   const [selectedAmenityId, setSelectedAmenityId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState("");
@@ -61,6 +72,8 @@ export function ResidenteAmenitiesView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingReservation, setEditingReservation] = useState<AmenityReservation | null>(null);
+  const [updatingReservationKey, setUpdatingReservationKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -79,12 +92,13 @@ export function ResidenteAmenitiesView() {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const [amenitiesResponse, reservationsResponse] = await Promise.all([
+        const [amenitiesResponse, reservationsResponse, historyResponse] = await Promise.all([
           getAmenitiesRequest(),
           getAmenitiesReservationsRequest({
             from: weekDates[0],
             to: weekDates[6],
           }),
+          getAmenitiesReservationHistoryRequest(),
         ]);
 
         if (!active) {
@@ -93,6 +107,7 @@ export function ResidenteAmenitiesView() {
 
         setAmenities(amenitiesResponse);
         setReservations(reservationsResponse);
+        setReservationHistory(historyResponse);
         if (amenitiesResponse.length > 0) {
           setSelectedAmenityId((current) => current ?? amenitiesResponse[0].id_amenidad);
         }
@@ -237,6 +252,75 @@ export function ResidenteAmenitiesView() {
       setErrorMessage(error instanceof Error ? error.message : "No fue posible confirmar la reserva.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  function canChangeReservation(reservation: AmenityReservation) {
+    const start = new Date(`${reservation.fecha}T${reservation.hora_inicio}:00`);
+    return (
+      reservation.id_usuario === user?.id &&
+      reservation.estado_actual !== "CANCELADA" &&
+      reservation.estado_actual !== "EN_CURSO" &&
+      reservation.estado_actual !== "FINALIZADA" &&
+      start.getTime() - Date.now() >= 120 * 60 * 1000
+    );
+  }
+
+  async function refreshReservations() {
+    const [reservationsResponse, historyResponse] = await Promise.all([
+      getAmenitiesReservationsRequest({
+        from: weekDates[0],
+        to: weekDates[6],
+      }),
+      getAmenitiesReservationHistoryRequest(),
+    ]);
+    setReservations(reservationsResponse);
+    setReservationHistory(historyResponse);
+
+    if (selectedAmenityId && selectedDate) {
+      setAvailability(await getAmenityAvailabilityRequest(selectedAmenityId, selectedDate));
+    }
+  }
+
+  async function handleUpdateReservation() {
+    if (!editingReservation || !selectedSlot) {
+      setErrorMessage("Selecciona un nuevo horario para modificar la reserva.");
+      return;
+    }
+
+    try {
+      setUpdatingReservationKey(editingReservation.reservation_key);
+      setErrorMessage("");
+      setSuccessMessage("");
+      const updated = await updateAmenitiesReservationRequest(editingReservation.reservation_key, {
+        id_amenidad: selectedAmenityId || editingReservation.id_amenidad,
+        fecha: selectedDate || editingReservation.fecha,
+        hora_inicio: selectedSlot.hora_inicio,
+        hora_fin: selectedSlot.hora_fin,
+      });
+      await refreshReservations();
+      setEditingReservation(null);
+      setSelectedSlot(null);
+      setSuccessMessage(`Reserva modificada para ${updated.amenidad_nombre} el ${formatLongDate(updated.fecha)}.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible modificar la reserva.");
+    } finally {
+      setUpdatingReservationKey(null);
+    }
+  }
+
+  async function handleCancelReservation(reservation: AmenityReservation) {
+    try {
+      setUpdatingReservationKey(reservation.reservation_key);
+      setErrorMessage("");
+      setSuccessMessage("");
+      await cancelAmenitiesReservationRequest(reservation.reservation_key);
+      await refreshReservations();
+      setSuccessMessage(`Reserva de ${reservation.amenidad_nombre} cancelada correctamente.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible cancelar la reserva.");
+    } finally {
+      setUpdatingReservationKey(null);
     }
   }
 
@@ -446,12 +530,48 @@ export function ResidenteAmenitiesView() {
                   selectedReservations.map((reservation) => (
                     <div
                       key={reservation.reservation_key}
-                      className="flex items-center justify-between rounded-xl bg-white px-4 py-3"
+                      className="flex flex-col gap-3 rounded-xl bg-white px-4 py-3 md:flex-row md:items-center md:justify-between"
                     >
-                      <span>
-                        {reservation.hora_inicio} - {reservation.hora_fin}
-                      </span>
-                      <span className="text-xs text-slate-500">{reservation.estado_actual}</span>
+                      <div>
+                        <span>
+                          {reservation.hora_inicio} - {reservation.hora_fin}
+                        </span>
+                        <span className="ml-3 rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700">
+                          {reservation.estado_actual}
+                        </span>
+                      </div>
+                      {canChangeReservation(reservation) ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={updatingReservationKey === reservation.reservation_key}
+                            onClick={() => {
+                              setEditingReservation(reservation);
+                              setSelectedAmenityId(reservation.id_amenidad);
+                              setSelectedDate(reservation.fecha);
+                              setSelectedSlot({
+                                hora_inicio: reservation.hora_inicio,
+                                hora_fin: reservation.hora_fin,
+                              });
+                            }}
+                            className="rounded-xl"
+                          >
+                            <Pencil className="size-4" />
+                            Modificar reserva
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={updatingReservationKey === reservation.reservation_key}
+                            onClick={() => void handleCancelReservation(reservation)}
+                            className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50"
+                          >
+                            <XCircle className="size-4" />
+                            Cancelar reserva
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   ))
                 ) : (
@@ -463,15 +583,69 @@ export function ResidenteAmenitiesView() {
         </Card>
 
         <div className="flex justify-end">
-          <Button
-            type="button"
-            disabled={!selectedAmenity || !selectedDate || !selectedSlot || selectedSlotIsBusy || isSubmitting}
-            onClick={handleConfirmReservation}
-            className="h-12 rounded-2xl bg-[linear-gradient(90deg,#3b82f6_0%,#1d4ed8_100%)] px-8 text-white hover:opacity-95"
-          >
-            {isSubmitting ? "Confirmando..." : "Confirmar reserva"}
-          </Button>
+          {editingReservation ? (
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setEditingReservation(null);
+                  setSelectedSlot(null);
+                }}
+                className="h-12 rounded-2xl"
+              >
+                Cancelar edicion
+              </Button>
+              <Button
+                type="button"
+                disabled={!selectedAmenity || !selectedDate || !selectedSlot || selectedSlotIsBusy}
+                onClick={() => void handleUpdateReservation()}
+                className="h-12 rounded-2xl bg-blue-600 px-8 text-white hover:bg-blue-700"
+              >
+                Guardar modificacion
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              disabled={!selectedAmenity || !selectedDate || !selectedSlot || selectedSlotIsBusy || isSubmitting}
+              onClick={handleConfirmReservation}
+              className="h-12 rounded-2xl bg-[linear-gradient(90deg,#3b82f6_0%,#1d4ed8_100%)] px-8 text-white hover:opacity-95"
+            >
+              {isSubmitting ? "Confirmando..." : "Confirmar reserva"}
+            </Button>
+          )}
         </div>
+
+        <Card className="border-white/70 bg-white shadow-[0_16px_40px_rgba(30,41,59,0.08)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <History className="size-5 text-blue-600" />
+              Historial de reservas
+            </CardTitle>
+            <CardDescription>Modificaciones y cancelaciones registradas en base de datos.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {reservationHistory.length === 0 ? (
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
+                Sin movimientos recientes.
+              </div>
+            ) : (
+              reservationHistory.slice(0, 6).map((entry) => (
+                <article key={entry.id_historial} className="rounded-2xl border border-slate-200 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-medium text-slate-900">{entry.amenidad_nombre}</p>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
+                      {entry.accion}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-500">{entry.detalle}</p>
+                  <p className="mt-2 text-xs text-slate-400">{entry.creado_en}</p>
+                </article>
+              ))
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
   );

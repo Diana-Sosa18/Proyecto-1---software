@@ -1,5 +1,5 @@
 # Usa Node
-FROM node:18
+FROM node:20
 
 # Carpeta de trabajo
 WORKDIR /app
@@ -13,8 +13,10 @@ RUN npm install
 # Copia todo
 COPY . .
 
+RUN npm run build
+
 # Expone puerto de Vite
 EXPOSE 5173
 
-# Corre la app
-CMD ["npm", "run", "dev", "--", "--host"]
+# Sirve el artefacto inmutable ya construido.
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173"]

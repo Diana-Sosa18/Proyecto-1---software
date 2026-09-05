@@ -16,8 +16,11 @@ export interface VisitRecord {
   observaciones?: string;
   token_qr?: string | null;
   qr_value?: string | null;
-  estado_acceso?: "AUTORIZADA" | "INGRESO_REGISTRADO" | "SALIDA_REGISTRADA" | "CANCELADA";
-  qr_status?: "VALID" | "USED" | "EXIT_REGISTERED" | "EXPIRED" | "CANCELLED";
+  estado_acceso?: "AUTORIZADA" | "INGRESO_REGISTRADO" | "SALIDA_REGISTRADA" | "CANCELADA" | "PENDIENTE_APROBACION" | "RECHAZADA";
+  qr_status?: "VALID" | "USED" | "EXIT_REGISTERED" | "EXPIRED" | "CANCELLED" | "PENDING_APPROVAL";
+  es_acceso_especial?: boolean;
+  fuera_horario?: boolean;
+  motivo_excepcion?: string;
   casa?: string;
 }
 
