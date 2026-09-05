@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, CheckCheck, Home, ShieldCheck, UserRoundCheck, Wallet } from "lucide-react";
+import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, CheckCheck, CreditCard, Home, ShieldCheck, UserRoundCheck, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
@@ -12,19 +12,29 @@ import {
   markAllNotificationsAsReadRequest,
   markNotificationAsReadRequest,
 } from "@/services/notificationsService";
+import { getResidentAccountStatementRequest } from "@/services/accountService";
 import {
   getOwnerProvidersRequest,
   updateOwnerProviderValidationRequest,
 } from "@/services/providersService";
 import { getVisitsRequest } from "@/services/visitsService";
+import type { AccountSummary } from "@/types/account";
 import type { NotificationRecord } from "@/types/notifications";
 import type { AdminProviderRecord } from "@/types/providers";
 import type { VisitRecord } from "@/types/visits";
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("es-GT", {
+    style: "currency",
+    currency: "GTQ",
+  }).format(value);
+}
 
 export function ResidenteView() {
   const navigate = useNavigate();
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [accountSummary, setAccountSummary] = useState<AccountSummary | null>(null);
   const [providers, setProviders] = useState<AdminProviderRecord[]>([]);
   const [notificationsError, setNotificationsError] = useState("");
   const [providersError, setProvidersError] = useState("");
@@ -56,6 +66,18 @@ export function ResidenteView() {
           setNotificationsError(
             error instanceof Error ? error.message : "No fue posible cargar las notificaciones.",
           );
+        }
+      });
+
+    getResidentAccountStatementRequest()
+      .then((response) => {
+        if (active) {
+          setAccountSummary(response.resumen);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setAccountSummary(null);
         }
       });
 
@@ -242,6 +264,18 @@ export function ResidenteView() {
         />
 
         <StatCard
+          label="Estado de cuenta"
+          value={accountSummary ? formatCurrency(accountSummary.saldo_pendiente) : "Q0.00"}
+          helper={
+            accountSummary?.cuotas_vencidas
+              ? `${accountSummary.cuotas_vencidas} cuotas vencidas`
+              : "Sin mora activa"
+          }
+          icon={CreditCard}
+          onClick={() => navigate("/residente/estado-cuenta")}
+        />
+
+        <StatCard
           label="Proveedores"
           value={String(pendingProviders.length)}
           helper={
@@ -351,6 +385,11 @@ export function ResidenteView() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         {[
+          {
+            title: "Estado de cuenta",
+            description: "Revise saldo pendiente, cuotas pagadas y vencimientos.",
+            path: "/residente/estado-cuenta",
+          },
           {
             title: "Visitas",
             description: "Autorice ingresos temporales, recurrentes o permanentes.",

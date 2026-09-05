@@ -11,6 +11,7 @@ const {
   ensureRestoreHistorySchema,
   ensureFinancialRulesSchema,
   ensureSanctionsSchema,
+  ensureTenantAccountSeed,
   ensureConfigurationSchema,
   ensureAutomaticBackupsSchema,
   ensureRemindersSchema,
@@ -60,6 +61,7 @@ async function startServer() {
   await ensureRestoreHistorySchema();
   await ensureFinancialRulesSchema();
   await ensureSanctionsSchema();
+  await ensureTenantAccountSeed();
   await ensureConfigurationSchema();
   await ensureAutomaticBackupsSchema();
   await ensureRemindersSchema();

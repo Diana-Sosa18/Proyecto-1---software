@@ -20,6 +20,8 @@ const adminPaymentsRoutes = require("./routes/adminPaymentsRoutes");
 const adminAuthorizedUsersRoutes = require("./routes/adminAuthorizedUsersRoutes");
 const restoresRoutes = require("./routes/restoresRoutes");
 const adminSanctionsRoutes = require("./routes/adminSanctionsRoutes");
+const residentAccountRoutes = require("./routes/residentAccountRoutes");
+const tenantAccountRoutes = require("./routes/tenantAccountRoutes");
 const configurationRoutes = require("./routes/configurationRoutes");
 const financialRulesRoutes = require("./routes/financialRulesRoutes");
 const sanctionHistoryRoutes = require("./routes/sanctionHistoryRoutes");
@@ -73,6 +75,8 @@ function createApp() {
   app.use(adminAuthorizedUsersRoutes);
   app.use(restoresRoutes);
   app.use(adminSanctionsRoutes);
+  app.use(residentAccountRoutes);
+  app.use(tenantAccountRoutes);
   app.use(configurationRoutes);
   app.use(financialRulesRoutes);
   app.use(sanctionHistoryRoutes);

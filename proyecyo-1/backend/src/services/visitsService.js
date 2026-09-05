@@ -115,6 +115,7 @@ function mapVisit(row) {
     fecha: row.fecha,
     hora_inicio: row.hora_inicio,
     hora_fin: row.hora_fin,
+    hora_salida: row.hora_salida || null,
     tipo_visita: row.tipo_visita,
     motivo_servicio: row.motivo_servicio || "",
     observaciones: row.observaciones || "",
@@ -158,6 +159,10 @@ function getCurrentDateTimeInTimezone() {
 }
 
 function getQrStatus(visit) {
+  if (visit.estado_acceso === "SALIDA_REGISTRADA" || visit.hora_salida) {
+    return "EXIT_REGISTERED";
+  }
+
   if (visit.estado_acceso === "INGRESO_REGISTRADO") {
     return "USED";
   }
@@ -220,6 +225,12 @@ async function listResidentVisits(userId, role = "residente") {
         DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+        (
+          SELECT TIME_FORMAT(ra.hora_salida, '%H:%i')
+          FROM REGISTRO_ACCESO ra
+          WHERE ra.id_acceso = a.id_acceso
+          LIMIT 1
+        ) AS hora_salida,
         a.tipo_visita,
         a.motivo_servicio,
         a.observaciones,
@@ -350,6 +361,7 @@ async function createVisit(userId, role = "residente", payload) {
           DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
           TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
           TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+          NULL AS hora_salida,
           a.tipo_visita,
           a.motivo_servicio,
           a.observaciones,
@@ -397,6 +409,12 @@ async function deleteVisit(userId, role = "residente", accessId) {
         DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+        (
+          SELECT TIME_FORMAT(ra.hora_salida, '%H:%i')
+          FROM REGISTRO_ACCESO ra
+          WHERE ra.id_acceso = a.id_acceso
+          LIMIT 1
+        ) AS hora_salida,
         a.tipo_visita,
         a.motivo_servicio,
         a.observaciones,
@@ -473,6 +491,12 @@ async function updateVisit(userId, role = "residente", accessId, payload = {}) {
         DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+        (
+          SELECT TIME_FORMAT(ra.hora_salida, '%H:%i')
+          FROM REGISTRO_ACCESO ra
+          WHERE ra.id_acceso = a.id_acceso
+          LIMIT 1
+        ) AS hora_salida,
         a.tipo_visita,
         a.motivo_servicio,
         a.observaciones,
@@ -585,6 +609,7 @@ async function updateVisit(userId, role = "residente", accessId, payload = {}) {
         DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+        NULL AS hora_salida,
         a.tipo_visita,
         a.motivo_servicio,
         a.observaciones,
@@ -729,6 +754,7 @@ async function cancelVisit(userId, role = "residente", accessId) {
         DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+        NULL AS hora_salida,
         a.tipo_visita,
         a.motivo_servicio,
         a.observaciones,
@@ -828,6 +854,12 @@ async function getGuardShiftVisits() {
         DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+        (
+          SELECT TIME_FORMAT(ra.hora_salida, '%H:%i')
+          FROM REGISTRO_ACCESO ra
+          WHERE ra.id_acceso = a.id_acceso
+          LIMIT 1
+        ) AS hora_salida,
         a.tipo_visita,
         a.motivo_servicio,
         a.observaciones,
@@ -866,6 +898,12 @@ async function validateQrVisit(qrToken) {
     throw error;
   }
 
+  if (mappedVisit.qr_status === "EXIT_REGISTERED") {
+    const error = new Error("La salida de esta visita ya fue registrada.");
+    error.status = 409;
+    throw error;
+  }
+
   if (mappedVisit.qr_status === "EXPIRED") {
     const error = new Error("QR expirado.");
     error.status = 410;
@@ -898,6 +936,12 @@ async function findVisitByQrToken(normalizedToken) {
         DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
+        (
+          SELECT TIME_FORMAT(ra.hora_salida, '%H:%i')
+          FROM REGISTRO_ACCESO ra
+          WHERE ra.id_acceso = a.id_acceso
+          LIMIT 1
+        ) AS hora_salida,
         a.tipo_visita,
         a.motivo_servicio,
         a.observaciones,
@@ -1018,6 +1062,81 @@ async function registerQrEntry(qrToken) {
   }
 }
 
+function ensureQrExitCanBeRegistered(visit) {
+  const status = String(visit.estado_acceso || "").toUpperCase();
+
+  if (status === "CANCELADA" || visit.qr_status === "CANCELLED") {
+    const error = new Error("Este QR ya no es valido.");
+    error.status = 410;
+    throw error;
+  }
+
+  if (status === "AUTORIZADA" || visit.qr_status === "VALID") {
+    const error = new Error("Primero debe registrarse el ingreso del visitante.");
+    error.status = 409;
+    throw error;
+  }
+
+  if (status === "SALIDA_REGISTRADA" || visit.qr_status === "EXIT_REGISTERED" || visit.hora_salida) {
+    const error = new Error("La salida de esta visita ya fue registrada.");
+    error.status = 409;
+    throw error;
+  }
+
+  if (status !== "INGRESO_REGISTRADO") {
+    const error = new Error("Este acceso no se encuentra en estado valido para registrar salida.");
+    error.status = 409;
+    throw error;
+  }
+
+  return true;
+}
+
+async function registerQrExit(qrToken) {
+  const normalizedToken = normalizeQrToken(qrToken);
+  const visit = await findVisitByQrToken(normalizedToken);
+
+  ensureQrExitCanBeRegistered(visit);
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    await connection.execute(
+      `
+        UPDATE ACCESO
+        SET estado_acceso = 'SALIDA_REGISTRADA'
+        WHERE id_acceso = ?
+      `,
+      [visit.id_acceso],
+    );
+    const [result] = await connection.execute(
+      `
+        UPDATE REGISTRO_ACCESO
+        SET hora_salida = CURTIME()
+        WHERE id_acceso = ?
+          AND hora_salida IS NULL
+      `,
+      [visit.id_acceso],
+    );
+
+    if (result.affectedRows === 0) {
+      const error = new Error("La salida de esta visita ya fue registrada.");
+      error.status = 409;
+      throw error;
+    }
+
+    await connection.commit();
+
+    return findVisitByQrToken(normalizedToken);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   listResidentVisits,
   listFrequentVisitors,
@@ -1029,5 +1148,9 @@ module.exports = {
   getGuardShiftVisits,
   validateQrVisit,
   registerQrEntry,
-  __private__: { ensureVisitType },
+  registerQrExit,
+  __private__: {
+    ensureVisitType,
+    ensureQrExitCanBeRegistered,
+  },
 };
