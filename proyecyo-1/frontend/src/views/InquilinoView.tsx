@@ -186,7 +186,12 @@ function formatCurrency(value: number) {
 }
 
 function getAccessStatus(visit: VisitRecord): Exclude<AccessFilter, "TODOS"> {
-  if (visit.estado_acceso === "INGRESO_REGISTRADO" || visit.qr_status === "USED") {
+  if (
+    visit.estado_acceso === "INGRESO_REGISTRADO" ||
+    visit.estado_acceso === "SALIDA_REGISTRADA" ||
+    visit.qr_status === "USED" ||
+    visit.qr_status === "EXIT_REGISTERED"
+  ) {
     return "UTILIZADO";
   }
 

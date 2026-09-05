@@ -11,6 +11,7 @@ const {
   getGuardVisits,
   postValidateQr,
   postRegisterQrEntry,
+  postRegisterQrExit,
 } = require("../controllers/visitsController");
 const { requireResidentOrTenant } = require("../middlewares/requireResident");
 const { requireGuard } = require("../middlewares/requireGuard");
@@ -27,5 +28,6 @@ router.patch("/visitas/:id/cancelar", requireResidentOrTenant, patchCancelVisit)
 router.get("/guardia/visitas", requireGuard, getGuardVisits);
 router.post("/guardia/validar-qr", requireGuard, postValidateQr);
 router.post("/guardia/registrar-ingreso", requireGuard, postRegisterQrEntry);
+router.post("/guardia/registrar-salida", requireGuard, postRegisterQrExit);
 
 module.exports = router;

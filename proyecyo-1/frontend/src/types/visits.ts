@@ -10,13 +10,14 @@ export interface VisitRecord {
   fecha: string;
   hora_inicio: string;
   hora_fin: string;
+  hora_salida?: string | null;
   tipo_visita: VisitType;
   motivo_servicio?: string;
   observaciones?: string;
   token_qr?: string | null;
   qr_value?: string | null;
-  estado_acceso?: "AUTORIZADA" | "INGRESO_REGISTRADO" | "CANCELADA";
-  qr_status?: "VALID" | "USED" | "EXPIRED" | "CANCELLED";
+  estado_acceso?: "AUTORIZADA" | "INGRESO_REGISTRADO" | "SALIDA_REGISTRADA" | "CANCELADA";
+  qr_status?: "VALID" | "USED" | "EXIT_REGISTERED" | "EXPIRED" | "CANCELLED";
   casa?: string;
 }
 

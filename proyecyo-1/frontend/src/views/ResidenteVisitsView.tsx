@@ -95,6 +95,10 @@ function countTodayVisits(visits: VisitRecord[]) {
 }
 
 function getVisitStatusLabel(visit: VisitRecord) {
+  if (visit.estado_acceso === "SALIDA_REGISTRADA" || visit.qr_status === "EXIT_REGISTERED") {
+    return "Salida registrada";
+  }
+
   if (visit.estado_acceso === "INGRESO_REGISTRADO" || visit.qr_status === "USED") {
     return "Ingreso registrado";
   }

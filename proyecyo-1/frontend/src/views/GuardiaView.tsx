@@ -3,6 +3,8 @@ import jsQR from "jsqr";
 import {
   Camera,
   CircleAlert,
+  LogIn,
+  LogOut,
   QrCode,
   ScanLine,
   Shield,
@@ -18,9 +20,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   getGuardVisitsRequest,
   registerQrEntryRequest,
+  registerQrExitRequest,
   validateQrRequest,
 } from "@/services/visitsService";
 import type { VisitRecord } from "@/types/visits";
+
+type GuardScanAction = "INGRESO" | "SALIDA";
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("es-GT", {
@@ -42,6 +47,10 @@ function canUseCamera() {
 }
 
 function getVisitBadge(visit: VisitRecord) {
+  if (visit.qr_status === "EXIT_REGISTERED" || visit.estado_acceso === "SALIDA_REGISTRADA") {
+    return "Salida registrada";
+  }
+
   if (visit.qr_status === "EXPIRED") {
     return "QR expirado";
   }
@@ -53,6 +62,15 @@ function getVisitBadge(visit: VisitRecord) {
   return "Autorizada";
 }
 
+function canRegisterExit(visit: VisitRecord) {
+  return (
+    visit.estado_acceso === "INGRESO_REGISTRADO" &&
+    visit.qr_status === "USED" &&
+    !visit.hora_salida &&
+    Boolean(visit.token_qr)
+  );
+}
+
 export function GuardiaView() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -62,6 +80,8 @@ export function GuardiaView() {
   const [validatedVisit, setValidatedVisit] = useState<VisitRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanAction, setScanAction] = useState<GuardScanAction>("INGRESO");
+  const [exitingAccessId, setExitingAccessId] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [manualCode, setManualCode] = useState("");
@@ -108,7 +128,21 @@ export function GuardiaView() {
   );
 
   const registeredCount = useMemo(
-    () => visits.filter((visit) => visit.qr_status === "USED").length,
+    () =>
+      visits.filter(
+        (visit) =>
+          visit.qr_status === "USED" ||
+          visit.qr_status === "EXIT_REGISTERED" ||
+          visit.estado_acceso === "SALIDA_REGISTRADA",
+      ).length,
+    [visits],
+  );
+
+  const exitCount = useMemo(
+    () =>
+      visits.filter(
+        (visit) => visit.qr_status === "EXIT_REGISTERED" || visit.estado_acceso === "SALIDA_REGISTRADA",
+      ).length,
     [visits],
   );
 
@@ -141,18 +175,29 @@ export function GuardiaView() {
     try {
       setErrorMessage("");
       setSuccessMessage("");
-      const visit = await validateQrRequest({ qrToken });
+      const isExitAction = scanAction === "SALIDA";
+      const visit = isExitAction
+        ? await registerQrExitRequest({ qrToken })
+        : await validateQrRequest({ qrToken });
+
       setValidatedVisit(visit);
       setValidationResult({
         status: "approved",
-        title: "Visita autorizada",
-        message: "QR valido. El ingreso fue registrado y este QR ya no funcionara una segunda vez.",
+        title: isExitAction ? "Salida registrada" : "Visita autorizada",
+        message: isExitAction
+          ? "La salida fue registrada con la hora actual."
+          : "QR valido. El ingreso fue registrado y este QR ya no funcionara una segunda vez.",
       });
       updateVisitCollection(visit);
-      setSuccessMessage("Visita autorizada e ingreso registrado.");
+      setSuccessMessage(isExitAction ? "Salida registrada correctamente." : "Visita autorizada e ingreso registrado.");
     } catch (error) {
       setValidatedVisit(null);
-      const message = error instanceof Error ? error.message : "No fue posible validar el QR.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : scanAction === "SALIDA"
+            ? "No fue posible registrar la salida."
+            : "No fue posible validar el QR.";
       setValidationResult({
         status: "rejected",
         title: "Acceso rechazado",
@@ -312,6 +357,38 @@ export function GuardiaView() {
     }
   }
 
+  async function handleRegisterExit(visit: VisitRecord) {
+    if (!visit.token_qr) {
+      setErrorMessage("Este acceso no tiene codigo QR para registrar salida.");
+      return;
+    }
+
+    try {
+      setExitingAccessId(visit.id_acceso);
+      setErrorMessage("");
+      setSuccessMessage("");
+      const updatedVisit = await registerQrExitRequest({ qrToken: visit.token_qr });
+      setValidatedVisit(updatedVisit);
+      setValidationResult({
+        status: "approved",
+        title: "Salida registrada",
+        message: "La salida fue registrada con la hora actual.",
+      });
+      updateVisitCollection(updatedVisit);
+      setSuccessMessage(`Salida registrada para ${updatedVisit.nombre}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No fue posible registrar la salida.";
+      setValidationResult({
+        status: "rejected",
+        title: "Acceso rechazado",
+        message,
+      });
+      setErrorMessage(message);
+    } finally {
+      setExitingAccessId(null);
+    }
+  }
+
   return (
     <AppShell
       role="guardia"
@@ -322,7 +399,7 @@ export function GuardiaView() {
         <StatCard label="Visitas del turno" value={String(visits.length)} helper={`${pendingCount} pendientes de ingreso`} icon={Users} />
         <StatCard label="Escaneos QR" value={String(registeredCount)} helper="Ingresos ya registrados" icon={QrCode} />
         <StatCard label="Validaciones" value={validatedVisit ? "OK" : "Lista"} helper="Control con QR en tiempo real" icon={UserCheck} />
-        <StatCard label="Seguridad" value="Alta" helper="Monitoreo estable" icon={Shield} />
+        <StatCard label="Salidas" value={String(exitCount)} helper="Visitantes con salida registrada" icon={Shield} />
       </div>
 
       {errorMessage ? (
@@ -343,10 +420,30 @@ export function GuardiaView() {
         <Card className="border-slate-200">
           <CardHeader>
             <CardTitle>Escanear QR</CardTitle>
-            <CardDescription>Lee el QR del visitante para validar acceso en garita.</CardDescription>
+            <CardDescription>Lee el QR del visitante para registrar ingreso o salida.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-4">
+              <div className="mb-4 grid gap-2 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  variant={scanAction === "INGRESO" ? "default" : "outline"}
+                  onClick={() => setScanAction("INGRESO")}
+                  className="rounded-2xl"
+                >
+                  <LogIn className="size-4" />
+                  Registrar ingreso
+                </Button>
+                <Button
+                  type="button"
+                  variant={scanAction === "SALIDA" ? "default" : "outline"}
+                  onClick={() => setScanAction("SALIDA")}
+                  className="rounded-2xl"
+                >
+                  <LogOut className="size-4" />
+                  Registrar salida
+                </Button>
+              </div>
               <video ref={videoRef} className="h-72 w-full rounded-2xl bg-slate-900 object-cover" muted playsInline />
               <canvas ref={canvasRef} className="hidden" />
               <div className="mt-4 flex flex-wrap gap-3">
@@ -381,7 +478,7 @@ export function GuardiaView() {
                   className="h-11 flex-1 rounded-2xl border border-slate-200 px-4 outline-none focus:border-blue-300"
                 />
                 <Button type="button" onClick={() => void handleManualValidation()} className="rounded-2xl">
-                  Validar QR
+                  {scanAction === "SALIDA" ? "Registrar salida" : "Validar QR"}
                 </Button>
               </div>
             </div>
@@ -408,17 +505,30 @@ export function GuardiaView() {
                   <p>Casa: {validatedVisit.casa}</p>
                   <p>Fecha: {formatDate(validatedVisit.fecha)}</p>
                   <p>Hora: {validatedVisit.hora_inicio} - {validatedVisit.hora_fin}</p>
+                  <p>Salida: {validatedVisit.hora_salida || "Sin registro"}</p>
                   <p>Tipo: {validatedVisit.tipo_visita}</p>
                   <p>Estado: {validatedVisit.estado_acceso}</p>
                 </div>
-                <Button
-                  type="button"
-                  onClick={() => void handleRegisterEntry()}
-                  disabled
-                  className="rounded-2xl"
-                >
-                  Ingreso ya registrado
-                </Button>
+                {canRegisterExit(validatedVisit) ? (
+                  <Button
+                    type="button"
+                    onClick={() => void handleRegisterExit(validatedVisit)}
+                    disabled={exitingAccessId === validatedVisit.id_acceso}
+                    className="rounded-2xl"
+                  >
+                    <LogOut className="size-4" />
+                    {exitingAccessId === validatedVisit.id_acceso ? "Registrando..." : "Registrar salida"}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={() => void handleRegisterEntry()}
+                    disabled
+                    className="rounded-2xl"
+                  >
+                    {validatedVisit.hora_salida ? "Salida ya registrada" : "Ingreso ya registrado"}
+                  </Button>
+                )}
               </div>
             ) : validationResult?.status === "rejected" ? (
               <div className="space-y-3 rounded-3xl bg-rose-50 p-5 text-rose-700">
@@ -458,10 +568,27 @@ export function GuardiaView() {
                   <p className="text-sm text-slate-500">
                     {visitor.casa} • {formatDate(visitor.fecha)} • {visitor.hora_inicio} - {visitor.hora_fin}
                   </p>
+                  {visitor.hora_salida ? (
+                    <p className="text-sm font-medium text-emerald-700">Salida: {visitor.hora_salida}</p>
+                  ) : null}
                 </div>
-                <span className="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">
-                  {getVisitBadge(visitor)}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {canRegisterExit(visitor) ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void handleRegisterExit(visitor)}
+                      disabled={exitingAccessId === visitor.id_acceso}
+                      className="rounded-xl"
+                    >
+                      <LogOut className="size-3.5" />
+                      {exitingAccessId === visitor.id_acceso ? "Registrando..." : "Registrar salida"}
+                    </Button>
+                  ) : null}
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">
+                    {getVisitBadge(visitor)}
+                  </span>
+                </div>
               </div>
             ))
           )}

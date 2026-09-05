@@ -64,6 +64,58 @@ async function indexExists(tableName, indexName) {
   return rows.length > 0;
 }
 
+function escapeIdentifier(identifier) {
+  return `\`${String(identifier).replace(/`/g, "``")}\``;
+}
+
+async function ensureAccessStatusCheckConstraint() {
+  let constraints = [];
+
+  try {
+    constraints = await query(
+      `
+        SELECT
+          cc.CONSTRAINT_NAME AS constraint_name,
+          cc.CHECK_CLAUSE AS check_clause
+        FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+        INNER JOIN INFORMATION_SCHEMA.CHECK_CONSTRAINTS cc
+          ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA
+          AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+        WHERE tc.TABLE_SCHEMA = ?
+          AND tc.TABLE_NAME = 'ACCESO'
+          AND tc.CONSTRAINT_TYPE = 'CHECK'
+          AND LOWER(cc.CHECK_CLAUSE) LIKE '%estado_acceso%'
+      `,
+      [env.DB_NAME],
+    );
+  } catch (error) {
+    console.warn("No fue posible revisar el CHECK de estado_acceso.", error.message);
+    return;
+  }
+
+  const hasUpdatedConstraint = constraints.some((constraint) =>
+    String(constraint.check_clause || "").includes("SALIDA_REGISTRADA"),
+  );
+
+  if (hasUpdatedConstraint) {
+    return;
+  }
+
+  try {
+    for (const constraint of constraints) {
+      await query(`ALTER TABLE ACCESO DROP CHECK ${escapeIdentifier(constraint.constraint_name)}`);
+    }
+
+    await query(`
+      ALTER TABLE ACCESO
+      ADD CONSTRAINT chk_acceso_estado
+      CHECK (estado_acceso IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'CANCELADA'))
+    `);
+  } catch (error) {
+    console.warn("No fue posible actualizar el CHECK de estado_acceso.", error.message);
+  }
+}
+
 async function ensureVisitQrSchema() {
   const hasTokenQr = await columnExists("ACCESO", "token_qr");
   const hasEstadoAcceso = await columnExists("ACCESO", "estado_acceso");
@@ -126,6 +178,8 @@ async function ensureVisitQrSchema() {
       ADD CONSTRAINT uq_acceso_token_qr UNIQUE (token_qr)
     `);
   }
+
+  await ensureAccessStatusCheckConstraint();
 }
 
 async function ensureAmenityReservationsSchema() {
