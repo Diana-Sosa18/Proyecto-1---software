@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import jsQR from "jsqr";
 import {
   Camera,
@@ -6,6 +6,7 @@ import {
   LogIn,
   LogOut,
   QrCode,
+  RefreshCw,
   ScanLine,
   Shield,
   UserCheck,
@@ -26,6 +27,7 @@ import {
 import type { VisitRecord } from "@/types/visits";
 
 type GuardScanAction = "INGRESO" | "SALIDA";
+const REFRESH_INTERVAL_MS = 10000;
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("es-GT", {
@@ -62,6 +64,19 @@ function getVisitBadge(visit: VisitRecord) {
   return "Autorizada";
 }
 
+function formatRefreshTime(date: Date | null) {
+  if (!date) {
+    return "Sin sincronizar";
+  }
+
+  return new Intl.DateTimeFormat("es-GT", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 function canRegisterExit(visit: VisitRecord) {
   return (
     visit.estado_acceso === "INGRESO_REGISTRADO" &&
@@ -80,41 +95,51 @@ export function GuardiaView() {
   const [validatedVisit, setValidatedVisit] = useState<VisitRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [scanAction, setScanAction] = useState<GuardScanAction>("INGRESO");
   const [exitingAccessId, setExitingAccessId] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [manualCode, setManualCode] = useState("");
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [validationResult, setValidationResult] = useState<{
     status: "approved" | "rejected";
     title: string;
     message: string;
   } | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  const loadGuardVisits = useCallback(async (options: { silent?: boolean } = {}) => {
+    const { silent = false } = options;
 
-    getGuardVisitsRequest()
-      .then((response) => {
-        if (active) {
-          setVisits(response);
-        }
-      })
-      .catch((error) => {
-        if (active) {
-          setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar las visitas.");
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setIsLoading(false);
-        }
-      });
+    try {
+      if (silent) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+
+      const response = await getGuardVisitsRequest();
+      setVisits(response);
+      setLastUpdatedAt(new Date());
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar las visitas.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadGuardVisits();
+
+    const intervalId = window.setInterval(() => {
+      void loadGuardVisits({ silent: true });
+    }, REFRESH_INTERVAL_MS);
 
     return () => {
-      active = false;
+      window.clearInterval(intervalId);
     };
-  }, []);
+  }, [loadGuardVisits]);
 
   useEffect(() => {
     return () => {
@@ -189,6 +214,7 @@ export function GuardiaView() {
           : "QR valido. El ingreso fue registrado y este QR ya no funcionara una segunda vez.",
       });
       updateVisitCollection(visit);
+      void loadGuardVisits({ silent: true });
       setSuccessMessage(isExitAction ? "Salida registrada correctamente." : "Visita autorizada e ingreso registrado.");
     } catch (error) {
       setValidatedVisit(null);
@@ -345,6 +371,7 @@ export function GuardiaView() {
         message: "El QR fue usado correctamente y ya no funcionara una segunda vez.",
       });
       updateVisitCollection(visit);
+      void loadGuardVisits({ silent: true });
       setSuccessMessage("Ingreso registrado correctamente.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "No fue posible registrar el ingreso.";
@@ -375,6 +402,7 @@ export function GuardiaView() {
         message: "La salida fue registrada con la hora actual.",
       });
       updateVisitCollection(updatedVisit);
+      void loadGuardVisits({ silent: true });
       setSuccessMessage(`Salida registrada para ${updatedVisit.nombre}.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "No fue posible registrar la salida.";
@@ -548,9 +576,27 @@ export function GuardiaView() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Control de ingresos</CardTitle>
-          <CardDescription>Listado operativo para revision rapida desde garita.</CardDescription>
+        <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <CardTitle>Control de ingresos</CardTitle>
+            <CardDescription>Listado operativo para revision rapida desde garita.</CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-slate-500">
+              Actualizado: {formatRefreshTime(lastUpdatedAt)}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void loadGuardVisits({ silent: true })}
+              disabled={isRefreshing || isLoading}
+              className="rounded-xl"
+            >
+              <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+              {isRefreshing ? "Actualizando..." : "Actualizar"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {isLoading ? (

@@ -955,9 +955,7 @@ async function registerQrEntry(qrToken) {
   }
 }
 
-async function registerQrExit(qrToken) {
-  const normalizedToken = normalizeQrToken(qrToken);
-  const visit = await findVisitByQrToken(normalizedToken);
+function ensureQrExitCanBeRegistered(visit) {
   const status = String(visit.estado_acceso || "").toUpperCase();
 
   if (status === "CANCELADA" || visit.qr_status === "CANCELLED") {
@@ -983,6 +981,15 @@ async function registerQrExit(qrToken) {
     error.status = 409;
     throw error;
   }
+
+  return true;
+}
+
+async function registerQrExit(qrToken) {
+  const normalizedToken = normalizeQrToken(qrToken);
+  const visit = await findVisitByQrToken(normalizedToken);
+
+  ensureQrExitCanBeRegistered(visit);
 
   const connection = await pool.getConnection();
 
@@ -1035,4 +1042,7 @@ module.exports = {
   validateQrVisit,
   registerQrEntry,
   registerQrExit,
+  __private__: {
+    ensureQrExitCanBeRegistered,
+  },
 };
