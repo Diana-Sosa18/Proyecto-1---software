@@ -158,6 +158,11 @@ function getCurrentDateTimeInTimezone() {
   };
 }
 
+function normalizeQrTime(value, fallback) {
+  const normalized = String(value || fallback);
+  return normalized.length === 5 ? `${normalized}:00` : normalized;
+}
+
 function getQrStatus(visit) {
   if (visit.estado_acceso === "SALIDA_REGISTRADA" || visit.hora_salida) {
     return "EXIT_REGISTERED";
@@ -176,10 +181,19 @@ function getQrStatus(visit) {
   }
 
   const currentDateTime = getCurrentDateTimeInTimezone();
+  const startTime = normalizeQrTime(visit.hora_inicio, "00:00:00");
+  const endTime = normalizeQrTime(visit.hora_fin, "23:59:59");
+
+  if (
+    currentDateTime.date < visit.fecha ||
+    (currentDateTime.date === visit.fecha && currentDateTime.time < startTime)
+  ) {
+    return "NOT_YET_VALID";
+  }
 
   if (
     currentDateTime.date > visit.fecha ||
-    (currentDateTime.date === visit.fecha && currentDateTime.time > `${visit.hora_fin}:00`)
+    (currentDateTime.date === visit.fecha && currentDateTime.time > endTime)
   ) {
     return "EXPIRED";
   }
@@ -193,14 +207,18 @@ function generateQrToken() {
 
 function normalizeQrToken(value) {
   const normalized = normalizeString(value);
+  const token = normalized.startsWith("NEXUSVISIT:")
+    ? normalized.slice("NEXUSVISIT:".length)
+    : normalized;
 
-  if (!normalized) {
+  if (!token || token.length > 64) {
     const error = new Error("El codigo QR es obligatorio.");
     error.status = 400;
+    error.code = "QR_INVALID";
     throw error;
   }
 
-  return normalized.startsWith("NEXUSVISIT:") ? normalized.slice("NEXUSVISIT:".length) : normalized;
+  return token;
 }
 
 function getOwnerFilter(role) {
@@ -882,43 +900,123 @@ async function getGuardShiftVisits() {
   return rows.map(mapVisit);
 }
 
-async function validateQrVisit(qrToken) {
-  const normalizedToken = normalizeQrToken(qrToken);
-  const mappedVisit = await findVisitByQrToken(normalizedToken);
+async function recordQrValidationAttempt({
+  accessId = null,
+  tokenQr = null,
+  guardUserId = null,
+  result,
+  detail,
+}) {
+  try {
+    await query(
+      `
+        INSERT INTO INTENTO_VALIDACION_QR (
+          id_acceso,
+          token_qr,
+          id_usuario_guardia,
+          resultado,
+          detalle
+        )
+        VALUES (?, ?, ?, ?, ?)
+      `,
+      [accessId, tokenQr, guardUserId, result, String(detail || "").slice(0, 255)],
+    );
+  } catch (error) {
+    // La auditoria no debe impedir que el guardia reciba el resultado del QR.
+    console.warn("No fue posible registrar el intento de validacion QR.", error.message);
+  }
+}
+
+async function validateQrVisit(qrToken, guardUserId = null) {
+  let normalizedToken = null;
+
+  try {
+    normalizedToken = normalizeQrToken(qrToken);
+  } catch (error) {
+    await recordQrValidationAttempt({
+      tokenQr: String(qrToken || "").slice(0, 64),
+      guardUserId,
+      result: "INVALIDO",
+      detail: error.message,
+    });
+    throw error;
+  }
+
+  let mappedVisit;
+  try {
+    mappedVisit = await findVisitByQrToken(normalizedToken);
+  } catch (error) {
+    await recordQrValidationAttempt({
+      tokenQr: normalizedToken,
+      guardUserId,
+      result: error.status === 404 ? "NO_ENCONTRADO" : "INVALIDO",
+      detail: error.message,
+    });
+    throw error;
+  }
+
+  const reject = async (result, message, status, code) => {
+    await recordQrValidationAttempt({
+      accessId: mappedVisit.id_acceso,
+      tokenQr: normalizedToken,
+      guardUserId,
+      result,
+      detail: message,
+    });
+    const error = new Error(message);
+    error.status = status;
+    error.code = code;
+    throw error;
+  };
+
+  if (mappedVisit.qr_status === "NOT_YET_VALID") {
+    await reject(
+      "AUN_NO_VIGENTE",
+      "Este QR aun no esta vigente. Espere hasta la hora de inicio programada.",
+      409,
+      "QR_NOT_YET_VALID",
+    );
+  }
 
   if (mappedVisit.qr_status === "PENDING_APPROVAL") {
-    const error = new Error("Este acceso especial aun no ha sido aprobado.");
-    error.status = 409;
-    throw error;
+    await reject(
+      "PENDIENTE_APROBACION",
+      "Este acceso especial aun no ha sido aprobado.",
+      409,
+      "QR_PENDING_APPROVAL",
+    );
   }
 
   if (mappedVisit.qr_status === "USED") {
-    const error = new Error("Este QR ya fue utilizado.");
-    error.status = 409;
-    throw error;
+    await reject("REUTILIZADO", "Este QR ya fue utilizado.", 409, "QR_ALREADY_USED");
   }
 
   if (mappedVisit.qr_status === "EXIT_REGISTERED") {
-    const error = new Error("La salida de esta visita ya fue registrada.");
-    error.status = 409;
-    throw error;
+    await reject(
+      "REUTILIZADO",
+      "La salida de esta visita ya fue registrada.",
+      409,
+      "QR_ALREADY_USED",
+    );
   }
 
   if (mappedVisit.qr_status === "EXPIRED") {
-    const error = new Error("QR expirado.");
-    error.status = 410;
-    throw error;
+    await reject("EXPIRADO", "QR expirado.", 410, "QR_EXPIRED");
   }
 
   if (mappedVisit.qr_status === "CANCELLED") {
-    // SCRUM-183: Mensaje claro para el guardia indicando cancelacion
-    const error = new Error(
-      `Acceso cancelado: ${mappedVisit.nombre} (casa ${mappedVisit.casa}). No autorizar el ingreso.`,
-    );
-    error.status = 410;
-    error.code = "ACCESS_CANCELLED";
-    throw error;
+    const message =
+      `Acceso cancelado: ${mappedVisit.nombre} (casa ${mappedVisit.casa}). No autorizar el ingreso.`;
+    await reject("CANCELADO", message, 410, "ACCESS_CANCELLED");
   }
+
+  await recordQrValidationAttempt({
+    accessId: mappedVisit.id_acceso,
+    tokenQr: normalizedToken,
+    guardUserId,
+    result: "VALIDO",
+    detail: "QR vigente y disponible para registrar el ingreso.",
+  });
 
   return mappedVisit;
 }
@@ -1026,22 +1124,30 @@ async function createArrivalNotification(connection, accessId) {
   );
 }
 
-async function registerQrEntry(qrToken) {
-  const normalizedToken = normalizeQrToken(qrToken);
-  const visit = await validateQrVisit(normalizedToken);
+async function registerQrEntry(qrToken, guardUserId = null) {
+  const visit = await validateQrVisit(qrToken, guardUserId);
+  const normalizedToken = visit.token_qr;
 
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
-    await connection.execute(
+    const [updateResult] = await connection.execute(
       `
         UPDATE ACCESO
         SET estado_acceso = 'INGRESO_REGISTRADO'
-        WHERE id_acceso = ?
+        WHERE id_acceso = ? AND estado_acceso = 'AUTORIZADA'
       `,
       [visit.id_acceso],
     );
+
+    if (updateResult.affectedRows === 0) {
+      const error = new Error("Este QR ya fue utilizado.");
+      error.status = 409;
+      error.code = "QR_ALREADY_USED";
+      throw error;
+    }
+
     await connection.execute(
       `
         INSERT INTO REGISTRO_ACCESO (id_acceso, hora_ingreso)
@@ -1056,6 +1162,15 @@ async function registerQrEntry(qrToken) {
     return findVisitByQrToken(normalizedToken);
   } catch (error) {
     await connection.rollback();
+    if (error.code === "QR_ALREADY_USED") {
+      await recordQrValidationAttempt({
+        accessId: visit.id_acceso,
+        tokenQr: normalizedToken,
+        guardUserId,
+        result: "REUTILIZADO",
+        detail: error.message,
+      });
+    }
     throw error;
   } finally {
     connection.release();
@@ -1152,5 +1267,7 @@ module.exports = {
   __private__: {
     ensureVisitType,
     ensureQrExitCanBeRegistered,
+    getQrStatus,
+    normalizeQrToken,
   },
 };
