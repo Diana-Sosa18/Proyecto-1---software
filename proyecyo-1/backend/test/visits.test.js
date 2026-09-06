@@ -14,6 +14,40 @@ test("ensureQrExitCanBeRegistered allows exit after a registered entry", () => {
   );
 });
 
+test("getQrStatus marks a QR from a future date as not yet valid", () => {
+  assert.equal(
+    __private__.getQrStatus({
+      estado_acceso: "AUTORIZADA",
+      token_qr: "future-qr",
+      fecha: "2999-01-01",
+      hora_inicio: "08:00",
+      hora_fin: "10:00",
+    }),
+    "NOT_YET_VALID",
+  );
+});
+
+test("getQrStatus marks an access outside its validity window as expired", () => {
+  assert.equal(
+    __private__.getQrStatus({
+      estado_acceso: "AUTORIZADA",
+      token_qr: "expired-qr",
+      fecha: "2000-01-01",
+      hora_inicio: "08:00",
+      hora_fin: "10:00",
+    }),
+    "EXPIRED",
+  );
+});
+
+test("normalizeQrToken accepts the QR payload prefix and rejects empty payloads", () => {
+  assert.equal(__private__.normalizeQrToken("NEXUSVISIT:qr-123"), "qr-123");
+  assert.throws(
+    () => __private__.normalizeQrToken("NEXUSVISIT:"),
+    (error) => error.code === "QR_INVALID" && error.status === 400,
+  );
+});
+
 test("ensureQrExitCanBeRegistered rejects exit before entry", () => {
   assert.throws(
     () =>

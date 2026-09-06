@@ -88,6 +88,13 @@ function getVisitBadge(visit: VisitRecord): { label: string; className: string }
     };
   }
 
+  if (visit.qr_status === "NOT_YET_VALID") {
+    return {
+      label: "QR aun no vigente",
+      className: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200",
+    };
+  }
+
   if (visit.qr_status === "EXPIRED") {
     return {
       label: "QR expirado",
