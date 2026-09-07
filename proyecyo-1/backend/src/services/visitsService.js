@@ -1,5 +1,6 @@
 const { pool, query } = require("../database/mysql");
 const { assertVisitTimesAllowed } = require("./configurationService");
+const { ensureValidVehiclePlate } = require("../utils/vehiclePlate");
 const crypto = require("crypto");
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 
@@ -309,7 +310,7 @@ async function createVisit(userId, role = "residente", payload) {
   const house = await getHouseByUserId(userId, role);
   const nombre = normalizeString(payload.nombre);
   const dpi = normalizeString(payload.dpi);
-  const placa = normalizeString(payload.placa).toUpperCase();
+  const placa = ensureValidVehiclePlate(payload.placa);
   const foto = normalizeString(payload.foto);
   const fecha = ensureValidDate(payload.fecha);
   const horaInicio = ensureValidTime(payload.hora_inicio, "hora de inicio");
@@ -552,7 +553,7 @@ async function updateVisit(userId, role = "residente", accessId, payload = {}) {
 
   const nombre = normalizeString(payload.nombre);
   const dpi = normalizeString(payload.dpi);
-  const placa = normalizeString(payload.placa).toUpperCase();
+  const placa = ensureValidVehiclePlate(payload.placa);
   const fecha = ensureValidDate(payload.fecha);
   const horaInicio = ensureValidTime(payload.hora_inicio, "hora de inicio");
   const horaFin = ensureValidTime(payload.hora_fin, "hora de fin");

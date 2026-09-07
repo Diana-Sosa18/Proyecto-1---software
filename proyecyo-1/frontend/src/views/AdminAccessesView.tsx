@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, CheckCircle2, Clock3, Download, RefreshCw, Search, XCircle } from "lucide-react";
 import {
   Bar,
@@ -27,6 +27,7 @@ import type {
   AdminAccessSummary,
   AdminAccessType,
 } from "@/types/accesses";
+import { subscribeToAccessCounterUpdates } from "@/utils/accessCounterUpdates";
 
 const typeOptions: Array<{ value: AdminAccessFilterType; label: string }> = [
   { value: "TODOS", label: "Todos los tipos" },
@@ -394,6 +395,7 @@ export function AdminAccessesView() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const latestRequestRef = useRef(0);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -421,6 +423,8 @@ export function AdminAccessesView() {
   const loadAccessModule = useCallback(
     async (options: { silent?: boolean } = {}) => {
       const { silent = false } = options;
+      const requestId = latestRequestRef.current + 1;
+      latestRequestRef.current = requestId;
 
       try {
         if (silent) {
@@ -445,22 +449,31 @@ export function AdminAccessesView() {
           getAdminAccessesRequest(filters),
         ]);
 
+        if (requestId !== latestRequestRef.current) {
+          return;
+        }
+
         setSummary(summaryResponse);
         setHourlyChartData(hourlyChartResponse);
         setDailyChartData(dailyChartResponse);
         setAccesses(accessesResponse);
         setLastUpdatedAt(new Date());
       } catch (error) {
+        if (requestId !== latestRequestRef.current) {
+          return;
+        }
         setErrorMessage(
           error instanceof Error
             ? error.message
             : "No fue posible cargar el Control de Accesos.",
         );
       } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
-        setIsChartLoading(false);
-        setIsDailyChartLoading(false);
+        if (requestId === latestRequestRef.current) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+          setIsChartLoading(false);
+          setIsDailyChartLoading(false);
+        }
       }
     },
     [filters],
@@ -475,6 +488,25 @@ export function AdminAccessesView() {
 
     return () => {
       window.clearInterval(intervalId);
+    };
+  }, [loadAccessModule]);
+
+  useEffect(() => {
+    const refresh = () => void loadAccessModule({ silent: true });
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        refresh();
+      }
+    };
+    const unsubscribe = subscribeToAccessCounterUpdates(refresh);
+
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, [loadAccessModule]);
 

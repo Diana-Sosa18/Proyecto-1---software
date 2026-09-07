@@ -34,6 +34,7 @@ import {
   formatVisitScheduleSummary,
   validateVisitTimesAgainstSchedule,
 } from "@/utils/visitSchedule";
+import { getVehiclePlateError, normalizeVehiclePlate } from "@/utils/vehiclePlate";
 
 type VisitFormState = VisitPayload;
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
@@ -218,9 +219,17 @@ export function ResidenteVisitsView() {
   }
 
   function validateStep() {
-    if (step === 1 && !form.nombre.trim()) {
-      setErrorMessage("El nombre del visitante es obligatorio.");
-      return false;
+    if (step === 1) {
+      if (!form.nombre.trim()) {
+        setErrorMessage("El nombre del visitante es obligatorio.");
+        return false;
+      }
+
+      const plateError = getVehiclePlateError(form.placa);
+      if (plateError) {
+        setErrorMessage(plateError);
+        return false;
+      }
     }
 
     if (step === 2) {
@@ -569,9 +578,17 @@ export function ResidenteVisitsView() {
                   <Input
                     value={form.placa}
                     onChange={(event) => updateForm("placa", event.target.value.toUpperCase())}
+                    onBlur={() => updateForm("placa", normalizeVehiclePlate(form.placa))}
                     placeholder="P-123ABC"
+                    maxLength={14}
+                    aria-invalid={Boolean(getVehiclePlateError(form.placa))}
                     className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
                   />
+                  {getVehiclePlateError(form.placa) ? (
+                    <span className="text-xs text-rose-600">{getVehiclePlateError(form.placa)}</span>
+                  ) : (
+                    <span className="text-xs text-slate-500">Ejemplo: P-123ABC</span>
+                  )}
                 </label>
 
                 <div className="space-y-2">

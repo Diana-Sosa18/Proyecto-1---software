@@ -2,6 +2,29 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const { __private__ } = require("../src/services/visitsService");
+const {
+  ensureValidVehiclePlate,
+  normalizeVehiclePlate,
+} = require("../src/utils/vehiclePlate");
+
+test("normalizeVehiclePlate estandariza placas guatemaltecas", () => {
+  assert.equal(normalizeVehiclePlate(" p 123 abc "), "P-123ABC");
+  assert.equal(normalizeVehiclePlate("tc-456def"), "TC-456DEF");
+});
+
+test("ensureValidVehiclePlate permite una placa opcional y formatos internacionales", () => {
+  assert.equal(ensureValidVehiclePlate(""), "");
+  assert.equal(ensureValidVehiclePlate("abc 1234"), "ABC1234");
+});
+
+test("ensureValidVehiclePlate rechaza caracteres y placas incompletas", () => {
+  for (const plate of ["123456", "ABCDEF", "P-12", "P@123ABC", "AB 12"]) {
+    assert.throws(
+      () => ensureValidVehiclePlate(plate),
+      (error) => error.status === 400 && error.code === "INVALID_VEHICLE_PLATE",
+    );
+  }
+});
 
 test("ensureQrExitCanBeRegistered allows exit after a registered entry", () => {
   assert.equal(

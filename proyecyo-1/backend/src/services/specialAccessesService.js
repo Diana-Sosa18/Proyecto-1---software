@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 
 const { pool, query } = require("../database/mysql");
+const { ensureValidVehiclePlate } = require("../utils/vehiclePlate");
 
 const DEFAULT_SCHEDULE = { inicio: "06:00", fin: "22:00" };
 
@@ -220,7 +221,7 @@ async function notifyGuards(connection, accessId, titulo, mensaje) {
 async function createSpecialAccess(adminUserId, payload = {}) {
   const nombre = normalizeString(payload.nombre);
   const dpi = normalizeString(payload.dpi);
-  const placa = normalizeString(payload.placa).toUpperCase();
+  const placa = ensureValidVehiclePlate(payload.placa);
   const fecha = ensureValidDate(payload.fecha);
   const horaInicio = ensureValidTime(payload.hora_inicio, "hora de inicio");
   const horaFin = ensureValidTime(payload.hora_fin, "hora de fin");
