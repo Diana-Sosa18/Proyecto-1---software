@@ -417,15 +417,23 @@ async function getAdminAccessDailyChart() {
   return buckets;
 }
 
-async function listAdminAccesses(filters = {}) {
+async function listAdminAccesses(filters = {}, reportRange = null) {
   const currentDate = getCurrentDateInTimezone();
   const search = normalizeString(filters.search).toLowerCase();
   const house = normalizeString(filters.house).toLowerCase();
   const plate = normalizeString(filters.plate).toLowerCase();
   const accessType = normalizeAccessType(filters.type);
   const accessStatus = normalizeAccessStatus(filters.status);
-  const sqlFilters = ["a.fecha = ?"];
-  const params = [currentDate];
+  const sqlFilters = reportRange ? ["1 = 1"] : ["a.fecha = ?"];
+  const params = reportRange ? [] : [currentDate];
+  if (reportRange?.desde) {
+    sqlFilters.push("a.fecha >= ?");
+    params.push(reportRange.desde);
+  }
+  if (reportRange?.hasta) {
+    sqlFilters.push("a.fecha <= ?");
+    params.push(reportRange.hasta);
+  }
 
   appendSearchFilter(sqlFilters, params, search);
   appendHouseFilter(sqlFilters, params, house);
@@ -466,8 +474,10 @@ async function listAdminAccesses(filters = {}) {
         ON ra.id_acceso = a.id_acceso
       WHERE ${sqlFilters.join(" AND ")}
       ORDER BY
+        a.fecha DESC,
         COALESCE(ra.hora_ingreso, a.hora_inicio, '00:00:00') DESC,
         a.id_acceso DESC
+      ${reportRange ? "LIMIT 10001" : ""}
     `,
     params,
   );
