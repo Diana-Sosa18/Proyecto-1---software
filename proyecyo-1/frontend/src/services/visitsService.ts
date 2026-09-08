@@ -1,4 +1,5 @@
 import { apiRequest } from "@/services/api";
+import { notifyAccessCountersChanged } from "@/utils/accessCounterUpdates";
 import type {
   FrequentVisitor,
   GuardQrValidationPayload,
@@ -14,30 +15,38 @@ export function getFrequentVisitorsRequest() {
   return apiRequest<FrequentVisitor[]>("/visitantes-frecuentes");
 }
 
-export function createVisitRequest(payload: VisitPayload) {
-  return apiRequest<VisitRecord>("/visitas", {
+export async function createVisitRequest(payload: VisitPayload) {
+  const visit = await apiRequest<VisitRecord>("/visitas", {
     method: "POST",
     body: payload,
   });
+  notifyAccessCountersChanged();
+  return visit;
 }
 
-export function updateVisitRequest(id: number, payload: VisitPayload) {
-  return apiRequest<VisitRecord>(`/visitas/${id}`, {
+export async function updateVisitRequest(id: number, payload: VisitPayload) {
+  const visit = await apiRequest<VisitRecord>(`/visitas/${id}`, {
     method: "PATCH",
     body: payload,
   });
+  notifyAccessCountersChanged();
+  return visit;
 }
 
-export function deleteVisitRequest(id: number) {
-  return apiRequest<VisitRecord>(`/visitas/${id}`, {
+export async function deleteVisitRequest(id: number) {
+  const visit = await apiRequest<VisitRecord>(`/visitas/${id}`, {
     method: "DELETE",
   });
+  notifyAccessCountersChanged();
+  return visit;
 }
 
-export function cancelVisitRequest(id: number) {
-  return apiRequest<VisitRecord>(`/visitas/${id}/cancelar`, {
+export async function cancelVisitRequest(id: number) {
+  const visit = await apiRequest<VisitRecord>(`/visitas/${id}/cancelar`, {
     method: "PATCH",
   });
+  notifyAccessCountersChanged();
+  return visit;
 }
 
 export function deleteFrequentVisitorRequest(id: number) {
@@ -57,16 +66,20 @@ export function validateQrRequest(payload: GuardQrValidationPayload) {
   });
 }
 
-export function registerQrEntryRequest(payload: GuardQrValidationPayload) {
-  return apiRequest<VisitRecord>("/guardia/registrar-ingreso", {
+export async function registerQrEntryRequest(payload: GuardQrValidationPayload) {
+  const visit = await apiRequest<VisitRecord>("/guardia/registrar-ingreso", {
     method: "POST",
     body: payload,
   });
+  notifyAccessCountersChanged();
+  return visit;
 }
 
-export function registerQrExitRequest(payload: GuardQrValidationPayload) {
-  return apiRequest<VisitRecord>("/guardia/registrar-salida", {
+export async function registerQrExitRequest(payload: GuardQrValidationPayload) {
+  const visit = await apiRequest<VisitRecord>("/guardia/registrar-salida", {
     method: "POST",
     body: payload,
   });
+  notifyAccessCountersChanged();
+  return visit;
 }

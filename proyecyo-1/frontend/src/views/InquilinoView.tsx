@@ -62,6 +62,7 @@ import type { AuthorizationRequest, TenantPermission } from "@/types/sprintStori
 import type { TenantAccountSummary } from "@/types/tenantAccount";
 import type { NotificationRecord } from "@/types/notifications";
 import type { FrequentVisitor, VisitPayload, VisitRecord, VisitType } from "@/types/visits";
+import { getVehiclePlateError, normalizeVehiclePlate } from "@/utils/vehiclePlate";
 
 type VisitFormState = VisitPayload;
 type AccessFilter = "TODOS" | "APROBADO" | "UTILIZADO" | "RECHAZADO" | "PENDIENTE";
@@ -452,9 +453,17 @@ export function InquilinoView() {
   }
 
   function validateStep() {
-    if (step === 1 && !form.nombre.trim()) {
-      setErrorMessage("El nombre del visitante es obligatorio.");
-      return false;
+    if (step === 1) {
+      if (!form.nombre.trim()) {
+        setErrorMessage("El nombre del visitante es obligatorio.");
+        return false;
+      }
+
+      const plateError = getVehiclePlateError(form.placa);
+      if (plateError) {
+        setErrorMessage(plateError);
+        return false;
+      }
     }
 
     if (step === 2) {
@@ -476,6 +485,12 @@ export function InquilinoView() {
   function validateVisitPayload(payload: VisitFormState, nameMessage: string) {
     if (!payload.nombre.trim()) {
       setErrorMessage(nameMessage);
+      return false;
+    }
+
+    const plateError = getVehiclePlateError(payload.placa);
+    if (plateError) {
+      setErrorMessage(plateError);
       return false;
     }
 
@@ -1197,9 +1212,15 @@ export function InquilinoView() {
               <Input
                 value={providerForm.placa}
                 onChange={(event) => updateProviderForm("placa", event.target.value.toUpperCase())}
+                onBlur={() => updateProviderForm("placa", normalizeVehiclePlate(providerForm.placa))}
                 placeholder="P-123ABC"
+                maxLength={14}
+                aria-invalid={Boolean(getVehiclePlateError(providerForm.placa))}
                 className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
               />
+              {getVehiclePlateError(providerForm.placa) ? (
+                <span className="text-xs text-rose-600">{getVehiclePlateError(providerForm.placa)}</span>
+              ) : null}
             </label>
 
             <label className="block space-y-2">
@@ -1419,9 +1440,17 @@ export function InquilinoView() {
                 <Input
                   value={form.placa}
                   onChange={(event) => updateForm("placa", event.target.value.toUpperCase())}
+                  onBlur={() => updateForm("placa", normalizeVehiclePlate(form.placa))}
                   placeholder="P-123ABC"
+                  maxLength={14}
+                  aria-invalid={Boolean(getVehiclePlateError(form.placa))}
                   className="h-14 rounded-2xl border-slate-100 bg-slate-50 px-4"
                 />
+                {getVehiclePlateError(form.placa) ? (
+                  <span className="text-xs text-rose-600">{getVehiclePlateError(form.placa)}</span>
+                ) : (
+                  <span className="text-xs text-slate-500">Ejemplo: P-123ABC</span>
+                )}
               </label>
             </>
           ) : null}
@@ -1737,8 +1766,14 @@ export function InquilinoView() {
                 <Input
                   value={editForm.placa}
                   onChange={(event) => updateEditForm("placa", event.target.value.toUpperCase())}
+                  onBlur={() => updateEditForm("placa", normalizeVehiclePlate(editForm.placa))}
+                  maxLength={14}
+                  aria-invalid={Boolean(getVehiclePlateError(editForm.placa))}
                   className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
                 />
+                {getVehiclePlateError(editForm.placa) ? (
+                  <span className="text-xs text-rose-600">{getVehiclePlateError(editForm.placa)}</span>
+                ) : null}
               </label>
 
               <label className="block space-y-2">

@@ -80,6 +80,7 @@ const usedVisit = {
 };
 
 describe("Accesos y permisos del inquilino", () => {
+  const renderView = () => render(<MemoryRouter><InquilinoView /></MemoryRouter>);
   beforeEach(() => {
     window.localStorage.clear();
     vi.mocked(getVisitsRequest).mockResolvedValue([approvedVisit, usedVisit]);

@@ -223,26 +223,23 @@ async function getAdminAccessSummary() {
   const rows = await query(
     `
       SELECT
-        COUNT(*) AS total_dia,
-        SUM(
+        COUNT(DISTINCT a.id_acceso) AS total_dia,
+        COUNT(DISTINCT
           CASE
             WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'APROBADA')
-              THEN 1
-            ELSE 0
+              THEN a.id_acceso
           END
         ) AS aprobados,
-        SUM(
+        COUNT(DISTINCT
           CASE
             WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('PENDIENTE', 'PENDIENTE_APROBACION')
-              THEN 1
-            ELSE 0
+              THEN a.id_acceso
           END
         ) AS pendientes,
-        SUM(
+        COUNT(DISTINCT
           CASE
             WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('CANCELADA', 'RECHAZADA')
-              THEN 1
-            ELSE 0
+              THEN a.id_acceso
           END
         ) AS rechazados
       FROM ACCESO a
@@ -280,26 +277,23 @@ async function getAdminAccessHourlyChart() {
     `
       SELECT
         HOUR(COALESCE(ra.hora_ingreso, a.hora_inicio)) AS hora,
-        COUNT(*) AS total,
-        SUM(
+        COUNT(DISTINCT a.id_acceso) AS total,
+        COUNT(DISTINCT
           CASE
             WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'APROBADA')
-              THEN 1
-            ELSE 0
+              THEN a.id_acceso
           END
         ) AS aprobados,
-        SUM(
+        COUNT(DISTINCT
           CASE
             WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('PENDIENTE', 'PENDIENTE_APROBACION')
-              THEN 1
-            ELSE 0
+              THEN a.id_acceso
           END
         ) AS pendientes,
-        SUM(
+        COUNT(DISTINCT
           CASE
             WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('CANCELADA', 'RECHAZADA')
-              THEN 1
-            ELSE 0
+              THEN a.id_acceso
           END
         ) AS rechazados
       FROM ACCESO a
@@ -361,26 +355,23 @@ async function getAdminAccessDailyChart() {
     `
       SELECT
         DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
-        COUNT(*) AS total,
-        SUM(
+        COUNT(DISTINCT a.id_acceso) AS total,
+        COUNT(DISTINCT
           CASE
-            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'APROBADA')
-              THEN 1
-            ELSE 0
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'APROBADA')
+              THEN a.id_acceso
           END
         ) AS aprobados,
-        SUM(
+        COUNT(DISTINCT
           CASE
-            WHEN UPPER(COALESCE(a.estado_acceso, '')) = 'PENDIENTE'
-              THEN 1
-            ELSE 0
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('PENDIENTE', 'PENDIENTE_APROBACION')
+              THEN a.id_acceso
           END
         ) AS pendientes,
-        SUM(
+        COUNT(DISTINCT
           CASE
             WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('CANCELADA', 'RECHAZADA')
-              THEN 1
-            ELSE 0
+              THEN a.id_acceso
           END
         ) AS rechazados
       FROM ACCESO a

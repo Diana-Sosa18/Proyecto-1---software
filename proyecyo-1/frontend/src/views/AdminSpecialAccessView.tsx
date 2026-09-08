@@ -28,6 +28,7 @@ import type {
   SpecialAccessRecord,
   VisitScheduleConfig,
 } from "@/types/announcements";
+import { getVehiclePlateError, normalizeVehiclePlate } from "@/utils/vehiclePlate";
 
 function createInitialForm() {
   const today = new Intl.DateTimeFormat("en-CA", {
@@ -121,6 +122,12 @@ export function AdminSpecialAccessView() {
   }, []);
 
   async function handleCreateSpecialAccess() {
+    const plateError = getVehiclePlateError(form.placa);
+    if (plateError) {
+      setErrorMessage(plateError);
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage("");
     setSuccessMessage("");
@@ -231,10 +238,17 @@ export function AdminSpecialAccessView() {
               />
               <input
                 value={form.placa}
-                onChange={(e) => setForm((c) => ({ ...c, placa: e.target.value }))}
-                placeholder="Placa"
+                onChange={(e) => setForm((c) => ({ ...c, placa: e.target.value.toUpperCase() }))}
+                onBlur={() => setForm((c) => ({ ...c, placa: normalizeVehiclePlate(c.placa) }))}
+                placeholder="P-123ABC"
+                maxLength={14}
+                aria-label="Placa del vehiculo"
+                aria-invalid={Boolean(getVehiclePlateError(form.placa))}
                 className="h-11 rounded-xl border border-slate-200 px-4 outline-none focus:border-blue-300"
               />
+              {getVehiclePlateError(form.placa) ? (
+                <p className="text-xs text-rose-600 md:col-span-2">{getVehiclePlateError(form.placa)}</p>
+              ) : null}
               <select
                 value={form.id_casa}
                 onChange={(e) => setForm((c) => ({ ...c, id_casa: Number(e.target.value) }))}

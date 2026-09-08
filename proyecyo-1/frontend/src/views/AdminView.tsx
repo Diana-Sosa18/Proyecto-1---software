@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -20,6 +20,7 @@ import {
 import { getAdminAmenityStatsRequest } from "@/services/amenitiesService";
 import type { AdminAccessHourlyPoint, AdminAccessRecord, AdminAccessSummary } from "@/types/accesses";
 import type { AmenityStatsResponse } from "@/types/amenities";
+import { subscribeToAccessCounterUpdates } from "@/utils/accessCounterUpdates";
 
 function buildDashboardCards(summary: AdminAccessSummary) {
   return [
@@ -106,11 +107,14 @@ export function AdminView() {
   const [statsFrom, setStatsFrom] = useState(today);
   const [statsTo, setStatsTo] = useState(today);
   const [amenityStats, setAmenityStats] = useState<AmenityStatsResponse | null>(null);
+  const latestAccessRequestRef = useRef(0);
 
   useEffect(() => {
     let active = true;
 
     async function loadDashboard(options: { silent?: boolean } = {}) {
+      const requestId = latestAccessRequestRef.current + 1;
+      latestAccessRequestRef.current = requestId;
       try {
         if (options.silent) {
           setIsRefreshing(true);
@@ -120,7 +124,7 @@ export function AdminView() {
           getAdminAccessHourlyChartRequest(),
           getAdminAccessesRequest({}),
         ]);
-        if (active) {
+        if (active && requestId === latestAccessRequestRef.current) {
           setSummary(summaryResponse);
           setHourlyAccesses(hourlyResponse);
           setAccesses(accessesResponse.slice(0, 6));
@@ -128,11 +132,11 @@ export function AdminView() {
           setRefreshError(false);
         }
       } catch {
-        if (active) {
+        if (active && requestId === latestAccessRequestRef.current) {
           setRefreshError(true);
         }
       } finally {
-        if (active) {
+        if (active && requestId === latestAccessRequestRef.current) {
           setIsRefreshing(false);
         }
       }
@@ -142,10 +146,23 @@ export function AdminView() {
     const interval = window.setInterval(() => {
       void loadDashboard({ silent: true });
     }, 30000);
+    const refresh = () => void loadDashboard({ silent: true });
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        refresh();
+      }
+    };
+    const unsubscribe = subscribeToAccessCounterUpdates(refresh);
+
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
 
     return () => {
       active = false;
       window.clearInterval(interval);
+      unsubscribe();
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, []);
 

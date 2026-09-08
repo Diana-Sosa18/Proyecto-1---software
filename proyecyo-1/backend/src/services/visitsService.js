@@ -1,5 +1,6 @@
 const { pool, query } = require("../database/mysql");
 const { assertVisitTimesAllowed } = require("./configurationService");
+const { ensureValidVehiclePlate } = require("../utils/vehiclePlate");
 const crypto = require("crypto");
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 
@@ -309,7 +310,7 @@ async function createVisit(userId, role = "residente", payload) {
   const house = await getHouseByUserId(userId, role);
   const nombre = normalizeString(payload.nombre);
   const dpi = normalizeString(payload.dpi);
-  const placa = normalizeString(payload.placa).toUpperCase();
+  const placa = ensureValidVehiclePlate(payload.placa);
   const foto = normalizeString(payload.foto);
   const fecha = ensureValidDate(payload.fecha);
   const horaInicio = ensureValidTime(payload.hora_inicio, "hora de inicio");
@@ -338,13 +339,25 @@ async function createVisit(userId, role = "residente", payload) {
   try {
     await connection.beginTransaction();
 
-    const [visitorResult] = await connection.execute(
-      `
-        INSERT INTO VISITANTE (nombre, dpi, placa)
-        VALUES (?, ?, ?)
-      `,
-      [nombre, dpi, placa],
+    const [existingVisitors] = await connection.execute(
+      `SELECT id_visitante FROM VISITANTE
+       WHERE (? <> '' AND dpi = ?) OR (? <> '' AND UPPER(REPLACE(REPLACE(placa, '-', ''), ' ', '')) = ?)
+       ORDER BY id_visitante LIMIT 1 FOR UPDATE`,
+      [dpi, dpi, placa, placa.replace(/-/g, "")],
     );
+    let visitorId = existingVisitors[0]?.id_visitante;
+    if (visitorId) {
+      await connection.execute(
+        "UPDATE VISITANTE SET nombre = ?, dpi = ?, placa = ? WHERE id_visitante = ?",
+        [nombre, dpi || null, placa || null, visitorId],
+      );
+    } else {
+      const [visitorResult] = await connection.execute(
+        "INSERT INTO VISITANTE (nombre, dpi, placa) VALUES (?, ?, ?)",
+        [nombre, dpi || null, placa || null],
+      );
+      visitorId = visitorResult.insertId;
+    }
 
     const [accessResult] = await connection.execute(
       `
@@ -352,7 +365,7 @@ async function createVisit(userId, role = "residente", payload) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTORIZADA')
       `,
       [
-        visitorResult.insertId,
+        visitorId,
         house.id_casa,
         userId,
         fecha,
@@ -552,7 +565,7 @@ async function updateVisit(userId, role = "residente", accessId, payload = {}) {
 
   const nombre = normalizeString(payload.nombre);
   const dpi = normalizeString(payload.dpi);
-  const placa = normalizeString(payload.placa).toUpperCase();
+  const placa = ensureValidVehiclePlate(payload.placa);
   const fecha = ensureValidDate(payload.fecha);
   const horaInicio = ensureValidTime(payload.hora_inicio, "hora de inicio");
   const horaFin = ensureValidTime(payload.hora_fin, "hora de fin");
