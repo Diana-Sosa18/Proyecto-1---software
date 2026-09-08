@@ -1,4 +1,5 @@
 const { pool, query } = require("../database/mysql");
+const { ensureValidTime: ensureStrictTime } = require("../utils/dateTimeValidation");
 
 const CONFIG_KEYS = {
   HORA_APERTURA: "visitas_hora_apertura",
@@ -21,15 +22,7 @@ function normalizeString(value) {
 }
 
 function ensureValidTime(value, fieldName) {
-  const normalized = normalizeString(value);
-
-  if (!/^\d{2}:\d{2}$/.test(normalized) && !/^\d{2}:\d{2}:\d{2}$/.test(normalized)) {
-    const error = new Error(`La ${fieldName} es obligatoria y debe tener formato HH:MM.`);
-    error.status = 400;
-    throw error;
-  }
-
-  return normalized.length === 5 ? normalized : normalized.slice(0, 5);
+  return ensureStrictTime(value, fieldName).slice(0, 5);
 }
 
 function toMinutes(time) {

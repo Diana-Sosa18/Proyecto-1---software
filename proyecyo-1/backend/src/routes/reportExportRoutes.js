@@ -1,2 +1,25 @@
-const r=require("express").Router(),{requireAdmin}=require("../middlewares/requireAdmin"),s=require("../services/reportExportService");
-r.get("/admin/reportes/exportar",requireAdmin,async(q,x,n)=>{try{const{type,format}=s.validate(q.query.reporte,q.query.formato),filters=s.validateFilters(q.query),data=await s.rows(type,filters),file=format==="pdf"?await s.pdf(type,data,q.authUser.id,filters):await s.excel(type,data,q.authUser.id,filters),name=`nexus-${type}-${new Date().toISOString().slice(0,10)}.${format}`;x.set("Content-Type",format==="pdf"?"application/pdf":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");x.set("Content-Disposition",`attachment; filename="${name}"`);x.send(file)}catch(e){n(e)}});module.exports=r;
+﻿const router = require("express").Router();
+const { requireAdmin } = require("../middlewares/requireAdmin");
+const reports = require("../services/reportExportService");
+
+router.get("/admin/reportes/exportar", requireAdmin, async (req, res, next) => {
+  try {
+    const { type, format } = reports.validate(req.query.reporte, req.query.formato);
+    const filters = reports.validateFilters(req.query, type);
+    const now = new Date();
+    if (filters.vista === "hoy") {
+      filters.desde = filters.hasta = reports.localTimestamp(now).slice(0, 10);
+    }
+    const data = await reports.rows(type, filters, now);
+    const file = await reports[format === "pdf" ? "pdf" : "excel"](type, data, req.authUser.id, filters, now);
+    const name = `nexus-${type}-${reports.localTimestamp(now).slice(0, 10)}.${format}`;
+    res.set("Content-Type", format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.set("Content-Disposition", `attachment; filename="${name}"`);
+    res.set("Access-Control-Expose-Headers", "Content-Disposition");
+    res.set("Cache-Control", "no-store");
+    res.send(file);
+  } catch (error) {
+    next(error);
+  }
+});
+module.exports = router;

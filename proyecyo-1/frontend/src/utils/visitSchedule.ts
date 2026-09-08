@@ -1,4 +1,5 @@
 import type { VisitScheduleConfig } from "@/types/configuration";
+import { validateTimeRange } from "@/utils/dateTimeValidation";
 
 function toMinutes(time: string) {
   const [hours, minutes] = time.split(":").map(Number);
@@ -14,13 +15,8 @@ export function validateVisitTimesAgainstSchedule(
     return "Las autorizaciones de visita estan temporalmente deshabilitadas.";
   }
 
-  if (!horaInicio || !horaFin) {
-    return "Completa fecha y horario antes de continuar.";
-  }
-
-  if (horaInicio >= horaFin) {
-    return "La hora de fin debe ser mayor a la hora de inicio.";
-  }
+  const rangeError = validateTimeRange(horaInicio, horaFin);
+  if (rangeError) return rangeError;
 
   const startMinutes = toMinutes(horaInicio);
   const endMinutes = toMinutes(horaFin);
@@ -40,13 +36,8 @@ export function validateVisitTimesAgainstSchedule(
 }
 
 export function validateVisitScheduleForm(payload: VisitScheduleConfig): string | null {
-  if (!payload.hora_apertura || !payload.hora_cierre) {
-    return "Completa las horas de apertura y cierre.";
-  }
-
-  if (payload.hora_apertura >= payload.hora_cierre) {
-    return "La hora de cierre debe ser mayor a la hora de apertura.";
-  }
+  const rangeError = validateTimeRange(payload.hora_apertura, payload.hora_cierre);
+  if (rangeError) return rangeError.replace("hora de inicio", "hora de apertura").replace("hora de fin", "hora de cierre");
 
   if (payload.duracion_maxima_horas < 1 || payload.duracion_maxima_horas > 12) {
     return "La duracion maxima debe estar entre 1 y 12 horas.";

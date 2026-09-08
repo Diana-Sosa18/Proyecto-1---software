@@ -11,6 +11,7 @@ import {
 } from "recharts";
 
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { downloadReport } from "@/services/reportExportService";
 import {
   getAdminAccessDailyChartRequest,
   getAdminAccessHourlyChartRequest,
@@ -396,6 +397,19 @@ export function AdminAccessesView() {
   const [errorMessage, setErrorMessage] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const latestRequestRef = useRef(0);
+  const [isExporting, setIsExporting] = useState(false);
+
+  async function exportPdf() {
+    setIsExporting(true);
+    setErrorMessage("");
+    try {
+      await downloadReport({ reporte: "accesos", formato: "pdf", vista: "hoy", search, house, plate, type: selectedType, status: selectedStatus });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No fue posible exportar el reporte.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -630,11 +644,12 @@ export function AdminAccessesView() {
 
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={() => void exportPdf()}
+            disabled={isExporting}
             className="inline-flex h-10 min-w-[150px] items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-medium text-white transition hover:bg-blue-700"
           >
             <Download className="size-4" />
-            Exportar PDF
+            {isExporting ? "Generando..." : "Exportar PDF"}
           </button>
         </div>
       </section>

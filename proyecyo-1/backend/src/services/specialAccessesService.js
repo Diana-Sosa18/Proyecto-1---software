@@ -2,35 +2,12 @@ const crypto = require("crypto");
 
 const { pool, query } = require("../database/mysql");
 const { ensureValidVehiclePlate } = require("../utils/vehiclePlate");
+const { ensureValidDate, ensureValidTime } = require("../utils/dateTimeValidation");
 
 const DEFAULT_SCHEDULE = { inicio: "06:00", fin: "22:00" };
 
 function normalizeString(value) {
   return String(value || "").trim();
-}
-
-function ensureValidDate(value) {
-  const normalized = normalizeString(value);
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-    const error = new Error("La fecha es obligatoria y debe tener formato YYYY-MM-DD.");
-    error.status = 400;
-    throw error;
-  }
-
-  return normalized;
-}
-
-function ensureValidTime(value, fieldName) {
-  const normalized = normalizeString(value);
-
-  if (!/^\d{2}:\d{2}$/.test(normalized) && !/^\d{2}:\d{2}:\d{2}$/.test(normalized)) {
-    const error = new Error(`La ${fieldName} es obligatoria y debe tener formato HH:MM.`);
-    error.status = 400;
-    throw error;
-  }
-
-  return normalized.length === 5 ? `${normalized}:00` : normalized;
 }
 
 function generateQrToken() {
