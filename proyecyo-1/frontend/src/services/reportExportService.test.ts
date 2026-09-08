@@ -4,7 +4,7 @@ import { downloadReport } from "./reportExportService";
 describe("HU10 descarga de reportes", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    localStorage.setItem("nexus.session", JSON.stringify({ id: 7, role: "admin" }));
+    localStorage.setItem("nexus.session", JSON.stringify({ id: 7, role: "admin", token: "signed-token" }));
     vi.stubGlobal("fetch", vi.fn());
     vi.stubGlobal("URL", class extends URL {
       static createObjectURL = vi.fn(() => "blob:reporte");
@@ -29,7 +29,7 @@ describe("HU10 descarga de reportes", () => {
     expect(query.get("house")).toBe("A-1");
     expect(query.get("search")).toBe("Ana");
     expect(query.get("plate")).toBe("P123");
-    expect(options?.headers).toEqual({ "x-user-role": "admin", "x-user-id": "7" });
+    expect(options?.headers).toEqual({ Authorization: "Bearer signed-token" });
     expect(click).toHaveBeenCalledOnce();
     expect(URL.revokeObjectURL).not.toHaveBeenCalled();
     vi.runAllTimers();

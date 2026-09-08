@@ -1,10 +1,10 @@
 ﻿export async function downloadReport(filters: Record<string, string>) {
   const raw = localStorage.getItem("nexus.session");
-  let session: { role?: string; id?: number } = {};
+  let session: { token?: string } = {};
   try { session = raw ? JSON.parse(raw) : {}; } catch { /* The API validates the session. */ }
   const query = new URLSearchParams(filters);
   const response = await fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:3000"}/admin/reportes/exportar?${query}`, {
-    headers: { "x-user-role": session.role || "", "x-user-id": String(session.id || "") },
+    headers: session.token ? { Authorization: `Bearer ${session.token}` } : {},
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
