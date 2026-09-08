@@ -24,18 +24,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   if (rawSession) {
     try {
-      const session = JSON.parse(rawSession) as { id?: number; email?: string; role?: string };
+      const session = JSON.parse(rawSession) as { token?: string };
 
-      if (session.role) {
-        headers.set("x-user-role", session.role);
-      }
-
-      if (session.email) {
-        headers.set("x-user-email", session.email);
-      }
-
-      if (session.id) {
-        headers.set("x-user-id", String(session.id));
+      if (session.token) {
+        headers.set("Authorization", `Bearer ${session.token}`);
       }
     } catch {
       window.localStorage.removeItem(SESSION_STORAGE_KEY);

@@ -17,7 +17,7 @@ describe("GET /admin/pagos", () => {
   it("rechaza la peticion sin headers de administrador", async () => {
     const response = await request(app).get("/admin/pagos");
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401);
     expect(listDelinquentResidents).not.toHaveBeenCalled();
   });
 

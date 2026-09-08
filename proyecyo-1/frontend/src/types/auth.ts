@@ -4,6 +4,7 @@ export interface AuthUser {
   id: number;
   email: string;
   role: UserRole;
+  token?: string;
 }
 
 export interface LoginPayload {

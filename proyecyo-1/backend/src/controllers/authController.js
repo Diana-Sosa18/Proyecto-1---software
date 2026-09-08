@@ -11,7 +11,11 @@ async function login(req, res, next) {
 
 async function session(req, res, next) {
   try {
-    const current = await getCurrentSession(req.header("x-user-id"));
+    const authorization = String(req.header("authorization") || "");
+    const match = authorization.match(/^Bearer\s+(.+)$/i);
+    const { verifySessionToken } = require("../services/sessionTokenService");
+    const userId = verifySessionToken(match?.[1]);
+    const current = await getCurrentSession(userId, match?.[1]);
     res.status(200).json(current);
   } catch (error) {
     next(error);

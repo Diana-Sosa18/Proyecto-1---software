@@ -1,5 +1,6 @@
 const { query } = require("../database/mysql");
 const { env } = require("../config/env");
+const { createSessionToken } = require("./sessionTokenService");
 
 async function comparePassword(plainPassword, storedPassword) {
   if (typeof storedPassword === "string" && storedPassword.startsWith("$2")) {
@@ -68,12 +69,13 @@ async function loginUser({ email, password }) {
     id: user.id,
     email: user.email,
     role: user.role,
+    token: createSessionToken(user.id),
   };
 }
 
 // Devuelve el rol y estado actuales del usuario desde la base de datos.
 // Permite al frontend refrescar los permisos sin depender de lo guardado al iniciar sesion.
-async function getCurrentSession(userId) {
+async function getCurrentSession(userId, token) {
   const id = Number(userId);
 
   if (!Number.isInteger(id) || id <= 0) {
@@ -116,6 +118,7 @@ async function getCurrentSession(userId) {
     id: user.id,
     email: user.email,
     role: user.role,
+    ...(token ? { token } : {}),
   };
 }
 
