@@ -8,6 +8,15 @@ function getNumber(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function getSessionSecret() {
+  const value = String(process.env.SESSION_SECRET || "").trim();
+  if (value) return value;
+  if ((process.env.NODE_ENV || "development") === "production") {
+    throw new Error("SESSION_SECRET es obligatorio en produccion.");
+  }
+  return "nexus-local-development-secret-change-me";
+}
+
 const env = {
   NODE_ENV: process.env.NODE_ENV || "development",
   PORT: getNumber(process.env.PORT, 3000),
@@ -19,7 +28,7 @@ const env = {
   DB_NAME: process.env.DB_NAME || "nexus_residencial",
   DB_CONNECTION_LIMIT: getNumber(process.env.DB_CONNECTION_LIMIT, 10),
   USE_BCRYPT: process.env.USE_BCRYPT === "true",
-  SESSION_SECRET: process.env.SESSION_SECRET || "nexus-local-development-secret-change-me",
+  SESSION_SECRET: getSessionSecret(),
 };
 
 module.exports = { env };
