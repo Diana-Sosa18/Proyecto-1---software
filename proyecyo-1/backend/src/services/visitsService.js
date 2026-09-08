@@ -339,13 +339,25 @@ async function createVisit(userId, role = "residente", payload) {
   try {
     await connection.beginTransaction();
 
-    const [visitorResult] = await connection.execute(
-      `
-        INSERT INTO VISITANTE (nombre, dpi, placa)
-        VALUES (?, ?, ?)
-      `,
-      [nombre, dpi, placa],
+    const [existingVisitors] = await connection.execute(
+      `SELECT id_visitante FROM VISITANTE
+       WHERE (? <> '' AND dpi = ?) OR (? <> '' AND UPPER(REPLACE(REPLACE(placa, '-', ''), ' ', '')) = ?)
+       ORDER BY id_visitante LIMIT 1 FOR UPDATE`,
+      [dpi, dpi, placa, placa.replace(/-/g, "")],
     );
+    let visitorId = existingVisitors[0]?.id_visitante;
+    if (visitorId) {
+      await connection.execute(
+        "UPDATE VISITANTE SET nombre = ?, dpi = ?, placa = ? WHERE id_visitante = ?",
+        [nombre, dpi || null, placa || null, visitorId],
+      );
+    } else {
+      const [visitorResult] = await connection.execute(
+        "INSERT INTO VISITANTE (nombre, dpi, placa) VALUES (?, ?, ?)",
+        [nombre, dpi || null, placa || null],
+      );
+      visitorId = visitorResult.insertId;
+    }
 
     const [accessResult] = await connection.execute(
       `
@@ -353,7 +365,7 @@ async function createVisit(userId, role = "residente", payload) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTORIZADA')
       `,
       [
-        visitorResult.insertId,
+        visitorId,
         house.id_casa,
         userId,
         fecha,

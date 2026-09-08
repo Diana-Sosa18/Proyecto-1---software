@@ -272,10 +272,12 @@ async function createSpecialAccess(adminUserId, payload = {}) {
 
     let visitorId;
 
-    const [existingVisitorRows] = await connection.execute(
-      "SELECT id_visitante FROM VISITANTE WHERE dpi = ? LIMIT 1",
-      [dpi],
-    );
+      const [existingVisitorRows] = await connection.execute(
+        `SELECT id_visitante FROM VISITANTE
+         WHERE dpi = ? OR (? <> '' AND UPPER(REPLACE(REPLACE(placa, '-', ''), ' ', '')) = ?)
+         ORDER BY id_visitante LIMIT 1 FOR UPDATE`,
+        [dpi, placa, placa.replace(/-/g, "")],
+      );
 
     if (existingVisitorRows[0]) {
       visitorId = existingVisitorRows[0].id_visitante;

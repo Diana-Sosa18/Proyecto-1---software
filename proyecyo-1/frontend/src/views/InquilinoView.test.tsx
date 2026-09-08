@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
 
 import { InquilinoView } from "@/views/InquilinoView";
 import { getVisitsRequest } from "@/services/visitsService";
@@ -60,6 +61,7 @@ const usedVisit = {
 };
 
 describe("Accesos y permisos del inquilino", () => {
+  const renderView = () => render(<MemoryRouter><InquilinoView /></MemoryRouter>);
   beforeEach(() => {
     window.localStorage.clear();
     vi.mocked(getVisitsRequest).mockResolvedValue([approvedVisit, usedVisit]);
@@ -68,7 +70,7 @@ describe("Accesos y permisos del inquilino", () => {
 
   it("filtra los accesos por estado utilizado", async () => {
     const user = userEvent.setup();
-    render(<InquilinoView />);
+    renderView();
 
     expect(await screen.findByText("Ana Aprobada")).toBeInTheDocument();
     expect(screen.getByText("Bruno Utilizado")).toBeInTheDocument();
@@ -90,7 +92,7 @@ describe("Accesos y permisos del inquilino", () => {
         estado: "ACTIVO",
       },
     ]);
-    render(<InquilinoView />);
+    renderView();
 
     expect(await screen.findByText("Gestion de visitas")).toBeInTheDocument();
     expect(screen.getByText("ACTIVO")).toBeInTheDocument();
