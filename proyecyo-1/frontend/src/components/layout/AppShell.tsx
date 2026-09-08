@@ -1,11 +1,9 @@
 import type { ReactNode } from "react";
 import { Building2, LogOut, ShieldCheck } from "lucide-react";
-import { NavLink } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
-import { rolePaths } from "@/routes/rolePaths";
 import type { UserRole } from "@/types/auth";
 
 type AppShellProps = {
@@ -66,26 +64,10 @@ export function AppShell({ role, title, subtitle, children }: AppShellProps) {
           </Card>
 
           <Card className="border-slate-200">
-            <CardContent className="p-3">
-              {Object.entries(rolePaths).map(([currentRole, path]) => {
-                const isCurrent = currentRole === role;
-
-                return (
-                  <NavLink
-                    key={path}
-                    to={path}
-                    className={`mb-2 flex rounded-lg px-3 py-2 text-sm transition ${
-                      isCurrent
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                    }`}
-                  >
-                    {roleLabels[currentRole as UserRole]}
-                  </NavLink>
-                );
-              })}
-              <p className="px-3 pt-2 text-xs text-slate-400">
-                Las rutas estan protegidas y cada sesion entra solo a su panel.
+            <CardContent className="p-4">
+              <p className="text-xs uppercase tracking-wide text-slate-400">Panel autorizado</p>
+              <p className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
+                {roleLabels[user?.role ?? role]}
               </p>
             </CardContent>
           </Card>
