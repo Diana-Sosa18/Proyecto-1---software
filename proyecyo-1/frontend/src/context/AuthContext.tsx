@@ -101,6 +101,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user, refreshSession]);
 
+  useEffect(() => {
+    window.addEventListener("nexus:session-expired", logout);
+    return () => window.removeEventListener("nexus:session-expired", logout);
+  }, [logout]);
+
   const login = useCallback(
     async (payload: LoginPayload) => {
       const response = await loginRequest(payload);

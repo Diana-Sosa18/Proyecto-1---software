@@ -1,3 +1,5 @@
+import { getApiErrorMessage, getFieldErrors, type FieldError } from "@/utils/errorMessages";
+
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 const SESSION_STORAGE_KEY = "nexus.session";
 
@@ -10,6 +12,7 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public payload?: unknown,
+    public fieldErrors: FieldError[] = [],
   ) {
     super(message);
     this.name = "ApiError";
@@ -44,19 +47,28 @@ async function getPayload(response: Response) {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: getRequestHeaders(options.headers),
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: getRequestHeaders(options.headers),
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    throw new ApiError("No se pudo conectar con el servidor. Revisa tu conexión e intenta nuevamente.", 0);
+  }
 
   const payload = await getPayload(response);
 
   if (!response.ok) {
+    if (response.status === 401 && path !== "/login") {
+      window.dispatchEvent(new Event("nexus:session-expired"));
+    }
     throw new ApiError(
-      (payload as { message?: string } | null)?.message ?? "Error inesperado en la API",
+      getApiErrorMessage(response.status, payload),
       response.status,
       payload,
+      getFieldErrors(payload),
     );
   }
 
@@ -64,10 +76,16 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 }
 
 export async function apiDownload(path: string) {
-  const response = await fetch(`${API_URL}${path}`, { headers: getRequestHeaders() });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, { headers: getRequestHeaders() });
+  } catch {
+    throw new ApiError("No se pudo conectar con el servidor. Revisa tu conexión e intenta nuevamente.", 0);
+  }
   if (!response.ok) {
     const payload = await getPayload(response);
-    throw new ApiError((payload as { message?: string } | null)?.message ?? "No fue posible descargar el archivo.", response.status, payload);
+    if (response.status === 401) window.dispatchEvent(new Event("nexus:session-expired"));
+    throw new ApiError(getApiErrorMessage(response.status, payload), response.status, payload, getFieldErrors(payload));
   }
   return response.blob();
 }

@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Building2, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -126,10 +126,7 @@ export function LoginView() {
 
               <form className="space-y-5" onSubmit={handleSubmit}>
                 {serverError ? (
-                  <Alert variant="destructive">
-                    <AlertTitle>Acceso denegado</AlertTitle>
-                    <AlertDescription>{serverError}</AlertDescription>
-                  </Alert>
+                  <ErrorAlert title="Acceso denegado" message={serverError} onDismiss={() => setServerError("")} />
                 ) : null}
 
                 <div>
@@ -142,7 +139,11 @@ export function LoginView() {
                       id="email"
                       type="email"
                       value={email}
-                      onChange={(event) => setEmail(event.target.value)}
+                      onChange={(event) => {
+                        setEmail(event.target.value);
+                        if (errors.email) setErrors((current) => ({ ...current, email: undefined }));
+                      }}
+                      aria-invalid={Boolean(errors.email)}
                       className="pl-11"
                       placeholder="correo@ejemplo.com"
                     />
@@ -160,7 +161,11 @@ export function LoginView() {
                       id="password"
                       type={showPassword ? "text" : "password"}
                       value={password}
-                      onChange={(event) => setPassword(event.target.value)}
+                      onChange={(event) => {
+                        setPassword(event.target.value);
+                        if (errors.password) setErrors((current) => ({ ...current, password: undefined }));
+                      }}
+                      aria-invalid={Boolean(errors.password)}
                       className="px-11"
                       placeholder="Ingrese su contrasena"
                     />
