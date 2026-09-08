@@ -19,6 +19,7 @@ const env = {
   DB_NAME: process.env.DB_NAME || "nexus_residencial",
   DB_CONNECTION_LIMIT: getNumber(process.env.DB_CONNECTION_LIMIT, 10),
   USE_BCRYPT: process.env.USE_BCRYPT === "true",
+  SESSION_SECRET: process.env.SESSION_SECRET || "nexus-local-development-secret-change-me",
 };
 
 module.exports = { env };

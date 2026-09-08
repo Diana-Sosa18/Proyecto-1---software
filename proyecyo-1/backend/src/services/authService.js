@@ -1,5 +1,6 @@
 const { query } = require("../database/mysql");
 const { env } = require("../config/env");
+const { createSessionToken } = require("./sessionTokenService");
 
 async function comparePassword(plainPassword, storedPassword) {
   if (typeof storedPassword === "string" && storedPassword.startsWith("$2")) {
@@ -68,9 +69,60 @@ async function loginUser({ email, password }) {
     id: user.id,
     email: user.email,
     role: user.role,
+    token: createSessionToken(user.id),
+  };
+}
+
+// Devuelve el rol y estado actuales del usuario desde la base de datos.
+// Permite al frontend refrescar los permisos sin depender de lo guardado al iniciar sesion.
+async function getCurrentSession(userId, token) {
+  const id = Number(userId);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    const error = new Error("Sesion invalida.");
+    error.status = 401;
+    throw error;
+  }
+
+  const rows = await query(
+    `
+      SELECT
+        u.id_usuario AS id,
+        u.correo AS email,
+        tu.nombre AS role,
+        u.activo AS activo
+      FROM USUARIO u
+      INNER JOIN TIPO_USUARIO tu
+        ON tu.id_tipo_usuario = u.id_tipo_usuario
+      WHERE u.id_usuario = ?
+      LIMIT 1
+    `,
+    [id],
+  );
+
+  const user = rows[0];
+
+  if (!user) {
+    const error = new Error("Sesion invalida.");
+    error.status = 401;
+    throw error;
+  }
+
+  if (Number(user.activo) === 0) {
+    const error = new Error("El usuario esta inactivo.");
+    error.status = 403;
+    throw error;
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    ...(token ? { token } : {}),
   };
 }
 
 module.exports = {
   loginUser,
+  getCurrentSession,
 };
