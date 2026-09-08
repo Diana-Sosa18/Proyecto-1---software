@@ -64,6 +64,60 @@ async function indexExists(tableName, indexName) {
   return rows.length > 0;
 }
 
+function escapeIdentifier(identifier) {
+  return `\`${String(identifier).replace(/`/g, "``")}\``;
+}
+
+async function ensureAccessStatusCheckConstraint() {
+  let constraints = [];
+
+  try {
+    constraints = await query(
+      `
+        SELECT
+          cc.CONSTRAINT_NAME AS constraint_name,
+          cc.CHECK_CLAUSE AS check_clause
+        FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+        INNER JOIN INFORMATION_SCHEMA.CHECK_CONSTRAINTS cc
+          ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA
+          AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+        WHERE tc.TABLE_SCHEMA = ?
+          AND tc.TABLE_NAME = 'ACCESO'
+          AND tc.CONSTRAINT_TYPE = 'CHECK'
+          AND LOWER(cc.CHECK_CLAUSE) LIKE '%estado_acceso%'
+      `,
+      [env.DB_NAME],
+    );
+  } catch (error) {
+    console.warn("No fue posible revisar el CHECK de estado_acceso.", error.message);
+    return;
+  }
+
+  const hasUpdatedConstraint = constraints.some((constraint) => {
+    const clause = String(constraint.check_clause || "");
+    return ["SALIDA_REGISTRADA", "PENDIENTE_APROBACION", "RECHAZADA"].every((status) =>
+      clause.includes(status),
+    );
+  });
+
+  if (hasUpdatedConstraint) {
+    return;
+  }
+
+  try {
+    for (const constraint of constraints) {
+      await query(`ALTER TABLE ACCESO DROP CHECK ${escapeIdentifier(constraint.constraint_name)}`);
+    }
+
+    await query(`
+      ALTER TABLE ACCESO
+      ADD CONSTRAINT chk_acceso_estado
+      CHECK (estado_acceso IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'CANCELADA', 'PENDIENTE_APROBACION', 'RECHAZADA'))
+    `);
+  } catch (error) {
+    console.warn("No fue posible actualizar el CHECK de estado_acceso.", error.message);
+  }
+}
 async function ensureRestoreHistorySchema() {
   if (!(await tableExists("HISTORIAL_RESTAURACION"))) {
     await query(`
@@ -152,6 +206,31 @@ async function ensureVisitQrSchema() {
       ADD CONSTRAINT uq_acceso_token_qr UNIQUE (token_qr)
     `);
   }
+
+  await ensureAccessStatusCheckConstraint();
+}
+
+async function ensureQrValidationAttemptsSchema() {
+  if (await tableExists("INTENTO_VALIDACION_QR")) {
+    return;
+  }
+
+  await query(`
+    CREATE TABLE INTENTO_VALIDACION_QR (
+      id_intento BIGINT PRIMARY KEY AUTO_INCREMENT,
+      id_acceso INT NULL,
+      token_qr VARCHAR(64) NULL,
+      id_usuario_guardia INT NULL,
+      resultado VARCHAR(30) NOT NULL,
+      detalle VARCHAR(255) NOT NULL,
+      creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (id_acceso) REFERENCES ACCESO(id_acceso) ON DELETE SET NULL,
+      FOREIGN KEY (id_usuario_guardia) REFERENCES USUARIO(id_usuario) ON DELETE SET NULL,
+      INDEX idx_intento_qr_fecha (creado_en),
+      INDEX idx_intento_qr_acceso (id_acceso),
+      CHECK (resultado IN ('VALIDO', 'NO_ENCONTRADO', 'AUN_NO_VIGENTE', 'EXPIRADO', 'REUTILIZADO', 'CANCELADO', 'PENDIENTE_APROBACION', 'INVALIDO'))
+    )
+  `);
 }
 
 async function ensureAmenityReservationsSchema() {
@@ -914,6 +993,7 @@ module.exports = {
   pool,
   query,
   ensureVisitQrSchema,
+  ensureQrValidationAttemptsSchema,
   ensureAmenityReservationsSchema,
   ensureNotificationsSchema,
   ensureTenantProvidersSchema,

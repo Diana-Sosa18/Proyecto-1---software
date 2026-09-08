@@ -10,13 +10,14 @@ export interface VisitRecord {
   fecha: string;
   hora_inicio: string;
   hora_fin: string;
+  hora_salida?: string | null;
   tipo_visita: VisitType;
   motivo_servicio?: string;
   observaciones?: string;
   token_qr?: string | null;
   qr_value?: string | null;
-  estado_acceso?: "AUTORIZADA" | "INGRESO_REGISTRADO" | "CANCELADA" | "PENDIENTE_APROBACION" | "RECHAZADA";
-  qr_status?: "VALID" | "USED" | "EXPIRED" | "CANCELLED" | "PENDING_APPROVAL";
+  estado_acceso?: "AUTORIZADA" | "INGRESO_REGISTRADO" | "SALIDA_REGISTRADA" | "CANCELADA" | "PENDIENTE_APROBACION" | "RECHAZADA";
+  qr_status?: "VALID" | "USED" | "EXIT_REGISTERED" | "EXPIRED" | "NOT_YET_VALID" | "CANCELLED" | "PENDING_APPROVAL";
   es_acceso_especial?: boolean;
   fuera_horario?: boolean;
   motivo_excepcion?: string;

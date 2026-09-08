@@ -63,3 +63,10 @@ export function registerQrEntryRequest(payload: GuardQrValidationPayload) {
     body: payload,
   });
 }
+
+export function registerQrExitRequest(payload: GuardQrValidationPayload) {
+  return apiRequest<VisitRecord>("/guardia/registrar-salida", {
+    method: "POST",
+    body: payload,
+  });
+}

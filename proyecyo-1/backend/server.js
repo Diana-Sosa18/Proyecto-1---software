@@ -2,6 +2,7 @@ const { createApp } = require("./src/app");
 const { env } = require("./src/config/env");
 const {
   ensureVisitQrSchema,
+  ensureQrValidationAttemptsSchema,
   ensureAmenityReservationsSchema,
   ensureNotificationsSchema,
   ensureTenantProvidersSchema,
@@ -54,6 +55,7 @@ async function waitForDatabase() {
 async function startServer() {
   await waitForDatabase();
   await ensureVisitQrSchema();
+  await ensureQrValidationAttemptsSchema();
   await ensureAmenityReservationsSchema();
   await ensureNotificationsSchema();
   await ensureTenantProvidersSchema();

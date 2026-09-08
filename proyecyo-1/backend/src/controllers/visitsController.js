@@ -9,6 +9,7 @@ const {
   getGuardShiftVisits,
   validateQrVisit,
   registerQrEntry,
+  registerQrExit,
 } = require("../services/visitsService");
 
 async function getVisits(req, res, next) {
@@ -85,7 +86,7 @@ async function getGuardVisits(_req, res, next) {
 
 async function postValidateQr(req, res, next) {
   try {
-    const visit = await registerQrEntry((req.body || {}).qrToken);
+    const visit = await registerQrEntry((req.body || {}).qrToken, req.authUser.id);
     res.status(200).json(visit);
   } catch (error) {
     next(error);
@@ -94,7 +95,16 @@ async function postValidateQr(req, res, next) {
 
 async function postRegisterQrEntry(req, res, next) {
   try {
-    const visit = await registerQrEntry((req.body || {}).qrToken);
+    const visit = await registerQrEntry((req.body || {}).qrToken, req.authUser.id);
+    res.status(200).json(visit);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function postRegisterQrExit(req, res, next) {
+  try {
+    const visit = await registerQrExit((req.body || {}).qrToken);
     res.status(200).json(visit);
   } catch (error) {
     next(error);
@@ -112,4 +122,5 @@ module.exports = {
   getGuardVisits,
   postValidateQr,
   postRegisterQrEntry,
+  postRegisterQrExit,
 };

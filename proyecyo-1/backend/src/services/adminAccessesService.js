@@ -76,7 +76,7 @@ function mapAccessType(tipoVisita) {
 function mapAccessStatus(estadoAcceso) {
   const normalized = normalizeString(estadoAcceso).toUpperCase();
 
-  if (["AUTORIZADA", "INGRESO_REGISTRADO", "APROBADA"].includes(normalized)) {
+  if (["AUTORIZADA", "INGRESO_REGISTRADO", "SALIDA_REGISTRADA", "APROBADA"].includes(normalized)) {
     return "APROBADO";
   }
 
@@ -206,7 +206,7 @@ function appendStatusFilter(filters, accessStatus) {
   }
 
   if (accessStatus === "APROBADO") {
-    filters.push("UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'APROBADA')");
+    filters.push("UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'APROBADA')");
     return;
   }
 
@@ -226,7 +226,7 @@ async function getAdminAccessSummary() {
         COUNT(*) AS total_dia,
         SUM(
           CASE
-            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'APROBADA')
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'APROBADA')
               THEN 1
             ELSE 0
           END
@@ -283,7 +283,7 @@ async function getAdminAccessHourlyChart() {
         COUNT(*) AS total,
         SUM(
           CASE
-            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'APROBADA')
+            WHEN UPPER(COALESCE(a.estado_acceso, '')) IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'APROBADA')
               THEN 1
             ELSE 0
           END
