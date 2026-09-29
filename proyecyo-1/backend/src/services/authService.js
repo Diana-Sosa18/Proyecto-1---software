@@ -1,6 +1,6 @@
 const { query } = require("../database/mysql");
 const { env } = require("../config/env");
-const { createSessionToken } = require("./sessionTokenService");
+const { createActiveSession } = require("./activeSessionsService");
 
 async function comparePassword(plainPassword, storedPassword) {
   if (typeof storedPassword === "string" && storedPassword.startsWith("$2")) {
@@ -16,7 +16,7 @@ async function comparePassword(plainPassword, storedPassword) {
   return bcrypt.compare(plainPassword, storedPassword);
 }
 
-async function loginUser({ email, password }) {
+async function loginUser({ email, password }, sessionMetadata = {}) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const normalizedPassword = String(password || "").trim();
 
@@ -65,11 +65,13 @@ async function loginUser({ email, password }) {
     throw error;
   }
 
+  const session = await createActiveSession(user.id, sessionMetadata);
+
   return {
     id: user.id,
     email: user.email,
     role: user.role,
-    token: createSessionToken(user.id),
+    token: session.token,
   };
 }
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Building2, LogOut, ShieldCheck } from "lucide-react";
+import { Building2, Laptop, LogOut, ShieldCheck } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +39,9 @@ export function AppShell({ role, title, subtitle, children }: AppShellProps) {
           </div>
 
           <div className="flex items-center gap-3">
+            <Button variant="outline" asChild>
+              <Link to="/cuenta/sesiones"><Laptop className="size-4" /> Sesiones</Link>
+            </Button>
             <div className="hidden rounded-full bg-blue-50 px-4 py-2 text-sm text-blue-700 sm:flex">
               <ShieldCheck className="mr-2 size-4" />
               {roleLabels[role]}

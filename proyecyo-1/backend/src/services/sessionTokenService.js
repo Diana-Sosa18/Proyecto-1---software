@@ -11,12 +11,17 @@ function signature(payload) {
   return crypto.createHmac("sha256", env.SESSION_SECRET).update(payload).digest("base64url");
 }
 
-function createSessionToken(userId) {
-  const payload = encode({ sub: Number(userId), exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS });
+function createSessionToken(userId, sessionId = crypto.randomUUID()) {
+  const payload = encode({
+    sub: Number(userId),
+    sid: String(sessionId),
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
+  });
   return `${payload}.${signature(payload)}`;
 }
 
-function verifySessionToken(token) {
+function verifySessionTokenDetails(token) {
   const [payload, suppliedSignature, extra] = String(token || "").split(".");
   if (!payload || !suppliedSignature || extra) return null;
 
@@ -27,11 +32,26 @@ function verifySessionToken(token) {
 
   try {
     const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    if (!Number.isInteger(decoded.sub) || decoded.sub <= 0 || decoded.exp <= Date.now() / 1000) return null;
-    return decoded.sub;
+    if (
+      !Number.isInteger(decoded.sub)
+      || decoded.sub <= 0
+      || typeof decoded.sid !== "string"
+      || !decoded.sid
+      || decoded.exp <= Date.now() / 1000
+    ) return null;
+    return decoded;
   } catch {
     return null;
   }
 }
 
-module.exports = { createSessionToken, verifySessionToken };
+function verifySessionToken(token) {
+  return verifySessionTokenDetails(token)?.sub || null;
+}
+
+module.exports = {
+  TOKEN_TTL_SECONDS,
+  createSessionToken,
+  verifySessionToken,
+  verifySessionTokenDetails,
+};

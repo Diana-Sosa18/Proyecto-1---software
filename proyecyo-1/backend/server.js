@@ -5,6 +5,7 @@ const {
   ensureQrValidationAttemptsSchema,
   ensureAmenityReservationsSchema,
   ensureNotificationsSchema,
+  ensureActiveSessionsSchema,
   ensureTenantProvidersSchema,
   ensureAnnouncementsSchema,
   ensureSpecialAccessSchema,
@@ -58,6 +59,7 @@ async function startServer() {
   await ensureQrValidationAttemptsSchema();
   await ensureAmenityReservationsSchema();
   await ensureNotificationsSchema();
+  await ensureActiveSessionsSchema();
   await ensureTenantProvidersSchema();
   await ensureAnnouncementsSchema();
   await ensureSpecialAccessSchema();

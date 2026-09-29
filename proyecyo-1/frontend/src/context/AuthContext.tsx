@@ -1,7 +1,7 @@
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { ApiError } from "@/services/api";
-import { getSessionRequest, loginRequest } from "@/services/authService";
+import { getSessionRequest, loginRequest, logoutRequest } from "@/services/authService";
 import type { AuthUser, LoginPayload, LoginResponse } from "@/types/auth";
 
 const STORAGE_KEY = "nexus.session";
@@ -26,10 +26,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(session);
   }, []);
 
-  const logout = useCallback(() => {
+  const clearSession = useCallback(() => {
     window.localStorage.removeItem(STORAGE_KEY);
     setUser(null);
   }, []);
+
+  const logout = useCallback(() => {
+    void logoutRequest().catch(() => undefined);
+    clearSession();
+  }, [clearSession]);
 
   // Consulta al backend el rol y estado actuales del usuario y actualiza la sesion
   // si cambiaron los permisos. Si el usuario fue desactivado o eliminado, cierra la sesion.
@@ -44,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       stored = JSON.parse(rawSession) as AuthUser;
     } catch {
-      logout();
+      clearSession();
       return;
     }
 
@@ -58,10 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Si el backend indica que la sesion ya no es valida (usuario inactivo o eliminado),
       // se cierra la sesion. Los errores de red se ignoran para no cerrarla por fallos temporales.
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        logout();
+        clearSession();
       }
     }
-  }, [logout, persistSession]);
+  }, [clearSession, persistSession]);
 
   useEffect(() => {
     const rawSession = window.localStorage.getItem(STORAGE_KEY);
@@ -102,9 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, refreshSession]);
 
   useEffect(() => {
-    window.addEventListener("nexus:session-expired", logout);
-    return () => window.removeEventListener("nexus:session-expired", logout);
-  }, [logout]);
+    window.addEventListener("nexus:session-expired", clearSession);
+    return () => window.removeEventListener("nexus:session-expired", clearSession);
+  }, [clearSession]);
 
   const login = useCallback(
     async (payload: LoginPayload) => {

@@ -12,3 +12,7 @@ export function loginRequest(payload: LoginPayload) {
 export function getSessionRequest() {
   return apiRequest<LoginResponse>("/auth/session");
 }
+
+export function logoutRequest() {
+  return apiRequest<{ message: string }>("/auth/logout", { method: "POST" });
+}

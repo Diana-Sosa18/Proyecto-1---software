@@ -13,6 +13,7 @@ import {
   Wallet,
   BriefcaseBusiness,
   MessageSquareText,
+  MonitorSmartphone,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -174,6 +175,13 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
             <LogOut className="size-4" />
             Cerrar sesi\u00f3n
           </button>
+          <NavLink
+            to="/cuenta/sesiones"
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-[0.84rem] font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-950"
+          >
+            <MonitorSmartphone className="size-4" />
+            Sesiones activas
+          </NavLink>
         </div>
       </aside>
 

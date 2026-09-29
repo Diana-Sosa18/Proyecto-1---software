@@ -351,6 +351,26 @@ async function ensureNotificationsSchema() {
   }
 }
 
+async function ensureActiveSessionsSchema() {
+  if (!(await tableExists("SESION_ACTIVA"))) {
+    await query(`
+      CREATE TABLE SESION_ACTIVA (
+        id_sesion CHAR(36) PRIMARY KEY,
+        id_usuario INT NOT NULL,
+        dispositivo VARCHAR(120) NOT NULL,
+        user_agent VARCHAR(500) NULL,
+        direccion_ip VARCHAR(45) NULL,
+        creada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        ultima_actividad_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        expira_en DATETIME NOT NULL,
+        revocada_en DATETIME NULL,
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario) ON DELETE CASCADE,
+        INDEX idx_sesion_usuario_estado (id_usuario, revocada_en, expira_en)
+      )
+    `);
+  }
+}
+
 async function ensureTenantProvidersSchema() {
   const serviceColumns = [
     {
@@ -996,6 +1016,7 @@ module.exports = {
   ensureQrValidationAttemptsSchema,
   ensureAmenityReservationsSchema,
   ensureNotificationsSchema,
+  ensureActiveSessionsSchema,
   ensureTenantProvidersSchema,
   ensureAnnouncementsSchema,
   ensureSpecialAccessSchema,

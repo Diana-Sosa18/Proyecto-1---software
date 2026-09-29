@@ -35,6 +35,7 @@ import { ResidentNotificationsView } from "@/views/ResidentNotificationsView";
 import { LandingView } from "@/views/LandingView";
 import { PrivacyView } from "@/views/PrivacyView";
 import { AdminDemoRequestsView } from "@/views/AdminDemoRequestsView";
+import { ActiveSessionsView } from "@/views/ActiveSessionsView";
 
 function FallbackRedirect() {
   const { user } = useAuth();
@@ -90,6 +91,10 @@ export function AppRouter() {
           <Route path="/inquilino" element={<InquilinoView />} />
           <Route path="/inquilino/estado-cuenta" element={<InquilinoAccountView />} />
           <Route path="/inquilino/historial-financiero" element={<InquilinoAccountView />} />
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={["admin", "guardia", "residente", "inquilino"]} />}>
+          <Route path="/cuenta/sesiones" element={<ActiveSessionsView />} />
         </Route>
 
         <Route path="*" element={<FallbackRedirect />} />
