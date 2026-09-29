@@ -254,6 +254,7 @@ export function ResidenteView() {
               : "Notificaciones sin leer"
           }
           icon={Bell}
+          onClick={() => navigate("/residente/notificaciones")}
         />
 
         <StatCard
