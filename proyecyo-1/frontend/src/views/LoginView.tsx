@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Building2, Eye, EyeOff, Lock, Mail } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { Button } from "@/components/ui/button";
@@ -178,6 +178,12 @@ export function LoginView() {
                     </button>
                   </div>
                   {errors.password ? <p className="mt-2 text-sm text-red-600">{errors.password}</p> : null}
+                </div>
+
+                <div className="text-right">
+                  <Link to="/olvide-contrasena" className="text-sm font-semibold text-blue-700 hover:text-blue-900">
+                    Olvide mi contrasena
+                  </Link>
                 </div>
 
                 <Button type="submit" className="h-11 w-full bg-[#1E3A8A] hover:bg-[#2563EB]" disabled={isSubmitting}>

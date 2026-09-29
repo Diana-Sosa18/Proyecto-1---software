@@ -36,6 +36,8 @@ import { LandingView } from "@/views/LandingView";
 import { PrivacyView } from "@/views/PrivacyView";
 import { AdminDemoRequestsView } from "@/views/AdminDemoRequestsView";
 import { ActiveSessionsView } from "@/views/ActiveSessionsView";
+import { ForgotPasswordView } from "@/views/ForgotPasswordView";
+import { ResetPasswordView } from "@/views/ResetPasswordView";
 
 function FallbackRedirect() {
   const { user } = useAuth();
@@ -50,6 +52,8 @@ export function AppRouter() {
         <Route path="/privacidad" element={<PrivacyView />} />
         <Route element={<PublicRoute />}>
           <Route path="/login" element={<LoginView />} />
+          <Route path="/olvide-contrasena" element={<ForgotPasswordView />} />
+          <Route path="/restablecer-contrasena" element={<ResetPasswordView />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>

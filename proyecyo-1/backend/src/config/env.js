@@ -29,6 +29,10 @@ const env = {
   DB_CONNECTION_LIMIT: getNumber(process.env.DB_CONNECTION_LIMIT, 10),
   USE_BCRYPT: process.env.USE_BCRYPT === "true",
   SESSION_SECRET: getSessionSecret(),
+  PASSWORD_RESET_TTL_MINUTES: getNumber(process.env.PASSWORD_RESET_TTL_MINUTES, 30),
+  EMAIL_API_URL: process.env.EMAIL_API_URL || "",
+  EMAIL_API_KEY: process.env.EMAIL_API_KEY || "",
+  EMAIL_FROM: process.env.EMAIL_FROM || "no-reply@nexusresidencial.local",
 };
 
 module.exports = { env };

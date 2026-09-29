@@ -6,6 +6,7 @@ const {
   ensureAmenityReservationsSchema,
   ensureNotificationsSchema,
   ensureActiveSessionsSchema,
+  ensurePasswordResetSchema,
   ensureTenantProvidersSchema,
   ensureAnnouncementsSchema,
   ensureSpecialAccessSchema,
@@ -60,6 +61,7 @@ async function startServer() {
   await ensureAmenityReservationsSchema();
   await ensureNotificationsSchema();
   await ensureActiveSessionsSchema();
+  await ensurePasswordResetSchema();
   await ensureTenantProvidersSchema();
   await ensureAnnouncementsSchema();
   await ensureSpecialAccessSchema();

@@ -1,5 +1,11 @@
 # nexusprueba
 
+## Recuperacion de contrasena
+
+El flujo publico usa tokens aleatorios de un solo uso. En la base de datos se conserva solamente su hash SHA-256 y, al establecer una contrasena nueva, se revocan las sesiones activas de la cuenta.
+
+Para entregar el enlace se configura un proveedor HTTP de correo mediante `EMAIL_API_URL`. Opcionalmente se aceptan `EMAIL_API_KEY`, `EMAIL_FROM` y `PASSWORD_RESET_TTL_MINUTES`. El proveedor recibe un `POST` JSON con `from`, `to`, `subject`, `text` y `html`; ninguna credencial debe guardarse en `CONFIGURACION`.
+
 ## Docker
 
 Si el puerto de MySQL del host esta ocupado, cambia `MYSQL_HOST_PORT` en un archivo `.env`.

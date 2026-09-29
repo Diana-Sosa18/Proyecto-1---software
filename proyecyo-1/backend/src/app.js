@@ -42,6 +42,14 @@ const loginRateLimiter = rateLimit({
   message: { message: "Demasiados intentos de inicio de sesion. Intenta de nuevo mas tarde." },
 });
 
+const passwordResetRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Demasiadas solicitudes de recuperacion. Intenta de nuevo mas tarde." },
+});
+
 function createApp() {
   const app = express();
 
@@ -61,6 +69,7 @@ function createApp() {
   });
 
   app.use("/login", loginRateLimiter);
+  app.use("/auth/password/forgot", passwordResetRateLimiter);
   app.use(authRoutes);
   app.use(activeSessionsRoutes);
   app.use(usersRoutes);

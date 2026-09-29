@@ -371,6 +371,23 @@ async function ensureActiveSessionsSchema() {
   }
 }
 
+async function ensurePasswordResetSchema() {
+  if (!(await tableExists("PASSWORD_RESET_TOKEN"))) {
+    await query(`
+      CREATE TABLE PASSWORD_RESET_TOKEN (
+        id_token BIGINT PRIMARY KEY AUTO_INCREMENT,
+        id_usuario INT NOT NULL,
+        token_hash CHAR(64) UNIQUE NOT NULL,
+        solicitado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        expira_en DATETIME NOT NULL,
+        usado_en DATETIME NULL,
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario) ON DELETE CASCADE,
+        INDEX idx_password_reset_usuario_estado (id_usuario, usado_en, expira_en)
+      )
+    `);
+  }
+}
+
 async function ensureTenantProvidersSchema() {
   const serviceColumns = [
     {
@@ -1017,6 +1034,7 @@ module.exports = {
   ensureAmenityReservationsSchema,
   ensureNotificationsSchema,
   ensureActiveSessionsSchema,
+  ensurePasswordResetSchema,
   ensureTenantProvidersSchema,
   ensureAnnouncementsSchema,
   ensureSpecialAccessSchema,
