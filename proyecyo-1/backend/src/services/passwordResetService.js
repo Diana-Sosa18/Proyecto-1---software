@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const { env } = require("../config/env");
 const { pool, query } = require("../database/mysql");
 const { sendPasswordResetEmail } = require("./emailService");
+const { recordAudit } = require("./auditService");
 
 const GENERIC_RESPONSE = {
   message: "Si el correo pertenece a una cuenta activa, enviaremos instrucciones para recuperar el acceso.",
@@ -64,7 +65,7 @@ async function requestPasswordReset(email) {
   return GENERIC_RESPONSE;
 }
 
-async function resetPassword({ token, password }) {
+async function resetPassword({ token, password }, metadata = {}) {
   const suppliedToken = String(token || "").trim();
   if (!/^[a-f0-9]{64}$/i.test(suppliedToken)) {
     const error = new Error("El enlace de recuperacion es invalido o ya expiro.");
@@ -103,6 +104,14 @@ async function resetPassword({ token, password }) {
       "UPDATE SESION_ACTIVA SET revocada_en = NOW() WHERE id_usuario = ? AND revocada_en IS NULL",
       [record.id_usuario],
     );
+    await recordAudit({
+      userId: record.id_usuario,
+      action: "PASSWORD_RESET",
+      entity: "USUARIO",
+      entityId: record.id_usuario,
+      newData: { sesiones_revocadas: true },
+      metadata,
+    }, (sql, params) => connection.execute(sql, params));
     await connection.commit();
     return { message: "Contrasena actualizada. Ya puedes iniciar sesion." };
   } catch (error) {

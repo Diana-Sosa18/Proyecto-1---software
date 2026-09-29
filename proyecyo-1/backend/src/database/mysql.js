@@ -388,6 +388,28 @@ async function ensurePasswordResetSchema() {
   }
 }
 
+async function ensureAuditSchema() {
+  if (!(await tableExists("AUDITORIA"))) {
+    await query(`
+      CREATE TABLE AUDITORIA (
+        id_auditoria BIGINT PRIMARY KEY AUTO_INCREMENT,
+        id_usuario INT NULL,
+        accion VARCHAR(80) NOT NULL,
+        entidad VARCHAR(80) NOT NULL,
+        entidad_id VARCHAR(100) NULL,
+        datos_anteriores JSON NULL,
+        datos_nuevos JSON NULL,
+        direccion_ip VARCHAR(45) NULL,
+        user_agent VARCHAR(500) NULL,
+        creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario) ON DELETE SET NULL,
+        INDEX idx_auditoria_usuario_fecha (id_usuario, creado_en),
+        INDEX idx_auditoria_accion_fecha (accion, creado_en)
+      )
+    `);
+  }
+}
+
 async function ensureTenantProvidersSchema() {
   const serviceColumns = [
     {
@@ -1035,6 +1057,7 @@ module.exports = {
   ensureNotificationsSchema,
   ensureActiveSessionsSchema,
   ensurePasswordResetSchema,
+  ensureAuditSchema,
   ensureTenantProvidersSchema,
   ensureAnnouncementsSchema,
   ensureSpecialAccessSchema,

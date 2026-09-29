@@ -6,6 +6,7 @@ const rateLimit = require("express-rate-limit");
 const { env } = require("./config/env");
 const authRoutes = require("./routes/authRoutes");
 const activeSessionsRoutes = require("./routes/activeSessionsRoutes");
+const auditRoutes = require("./routes/auditRoutes");
 const usersRoutes = require("./routes/usersRoutes");
 const userTypesRoutes = require("./routes/userTypesRoutes");
 const visitsRoutes = require("./routes/visitsRoutes");
@@ -72,6 +73,7 @@ function createApp() {
   app.use("/auth/password/forgot", passwordResetRateLimiter);
   app.use(authRoutes);
   app.use(activeSessionsRoutes);
+  app.use(auditRoutes);
   app.use(usersRoutes);
   app.use(userTypesRoutes);
   app.use(visitsRoutes);

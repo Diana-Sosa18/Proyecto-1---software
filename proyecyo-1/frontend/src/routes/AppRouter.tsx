@@ -38,6 +38,7 @@ import { AdminDemoRequestsView } from "@/views/AdminDemoRequestsView";
 import { ActiveSessionsView } from "@/views/ActiveSessionsView";
 import { ForgotPasswordView } from "@/views/ForgotPasswordView";
 import { ResetPasswordView } from "@/views/ResetPasswordView";
+import { AdminAuditView } from "@/views/AdminAuditView";
 
 function FallbackRedirect() {
   const { user } = useAuth();
@@ -72,6 +73,7 @@ export function AppRouter() {
           <Route path="/admin/reportes-financieros" element={<AdminMonthlyFinancialReportView />} />
           <Route path="/admin/configuracion" element={<AdminSettingsView />} />
           <Route path="/admin/solicitudes-demo" element={<AdminDemoRequestsView />} />
+          <Route path="/admin/auditoria" element={<AdminAuditView />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["guardia"]} />}>

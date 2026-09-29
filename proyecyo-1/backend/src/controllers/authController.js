@@ -1,6 +1,7 @@
 const { loginUser, getCurrentSession } = require("../services/authService");
 const { revokeSession } = require("../services/activeSessionsService");
 const { getAuthenticatedSession } = require("../middlewares/requireRoles");
+const { getRequestMetadata, recordAudit } = require("../services/auditService");
 
 async function login(req, res, next) {
   try {
@@ -33,6 +34,14 @@ async function logout(req, res, next) {
       throw error;
     }
     await revokeSession(authenticated.userId, authenticated.sessionId);
+    await recordAudit({
+      userId: authenticated.userId,
+      action: "SESSION_REVOKED",
+      entity: "SESION_ACTIVA",
+      entityId: authenticated.sessionId,
+      newData: { actual: true, cerrada: true },
+      metadata: getRequestMetadata(req),
+    });
     res.status(200).json({ message: "Sesion cerrada." });
   } catch (error) {
     next(error);

@@ -7,6 +7,7 @@ const {
   ensureNotificationsSchema,
   ensureActiveSessionsSchema,
   ensurePasswordResetSchema,
+  ensureAuditSchema,
   ensureTenantProvidersSchema,
   ensureAnnouncementsSchema,
   ensureSpecialAccessSchema,
@@ -62,6 +63,7 @@ async function startServer() {
   await ensureNotificationsSchema();
   await ensureActiveSessionsSchema();
   await ensurePasswordResetSchema();
+  await ensureAuditSchema();
   await ensureTenantProvidersSchema();
   await ensureAnnouncementsSchema();
   await ensureSpecialAccessSchema();

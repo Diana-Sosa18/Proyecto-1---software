@@ -102,6 +102,11 @@ const adminMenuItems: AdminMenuItem[] = [
     to: "/admin/configuracion",
   },
   {
+    label: "Auditor\u00eda",
+    icon: ShieldAlert,
+    to: "/admin/auditoria",
+  },
+  {
     label: "Solicitudes demo",
     icon: MessageSquareText,
     to: "/admin/solicitudes-demo",

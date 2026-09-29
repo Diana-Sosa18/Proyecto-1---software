@@ -24,6 +24,7 @@ DROP TABLE IF EXISTS RESIDENTE;
 DROP TABLE IF EXISTS TICKET;
 DROP TABLE IF EXISTS COMUNICADO;
 DROP TABLE IF EXISTS PERMISO;
+DROP TABLE IF EXISTS AUDITORIA;
 DROP TABLE IF EXISTS PASSWORD_RESET_TOKEN;
 DROP TABLE IF EXISTS SESION_ACTIVA;
 DROP TABLE IF EXISTS USUARIO;
@@ -105,6 +106,22 @@ CREATE TABLE PASSWORD_RESET_TOKEN (
     usado_en DATETIME NULL,
     FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario) ON DELETE CASCADE,
     INDEX idx_password_reset_usuario_estado (id_usuario, usado_en, expira_en)
+);
+
+CREATE TABLE AUDITORIA (
+    id_auditoria BIGINT PRIMARY KEY AUTO_INCREMENT,
+    id_usuario INT NULL,
+    accion VARCHAR(80) NOT NULL,
+    entidad VARCHAR(80) NOT NULL,
+    entidad_id VARCHAR(100) NULL,
+    datos_anteriores JSON NULL,
+    datos_nuevos JSON NULL,
+    direccion_ip VARCHAR(45) NULL,
+    user_agent VARCHAR(500) NULL,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario) ON DELETE SET NULL,
+    INDEX idx_auditoria_usuario_fecha (id_usuario, creado_en),
+    INDEX idx_auditoria_accion_fecha (accion, creado_en)
 );
 
 CREATE TABLE RESIDENTE (

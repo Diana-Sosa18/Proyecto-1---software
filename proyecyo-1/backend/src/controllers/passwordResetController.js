@@ -1,4 +1,5 @@
 const { requestPasswordReset, resetPassword } = require("../services/passwordResetService");
+const { getRequestMetadata } = require("../services/auditService");
 
 async function forgotPassword(req, res, next) {
   try {
@@ -11,7 +12,7 @@ async function forgotPassword(req, res, next) {
 
 async function changeForgottenPassword(req, res, next) {
   try {
-    const result = await resetPassword(req.body || {});
+    const result = await resetPassword(req.body || {}, getRequestMetadata(req));
     res.status(200).json(result);
   } catch (error) {
     next(error);
