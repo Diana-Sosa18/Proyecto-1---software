@@ -5,6 +5,7 @@ const {
   validateVisitSchedulePayload,
   validateVisitTimesAgainstSchedule,
   DEFAULT_VISIT_SCHEDULE,
+  validateGeneralConfiguration,
 } = require("../src/services/configurationService");
 
 const baseSchedule = {
@@ -104,4 +105,36 @@ test("DEFAULT_VISIT_SCHEDULE matches expected seed values", () => {
     activo: true,
     dias_habilitados: [1, 2, 3, 4, 5, 6, 0],
   });
+});
+
+test("validateGeneralConfiguration normalizes valid public parameters", () => {
+  assert.deepEqual(validateGeneralConfiguration({
+    nombre: " Residencial Los Pinos ",
+    direccion: "Zona 10",
+    correo_contacto: "ADMIN@PINOS.COM",
+    telefono_contacto: "+502 5555-5555",
+    zona_horaria: "America/Guatemala",
+    moneda: "gtq",
+  }), {
+    nombre: "Residencial Los Pinos",
+    direccion: "Zona 10",
+    correo_contacto: "admin@pinos.com",
+    telefono_contacto: "+502 5555-5555",
+    zona_horaria: "America/Guatemala",
+    moneda: "GTQ",
+  });
+});
+
+test("validateGeneralConfiguration rejects invalid backend values", () => {
+  const valid = {
+    nombre: "Residencial Los Pinos",
+    direccion: "Zona 10",
+    correo_contacto: "admin@pinos.com",
+    telefono_contacto: "+502 5555-5555",
+    zona_horaria: "America/Guatemala",
+    moneda: "GTQ",
+  };
+  assert.throws(() => validateGeneralConfiguration({ ...valid, correo_contacto: "incorrecto" }), /correo de contacto/);
+  assert.throws(() => validateGeneralConfiguration({ ...valid, zona_horaria: "Zona/Inexistente" }), /zona horaria/);
+  assert.throws(() => validateGeneralConfiguration({ ...valid, moneda: "EUR" }), /moneda debe ser/);
 });

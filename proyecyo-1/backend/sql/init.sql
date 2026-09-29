@@ -397,7 +397,13 @@ VALUES
     ('visitas_hora_cierre', '22:00'),
     ('visitas_duracion_maxima_horas', '4'),
     ('visitas_activo', 'true'),
-    ('visitas_dias_habilitados', '[1,2,3,4,5,6,0]');
+    ('visitas_dias_habilitados', '[1,2,3,4,5,6,0]'),
+    ('residencial_nombre', 'NexusResidencial'),
+    ('residencial_direccion', ''),
+    ('residencial_correo_contacto', 'administracion@nexusresidencial.local'),
+    ('residencial_telefono_contacto', ''),
+    ('residencial_zona_horaria', 'America/Guatemala'),
+    ('residencial_moneda', 'GTQ');
 
 CREATE TABLE NOTIFICACION (
     id_notificacion INT PRIMARY KEY AUTO_INCREMENT,

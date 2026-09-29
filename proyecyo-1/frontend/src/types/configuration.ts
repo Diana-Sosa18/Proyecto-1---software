@@ -13,3 +13,12 @@ export type UpdateVisitSchedulePayload = {
   activo: boolean;
   dias_habilitados: number[];
 };
+
+export type GeneralConfiguration = {
+  nombre: string;
+  direccion: string;
+  correo_contacto: string;
+  telefono_contacto: string;
+  zona_horaria: string;
+  moneda: "GTQ" | "USD";
+};

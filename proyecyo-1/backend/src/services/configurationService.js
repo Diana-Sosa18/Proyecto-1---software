@@ -17,6 +17,24 @@ const DEFAULT_VISIT_SCHEDULE = {
   dias_habilitados: [1, 2, 3, 4, 5, 6, 0],
 };
 
+const GENERAL_CONFIG_KEYS = {
+  NOMBRE: "residencial_nombre",
+  DIRECCION: "residencial_direccion",
+  CORREO: "residencial_correo_contacto",
+  TELEFONO: "residencial_telefono_contacto",
+  ZONA_HORARIA: "residencial_zona_horaria",
+  MONEDA: "residencial_moneda",
+};
+
+const DEFAULT_GENERAL_CONFIG = {
+  nombre: "NexusResidencial",
+  direccion: "",
+  correo_contacto: "administracion@nexusresidencial.local",
+  telefono_contacto: "",
+  zona_horaria: "America/Guatemala",
+  moneda: "GTQ",
+};
+
 function normalizeString(value) {
   return String(value || "").trim();
 }
@@ -245,6 +263,95 @@ async function assertVisitTimesAllowed(horaInicio, horaFin, fecha) {
   return schedule;
 }
 
+function validateGeneralConfiguration(payload) {
+  const value = {
+    nombre: normalizeString(payload.nombre),
+    direccion: normalizeString(payload.direccion),
+    correo_contacto: normalizeString(payload.correo_contacto).toLowerCase(),
+    telefono_contacto: normalizeString(payload.telefono_contacto),
+    zona_horaria: normalizeString(payload.zona_horaria),
+    moneda: normalizeString(payload.moneda).toUpperCase(),
+  };
+  if (value.nombre.length < 3 || value.nombre.length > 120) {
+    const error = new Error("El nombre del residencial debe tener entre 3 y 120 caracteres.");
+    error.status = 400;
+    throw error;
+  }
+  if (value.direccion.length > 200) {
+    const error = new Error("La direccion no puede superar 200 caracteres.");
+    error.status = 400;
+    throw error;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.correo_contacto)) {
+    const error = new Error("El correo de contacto no es valido.");
+    error.status = 400;
+    throw error;
+  }
+  if (value.telefono_contacto && !/^[+\d][\d\s()-]{6,24}$/.test(value.telefono_contacto)) {
+    const error = new Error("El telefono de contacto no es valido.");
+    error.status = 400;
+    throw error;
+  }
+  try {
+    new Intl.DateTimeFormat("es-GT", { timeZone: value.zona_horaria }).format();
+  } catch {
+    const error = new Error("La zona horaria no es valida.");
+    error.status = 400;
+    throw error;
+  }
+  if (!["GTQ", "USD"].includes(value.moneda)) {
+    const error = new Error("La moneda debe ser GTQ o USD.");
+    error.status = 400;
+    throw error;
+  }
+  return value;
+}
+
+async function getGeneralConfiguration() {
+  const rows = await query(
+    `SELECT clave, valor FROM CONFIGURACION WHERE clave IN (?, ?, ?, ?, ?, ?)`,
+    Object.values(GENERAL_CONFIG_KEYS),
+  );
+  const config = Object.fromEntries(rows.map((row) => [row.clave, row.valor]));
+  return {
+    nombre: config[GENERAL_CONFIG_KEYS.NOMBRE] ?? DEFAULT_GENERAL_CONFIG.nombre,
+    direccion: config[GENERAL_CONFIG_KEYS.DIRECCION] ?? DEFAULT_GENERAL_CONFIG.direccion,
+    correo_contacto: config[GENERAL_CONFIG_KEYS.CORREO] ?? DEFAULT_GENERAL_CONFIG.correo_contacto,
+    telefono_contacto: config[GENERAL_CONFIG_KEYS.TELEFONO] ?? DEFAULT_GENERAL_CONFIG.telefono_contacto,
+    zona_horaria: config[GENERAL_CONFIG_KEYS.ZONA_HORARIA] ?? DEFAULT_GENERAL_CONFIG.zona_horaria,
+    moneda: config[GENERAL_CONFIG_KEYS.MONEDA] ?? DEFAULT_GENERAL_CONFIG.moneda,
+  };
+}
+
+async function updateGeneralConfiguration(payload) {
+  const validated = validateGeneralConfiguration(payload);
+  const values = [
+    [GENERAL_CONFIG_KEYS.NOMBRE, validated.nombre],
+    [GENERAL_CONFIG_KEYS.DIRECCION, validated.direccion],
+    [GENERAL_CONFIG_KEYS.CORREO, validated.correo_contacto],
+    [GENERAL_CONFIG_KEYS.TELEFONO, validated.telefono_contacto],
+    [GENERAL_CONFIG_KEYS.ZONA_HORARIA, validated.zona_horaria],
+    [GENERAL_CONFIG_KEYS.MONEDA, validated.moneda],
+  ];
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    for (const [key, value] of values) {
+      await connection.execute(
+        "INSERT INTO CONFIGURACION (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)",
+        [key, value],
+      );
+    }
+    await connection.commit();
+    return validated;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   getVisitScheduleConfig,
   updateVisitScheduleConfig,
@@ -253,4 +360,9 @@ module.exports = {
   validateVisitSchedulePayload,
   DEFAULT_VISIT_SCHEDULE,
   CONFIG_KEYS,
+  DEFAULT_GENERAL_CONFIG,
+  GENERAL_CONFIG_KEYS,
+  getGeneralConfiguration,
+  updateGeneralConfiguration,
+  validateGeneralConfiguration,
 };

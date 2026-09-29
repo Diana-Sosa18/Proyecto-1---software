@@ -1,8 +1,19 @@
 import { apiRequest } from "@/services/api";
-import type { UpdateVisitSchedulePayload, VisitScheduleConfig } from "@/types/configuration";
+import type { GeneralConfiguration, UpdateVisitSchedulePayload, VisitScheduleConfig } from "@/types/configuration";
 
 export function getVisitScheduleConfigRequest() {
   return apiRequest<VisitScheduleConfig>("/configuracion/horarios-visita");
+}
+
+export function getGeneralConfigurationRequest() {
+  return apiRequest<GeneralConfiguration>("/admin/configuracion/general");
+}
+
+export function updateGeneralConfigurationRequest(payload: GeneralConfiguration) {
+  return apiRequest<GeneralConfiguration>("/admin/configuracion/general", {
+    method: "PUT",
+    body: payload,
+  });
 }
 
 export function getAdminVisitScheduleConfigRequest() {
