@@ -1,4 +1,5 @@
 const mysql = require("mysql2/promise");
+const { logger } = require("../utils/safeLogger");
 
 const { env } = require("../config/env");
 
@@ -89,7 +90,7 @@ async function ensureAccessStatusCheckConstraint() {
       [env.DB_NAME],
     );
   } catch (error) {
-    console.warn("No fue posible revisar el CHECK de estado_acceso.", error.message);
+    logger.warn("No fue posible revisar el CHECK de estado_acceso.", error);
     return;
   }
 
@@ -115,7 +116,7 @@ async function ensureAccessStatusCheckConstraint() {
       CHECK (estado_acceso IN ('AUTORIZADA', 'INGRESO_REGISTRADO', 'SALIDA_REGISTRADA', 'CANCELADA', 'PENDIENTE_APROBACION', 'RECHAZADA'))
     `);
   } catch (error) {
-    console.warn("No fue posible actualizar el CHECK de estado_acceso.", error.message);
+    logger.warn("No fue posible actualizar el CHECK de estado_acceso.", error);
   }
 }
 async function ensureRestoreHistorySchema() {

@@ -4,6 +4,17 @@
   "description": "",
   "main": "server.js",
   "scripts": {
+    "migrate:recurrente": "node scripts/migrate-recurrente.js",
+    "test:phase0:mysql": "node scripts/run-isolated-tests.js phase0",
+    "test:phase0:functional": "node scripts/run-isolated-tests.js functional",
+    "test:hu13:mysql": "node scripts/run-isolated-tests.js hu13",
+    "test:hu14:mysql": "node scripts/run-isolated-tests.js hu14",
+    "test:hu15:mysql": "node scripts/run-isolated-tests.js hu15",
+    "test:hu16:mysql": "node scripts/run-isolated-tests.js hu16",
+    "test:hu17:mysql": "node scripts/run-isolated-tests.js hu17",
+    "test:isolated:backend": "node scripts/run-isolated-tests.js backend",
+    "start:hu13:sandbox": "node scripts/start-hu13-sandbox.js",
+    "start:hu14:sandbox": "node scripts/start-hu13-sandbox.js",
     "dev": "node server.js",
     "start": "node server.js",
     "test": "node --test --test-concurrency=1 test/app.routes.test.js test/restores.test.js test/adminSanctions.test.js test/amenitiesReservations.test.js test/configuration.test.js test/visitorType.test.js test/financialRules.test.js test/sanctionHistory.test.js test/residentMonthlySummary.test.js test/reportExport.test.js test/dateTimeValidation.test.js test/automaticBackups.test.js test/demoRequests.test.js test/recordatoriosPago.test.js test/detalleFinanciero.test.js test/residentAccount.test.js test/tenantAccount.test.js test/visits.test.js && jest --runInBand",
@@ -21,7 +32,8 @@
     "express-rate-limit": "^8.6.2",
     "helmet": "^8.3.0",
     "mysql2": "^3.14.1",
-    "pdfkit": "^0.19.1"
+    "pdfkit": "^0.19.1",
+    "svix": "1.99.1"
   },
   "devDependencies": {
     "jest": "^30.4.2",

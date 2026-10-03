@@ -1,6 +1,8 @@
+import type { FinancialReview } from "./financialBalance";
 export type AdminPaymentStatus = "MOROSO" | "PENDIENTE" | "PAGADO";
 
-export interface AdminPaymentRecord {
+export interface AdminPaymentRecord extends FinancialReview {
+  recargo_pendiente?: number;
   id_casa: number;
   unidad: string;
   propietario_nombre: string;

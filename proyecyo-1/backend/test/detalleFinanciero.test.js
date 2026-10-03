@@ -34,6 +34,7 @@ test("mapCharge calcula saldo con recargo y estado", () => {
     pagado: 200,
     recargo: 25,
     saldo: 325,
+    capital_pendiente: 325, recargo_pendiente: 0, sobrepago: 0, requiere_revision: false,
     fecha_limite: "2026-07-30",
     estado: "PARCIAL",
   });

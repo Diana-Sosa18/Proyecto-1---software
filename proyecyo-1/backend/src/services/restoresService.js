@@ -1,4 +1,6 @@
 const { pool, query } = require("../database/mysql");
+const { FINANCIAL_TABLES } = require("../database/backupTables");
+const { sanitizeText } = require("../utils/safeLogger");
 
 const MAX_BACKUP_SIZE_BYTES = 2 * 1024 * 1024;
 const RESTORABLE_TABLES = new Set([
@@ -9,6 +11,7 @@ const RESTORABLE_TABLES = new Set([
   "REGISTRO_ACCESO", "REGLAMENTO", "RESERVA", "RESIDENTE", "SERVICIO",
   "SOLICITUD_AUTORIZACION_DIGITAL", "TICKET", "TIPO_USUARIO",
   "TIPO_USUARIO_PERMISO", "USUARIO", "VISITANTE",
+  "RECARGO_APLICADO", "TRANSACCION_SIMULADA", ...FINANCIAL_TABLES,
 ]);
 const DISALLOWED_PATTERNS = [
   /\bDROP\s+DATABASE\b/i,
@@ -132,7 +135,11 @@ function ensureSafeDataStatements(statements) {
     );
     const table = match?.[1]?.toUpperCase();
 
-    if (!table || !RESTORABLE_TABLES.has(table)) {
+    // Data restores must stay in the selected application database.
+    // Do not accept qualified targets such as USUARIO.other_table.
+    const qualifiedTarget = /^\s*(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+`?[A-Za-z0-9_]+`?\s*\./i.test(statement);
+
+    if (!table || !RESTORABLE_TABLES.has(table) || qualifiedTarget) {
       const error = new Error(
         "El respaldo solo puede modificar datos de tablas autorizadas mediante INSERT, UPDATE o DELETE.",
       );
@@ -231,6 +238,31 @@ async function listRestoreHistory() {
   }));
 }
 
+async function verifyRestoredReferences(connection, affectedTables) {
+  const [keys] = await connection.query(`
+    SELECT TABLE_NAME, CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME,
+      REFERENCED_COLUMN_NAME, ORDINAL_POSITION
+    FROM information_schema.KEY_COLUMN_USAGE
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL
+    ORDER BY TABLE_NAME, CONSTRAINT_NAME, ORDINAL_POSITION`);
+  const groups = new Map();
+  for (const key of keys) {
+    if (!affectedTables.includes(key.TABLE_NAME) && !affectedTables.includes(key.REFERENCED_TABLE_NAME)) continue;
+    const name = `${key.TABLE_NAME}:${key.CONSTRAINT_NAME}`;
+    if (!groups.has(name)) groups.set(name, []);
+    groups.get(name).push(key);
+  }
+  const identifier = (name) => `\`${String(name).replaceAll("`", "``")}\``;
+  for (const columns of groups.values()) {
+    const key = columns[0];
+    const present = columns.map((c) => `child.${identifier(c.COLUMN_NAME)} IS NOT NULL`).join(" AND ");
+    const matches = columns.map((c) => `parent.${identifier(c.REFERENCED_COLUMN_NAME)} = child.${identifier(c.COLUMN_NAME)}`).join(" AND ");
+    const [orphans] = await connection.query(`SELECT 1 FROM ${identifier(key.TABLE_NAME)} child
+      WHERE ${present} AND NOT EXISTS (SELECT 1 FROM ${identifier(key.REFERENCED_TABLE_NAME)} parent WHERE ${matches}) LIMIT 1`);
+    if (orphans.length) throw Object.assign(new Error("El respaldo deja referencias sin su registro padre."), { code: "RESTORE_REFERENTIAL_INTEGRITY" });
+  }
+}
+
 async function restoreBackup(userId, payload = {}) {
   const validation = validateBackupPayload(payload);
   const tables = validation.tables.join(",");
@@ -260,8 +292,11 @@ async function restoreBackup(userId, payload = {}) {
       await connection.query(statement);
     }
 
-    await connection.commit();
+    // MySQL does not retroactively validate rows when FK checks are re-enabled.
+    // Validate affected parent/child relations, including composite financial keys, BEFORE commit.
+    await verifyRestoredReferences(connection, validation.tables);
     await connection.query("SET FOREIGN_KEY_CHECKS = 1");
+    await connection.commit();
     await query(
       `
         UPDATE HISTORIAL_RESTAURACION
@@ -293,7 +328,7 @@ async function restoreBackup(userId, payload = {}) {
               finalizado_en = CURRENT_TIMESTAMP
           WHERE id_restauracion = ?
         `,
-        [String(error.message || "No fue posible restaurar el respaldo.").slice(0, 255), restoreId],
+        [sanitizeText(error.message || "No fue posible restaurar el respaldo.").slice(0, 255), restoreId],
       );
     } catch {
       // El respaldo podria haber alterado la tabla de historial antes de fallar.
@@ -314,4 +349,5 @@ module.exports = {
   restoreBackup,
   listRestoreHistory,
   validateBackupPayload,
+  verifyRestoredReferences,
 };

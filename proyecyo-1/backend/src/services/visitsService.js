@@ -1,4 +1,5 @@
 const { pool, query } = require("../database/mysql");
+const { logger } = require("../utils/safeLogger");
 const { assertVisitTimesAllowed } = require("./configurationService");
 const { ensureValidVehiclePlate } = require("../utils/vehiclePlate");
 const { ensureValidDate, ensureValidTime } = require("../utils/dateTimeValidation");
@@ -747,7 +748,7 @@ async function cancelVisit(userId, role = "residente", accessId) {
     await createGuardCancellationNotifications(normalizedAccessId);
   } catch (notificationError) {
     // No bloqueamos la cancelacion si fallan las notificaciones
-    console.error("Error creando notificaciones de cancelacion:", notificationError);
+    logger.error("Error creando notificaciones de cancelacion:", notificationError);
   }
 
   const updatedRows = await query(
@@ -913,7 +914,7 @@ async function recordQrValidationAttempt({
     );
   } catch (error) {
     // La auditoria no debe impedir que el guardia reciba el resultado del QR.
-    console.warn("No fue posible registrar el intento de validacion QR.", error.message);
+    logger.warn("No fue posible registrar el intento de validacion QR.", error);
   }
 }
 

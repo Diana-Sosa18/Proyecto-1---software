@@ -1,4 +1,5 @@
 const { query } = require("../database/mysql");
+const { calculateBalance, balanceDetails, sumMoney } = require("./financialBalance");
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -10,7 +11,7 @@ function normalizeDate(value) {
 }
 
 function computeChargeStatus(monto, pagado) {
-  const saldo = Number(monto || 0) - Number(pagado || 0);
+  const { saldo } = calculateBalance({ monto, pagado });
 
   if (saldo <= 0) {
     return "PAGADO";
@@ -24,9 +25,8 @@ function computeChargeStatus(monto, pagado) {
 }
 
 function mapCharge(row) {
-  const monto = Number(row.monto || 0);
-  const pagado = Number(row.pagado || 0);
-  const recargo = Number(row.recargo || 0);
+  const balance = calculateBalance(row);
+  const { monto, pagado, recargo } = balance;
 
   return {
     id_cuota: Number(row.id_cuota),
@@ -34,9 +34,10 @@ function mapCharge(row) {
     monto,
     pagado,
     recargo,
-    saldo: Math.max(monto + recargo - pagado, 0),
+    saldo: balance.saldo,
+    ...balanceDetails(balance),
     fecha_limite: row.fecha_limite,
-    estado: computeChargeStatus(monto + recargo, pagado),
+    estado: balance.saldo === 0 ? "PAGADO" : pagado > 0 ? "PARCIAL" : "PENDIENTE",
   };
 }
 
@@ -93,14 +94,6 @@ async function getFinancialDetail(userId, filters = {}) {
 
   const chargeFilters = ["cu.id_casa = ?"];
   const chargeParams = [house.id_casa];
-  if (desde) {
-    chargeFilters.push("cu.fecha_limite >= ?");
-    chargeParams.push(desde);
-  }
-  if (hasta) {
-    chargeFilters.push("cu.fecha_limite <= ?");
-    chargeParams.push(hasta);
-  }
 
   const charges = await query(
     `
@@ -187,9 +180,9 @@ async function getFinancialDetail(userId, filters = {}) {
   const recargos = surcharges.map(mapSurcharge);
   const pagos = payments.map(mapPayment);
 
-  const totalCargos = cargos.reduce((sum, item) => sum + item.monto, 0);
-  const totalRecargos = recargos.reduce((sum, item) => sum + item.monto_recargo, 0);
-  const totalPagado = pagos.reduce((sum, item) => sum + item.monto_pagado, 0);
+  const totalCargos = sumMoney(cargos.map((item) => item.monto));
+  const totalRecargos = sumMoney(cargos.map((item) => item.recargo));
+  const totalPagado = sumMoney(cargos.map((item) => item.pagado));
 
   return {
     unidad: house.torre ? `${house.torre}-${house.numero}` : house.numero,
@@ -201,7 +194,10 @@ async function getFinancialDetail(userId, filters = {}) {
       total_cargos: Number(totalCargos.toFixed(2)),
       total_recargos: Number(totalRecargos.toFixed(2)),
       total_pagado: Number(totalPagado.toFixed(2)),
-      saldo_pendiente: Number(Math.max(totalCargos + totalRecargos - totalPagado, 0).toFixed(2)),
+      saldo_pendiente: sumMoney(cargos.map((item) => item.saldo)),
+      total_pagado_periodo: sumMoney(pagos.map((item) => item.monto_pagado)),
+      sobrepago: sumMoney(cargos.map((item) => item.sobrepago)),
+      requiere_revision: cargos.some((item) => item.requiere_revision),
     },
     cargos,
     recargos,

@@ -1,5 +1,6 @@
 const path = require("path");
 const dotenv = require("dotenv");
+const { loadRecurrenteConfig, KEYS } = require("./recurrente");
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -35,4 +36,6 @@ const env = {
   EMAIL_FROM: process.env.EMAIL_FROM || "no-reply@nexusresidencial.local",
 };
 
+const recurrente = loadRecurrenteConfig();
+for (const key of KEYS) Object.defineProperty(env, key, { value: recurrente[key], enumerable: false });
 module.exports = { env };

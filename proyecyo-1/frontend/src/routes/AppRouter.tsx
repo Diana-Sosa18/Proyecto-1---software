@@ -9,6 +9,7 @@ import { AdminAccessesView } from "@/views/AdminAccessesView";
 import { AdminAuthorizedUsersView } from "@/views/AdminAuthorizedUsersView";
 import { AdminCommunicationsView } from "@/views/AdminCommunicationsView";
 import { AdminPaymentsView } from "@/views/AdminPaymentsView";
+import { AdminRecurrenteReconciliationView } from "@/views/AdminRecurrenteReconciliationView";
 import { AdminRemindersView } from "@/views/AdminRemindersView";
 import { AdminReportsView } from "@/views/AdminReportsView";
 import { AdminMonthlyFinancialReportView } from "@/views/AdminMonthlyFinancialReportView";
@@ -28,6 +29,8 @@ import { ResidenteRegulationsView } from "@/views/ResidenteRegulationsView";
 import { ResidenteUnifiedView } from "@/views/ResidenteUnifiedView";
 import { ResidenteView } from "@/views/ResidenteView";
 import { ResidenteAccountView } from "@/views/ResidenteAccountView";
+import { ResidentePaymentReturnView } from "@/views/ResidentePaymentReturnView";
+import { ResidentePaymentReceiptView } from "@/views/ResidentePaymentReceiptView";
 import { ResidenteVisitsView } from "@/views/ResidenteVisitsView";
 import { ResidentMonthlySummaryView } from "@/views/ResidentMonthlySummaryView";
 import { ResidenteFinancialDetailView } from "@/views/ResidenteFinancialDetailView";
@@ -65,6 +68,7 @@ export function AppRouter() {
           <Route path="/admin/accesos-especiales" element={<AdminSpecialAccessView />} />
           <Route path="/admin/comunicados" element={<AdminCommunicationsView />} />
           <Route path="/admin/pagos" element={<AdminPaymentsView />} />
+          <Route path="/admin/pagos/conciliacion" element={<AdminRecurrenteReconciliationView />} />
           <Route path="/admin/recordatorios" element={<AdminRemindersView />} />
           <Route path="/admin/sanciones" element={<AdminSanctionsView />} />
           <Route path="/admin/sanciones/historial-completo" element={<AdminSanctionHistoryView />} />
@@ -83,6 +87,8 @@ export function AppRouter() {
         <Route element={<ProtectedRoute allowedRoles={["residente"]} />}>
           <Route path="/residente" element={<ResidenteView />} />
           <Route path="/residente/estado-cuenta" element={<ResidenteAccountView />} />
+          <Route path="/residente/pagos/retorno" element={<ResidentePaymentReturnView />} />
+          <Route path="/residente/pagos/:paymentId/comprobante" element={<ResidentePaymentReceiptView />} />
           <Route path="/residente/unificado" element={<ResidenteUnifiedView />} />
           <Route path="/residente/reglamentos" element={<ResidenteRegulationsView />} />
           <Route path="/residente/visitas" element={<ResidenteVisitsView />} />

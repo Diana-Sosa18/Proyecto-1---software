@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CalendarClock,
@@ -9,13 +9,14 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { FinancialReviewNotice } from "@/components/payments/FinancialReviewNotice";
+import { RecurrenteReceipts } from "@/components/payments/RecurrenteReceipts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getResidentAccountStatementRequest, payResidentObligationRequest } from "@/services/accountService";
-import type { SimulatedPaymentResult } from "@/services/accountService";
-import { downloadResidentPaymentReceiptRequest } from "@/services/financialDetailService";
-import { savePaymentReceipt } from "@/services/paymentReceiptService";
+import { getResidentAccountStatementRequest } from "@/services/accountService";
+import { createResidentCheckoutRequest, redirectToRecurrente } from "@/services/recurrenteCheckoutService";
+import { getErrorMessage } from "@/utils/errorMessages";
 import type { AccountQuota, AccountQuotaStatus, AccountStatement } from "@/types/account";
 
 type AccountFilter = "TODAS" | AccountQuotaStatus;
@@ -99,31 +100,22 @@ export function ResidenteAccountView() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [payingQuotaId, setPayingQuotaId] = useState<number | null>(null);
-  const [paymentResult, setPaymentResult] = useState<SimulatedPaymentResult | null>(null);
+  const [checkoutError, setCheckoutError] = useState("");
+  const checkoutInProgress = useRef(false);
 
   async function payQuota(quota: AccountQuota) {
-    const confirmed = window.confirm(
-      `Pago simulado para fines académicos.\n\n${quota.servicio}\nMonto base: ${formatCurrency(quota.monto_base)}\nRecargos: ${formatCurrency(quota.recargo)}\nTotal: ${formatCurrency(quota.saldo_pendiente)}\n\n¿Confirmar pago?`,
-    );
-    if (!confirmed) return;
+    if (checkoutInProgress.current) return;
+    checkoutInProgress.current = true;
+    setPayingQuotaId(quota.id_cuota);
+    setCheckoutError("");
     try {
-      setPayingQuotaId(quota.id_cuota);
-      setErrorMessage("");
-      const result = await payResidentObligationRequest(quota.id_cuota);
-      setPaymentResult(result);
-      await loadAccount({ silent: true });
+      const checkout = await createResidentCheckoutRequest(quota.id_cuota);
+      redirectToRecurrente(checkout.checkout_url);
+      // Keep the action disabled while navigation completes; creation never confirms a payment.
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No fue posible registrar el pago simulado.");
-    } finally { setPayingQuotaId(null); }
-  }
-
-  async function downloadReceipt() {
-    if (!paymentResult) return;
-    try {
-      const blob = await downloadResidentPaymentReceiptRequest(paymentResult.id_pago);
-      savePaymentReceipt(blob, paymentResult.numero_comprobante);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No fue posible descargar el comprobante.");
+      setCheckoutError(getErrorMessage(error, "No fue posible abrir el checkout de Recurrente."));
+      checkoutInProgress.current = false;
+      setPayingQuotaId(null);
     }
   }
 
@@ -243,20 +235,18 @@ export function ResidenteAccountView() {
       ) : null}
 
       <Alert className="border-sky-200 bg-sky-50 text-sky-800">
-        <AlertTitle>Pago simulado para fines académicos.</AlertTitle>
-        <AlertDescription>No se solicitan ni almacenan datos bancarios.</AlertDescription>
+        <AlertTitle>Pago electrónico con Recurrente — Sandbox</AlertTitle>
+        <AlertDescription>Se abrirá el checkout hospedado. El pago quedará pendiente de verificación.</AlertDescription>
       </Alert>
 
-      {paymentResult ? (
-        <Alert className="border-emerald-200 bg-emerald-50 text-emerald-800">
-          <AlertTitle>Pago realizado</AlertTitle>
-          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-            <span>{paymentResult.concepto}: {formatCurrency(paymentResult.total)} · {paymentResult.numero_comprobante}</span>
-            <Button type="button" variant="outline" onClick={() => void downloadReceipt()}>Descargar comprobante</Button>
-          </AlertDescription>
+      {checkoutError ? (
+        <Alert variant="destructive">
+          <AlertTitle>No se pudo abrir el checkout</AlertTitle>
+          <AlertDescription>{checkoutError}</AlertDescription>
         </Alert>
       ) : null}
 
+      <FinancialReviewNotice {...statement.resumen} />
       {statement.resumen.cuotas_vencidas > 0 ? (
         <Alert className="border-rose-200 bg-rose-50 text-rose-800">
           <AlertTriangle className="size-5" />
@@ -368,8 +358,8 @@ export function ResidenteAccountView() {
                       </td>
                       <td className="px-5 py-4">
                         {quota.estado !== "PAGADA" ? (
-                          <Button type="button" disabled={payingQuotaId !== null} onClick={() => void payQuota(quota)}>
-                            {payingQuotaId === quota.id_cuota ? "Procesando..." : "Pagar"}
+                          <Button type="button" disabled={payingQuotaId !== null || quota.requiere_revision} onClick={() => void payQuota(quota)}>
+                            {payingQuotaId === quota.id_cuota ? "Abriendo checkout..." : "Pagar"}
                           </Button>
                         ) : null}
                       </td>
@@ -381,6 +371,7 @@ export function ResidenteAccountView() {
           )}
         </CardContent>
       </Card>
+      {!isLoading && statement.resumen.total_pagado > 0 && <RecurrenteReceipts totalPaid={statement.resumen.total_pagado} />}
     </AppShell>
   );
 }

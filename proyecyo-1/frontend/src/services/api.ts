@@ -3,7 +3,7 @@ import { getApiErrorMessage, getFieldErrors, type FieldError } from "@/utils/err
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 const SESSION_STORAGE_KEY = "nexus.session";
 
-type RequestOptions = RequestInit & {
+type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
 };
 
@@ -52,7 +52,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     response = await fetch(`${API_URL}${path}`, {
       ...options,
       headers: getRequestHeaders(options.headers),
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      body: options.body === undefined ? undefined
+        : typeof options.body === "string" ? options.body : JSON.stringify(options.body),
     });
   } catch {
     throw new ApiError("No se pudo conectar con el servidor. Revisa tu conexión e intenta nuevamente.", 0);

@@ -1,10 +1,12 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const os = require("node:os");
-const { query } = require("../database/mysql");
+const { pool, query } = require("../database/mysql");
+const { BACKUP_TABLES, REQUIRED_FINANCIAL_TABLES } = require("../database/backupTables");
+const { sanitizeText } = require("../utils/safeLogger");
 
 const FREQUENCIES = new Set(["DIARIO", "SEMANAL", "MENSUAL"]);
-const TABLES = ["TIPO_USUARIO", "USUARIO", "CASA", "RESIDENTE", "INQUILINO", "AMENIDAD", "CUOTA", "PAGO", "RESERVA", "VISITANTE", "ACCESO", "REGISTRO_ACCESO", "CONFIGURACION"];
+const TABLES = BACKUP_TABLES;
 let running = false;
 let scheduler = null;
 
@@ -43,15 +45,27 @@ function sqlValue(value) {
 
 async function generateSql() {
   const statements = ["-- NexusResidencial: respaldo de datos compatible con restauracion HU5"];
-  for (const table of TABLES) {
-    let rows;
-    try { rows = await query(`SELECT * FROM \`${table}\``); } catch { continue; }
-    for (const row of rows) {
-      const columns = Object.keys(row);
-      if (!columns.length) continue;
-      statements.push(`INSERT INTO \`${table}\` (${columns.map((c) => `\`${c}\``).join(",")}) VALUES (${columns.map((c) => sqlValue(row[c])).join(",")}) ON DUPLICATE KEY UPDATE \`${columns[0]}\`=VALUES(\`${columns[0]}\`);`);
+  const connection = await pool.getConnection();
+  try {
+    await connection.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ");
+    await connection.query("START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY");
+    for (const table of TABLES) {
+      let rows;
+      try { [rows] = await connection.query({ sql: `SELECT * FROM \`${table}\``, dateStrings: true }); }
+      catch (error) {
+        // Legacy optional tables may be absent, but never silently omit payment metadata.
+        if (error.code === "ER_NO_SUCH_TABLE" && !REQUIRED_FINANCIAL_TABLES.includes(table)) continue;
+        throw error;
+      }
+      for (const row of rows) {
+        const columns = Object.keys(row);
+        if (!columns.length) continue;
+        statements.push(`INSERT INTO \`${table}\` (${columns.map((c) => `\`${c}\``).join(",")}) VALUES (${columns.map((c) => sqlValue(row[c])).join(",")}) ON DUPLICATE KEY UPDATE \`${columns[0]}\`=VALUES(\`${columns[0]}\`);`);
+      }
     }
-  }
+    await connection.commit();
+  } catch (error) { await connection.rollback(); throw error; }
+  finally { connection.release(); }
   return `${statements.join("\n")}\n`;
 }
 
@@ -99,7 +113,7 @@ async function executeBackup(userId = null, type = "MANUAL", generator = generat
     await enforceRetention((await getConfig()).retencion);
     return { id_respaldo: Number(inserted.insertId), estado: "COMPLETADO", nombre_archivo: fileKey, tamano_bytes: size };
   } catch (error) {
-    await query("UPDATE RESPALDO_AUTOMATICO SET estado='FALLIDO',duracion_ms=?,mensaje=?,finalizado_en=NOW() WHERE id_respaldo=?", [Date.now() - started, String(error.message).slice(0, 255), inserted.insertId]).catch(() => {});
+    await query("UPDATE RESPALDO_AUTOMATICO SET estado='FALLIDO',duracion_ms=?,mensaje=?,finalizado_en=NOW() WHERE id_respaldo=?", [Date.now() - started, sanitizeText(error.message).slice(0, 255), inserted.insertId]).catch(() => {});
     throw error;
   } finally { running = false; }
 }
@@ -128,4 +142,4 @@ function startScheduler() {
   return scheduler;
 }
 
-module.exports = { validateConfig, resolveKnownFile, getConfig, saveConfig, listBackups, executeBackup, getDownload, startScheduler };
+module.exports = { validateConfig, resolveKnownFile, getConfig, saveConfig, listBackups, executeBackup, getDownload, startScheduler, generateSql };

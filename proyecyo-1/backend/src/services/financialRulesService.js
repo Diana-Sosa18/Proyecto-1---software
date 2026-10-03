@@ -1,4 +1,5 @@
 const { pool, query } = require("../database/mysql");
+const { QUOTA_BALANCES_SQL } = require("./financialBalance");
 
 const TYPES = ["PORCENTAJE", "FIJO"];
 const DEFAULT_RULE = { dia_limite: 10, tipo: "PORCENTAJE", porcentaje: 5, monto_fijo: 0, dias_gracia: 0, activo: true, vigente_desde: "2026-01-01" };
@@ -53,10 +54,11 @@ async function applySurcharges(userId) {
     await connection.beginTransaction();
     const [fees] = await connection.execute(`
       SELECT cu.id_cuota, cu.id_casa, cu.monto, cu.fecha_limite,
-        GREATEST(cu.monto-COALESCE(SUM(p.monto_pagado),0),0) saldo
-      FROM CUOTA cu LEFT JOIN PAGO p ON p.id_cuota=cu.id_cuota
+        balance.capital_pendiente saldo
+      FROM CUOTA cu INNER JOIN (${QUOTA_BALANCES_SQL}) balance ON balance.id_cuota = cu.id_cuota
       WHERE cu.fecha_limite >= ? AND DATE_ADD(cu.fecha_limite, INTERVAL ? DAY) < CURDATE()
-      GROUP BY cu.id_cuota HAVING saldo > 0 FOR UPDATE`, [rule.vigente_desde, rule.dias_gracia]);
+        AND balance.capital_pendiente > 0 AND balance.sobrepago = 0
+      FOR UPDATE`, [rule.vigente_desde, rule.dias_gracia]);
     let applied = 0;
     for (const fee of fees) {
       const amount = calculateSurcharge(Number(fee.saldo), rule);

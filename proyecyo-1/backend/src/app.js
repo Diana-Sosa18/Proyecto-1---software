@@ -4,6 +4,9 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 
 const { env } = require("./config/env");
+const { mountRecurrenteWebhook } = require("./middlewares/recurrenteRawBody");
+const { createWebhookHandler } = require("./controllers/recurrenteWebhookController");
+const { logger, sanitizeText } = require("./utils/safeLogger");
 const authRoutes = require("./routes/authRoutes");
 const activeSessionsRoutes = require("./routes/activeSessionsRoutes");
 const auditRoutes = require("./routes/auditRoutes");
@@ -34,6 +37,8 @@ const residentFinancialDetailRoutes = require("./routes/residentFinancialDetailR
 const residentAccountRoutes = require("./routes/residentAccountRoutes");
 const tenantAccountRoutes = require("./routes/tenantAccountRoutes");
 const paymentReceiptRoutes = require("./routes/paymentReceiptRoutes");
+const { recurrenteCheckoutRoutes } = require("./routes/recurrenteCheckoutRoutes");
+const { adminRecurrenteReconciliationRoutes } = require("./routes/adminRecurrenteReconciliationRoutes");
 
 const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -51,7 +56,7 @@ const passwordResetRateLimiter = rateLimit({
   message: { message: "Demasiadas solicitudes de recuperacion. Intenta de nuevo mas tarde." },
 });
 
-function createApp() {
+function createApp({ recurrenteWebhookHandler, recurrenteCheckoutService, recurrenteReconciliationService } = {}) {
   const app = express();
 
   app.use(helmet());
@@ -63,6 +68,7 @@ function createApp() {
     }),
   );
 
+  mountRecurrenteWebhook(app, recurrenteWebhookHandler || createWebhookHandler());
   app.use(express.json({ limit: "5mb" }));
 
   app.get("/health", (_req, res) => {
@@ -101,6 +107,8 @@ function createApp() {
   app.use(residentAccountRoutes);
   app.use(tenantAccountRoutes);
   app.use(paymentReceiptRoutes);
+  app.use(recurrenteCheckoutRoutes(recurrenteCheckoutService));
+  app.use(adminRecurrenteReconciliationRoutes(recurrenteReconciliationService));
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;
@@ -112,16 +120,16 @@ function createApp() {
       // No exponer detalles internos (mensajes de MySQL, rutas, stack) al cliente.
       message = "Error interno del servidor";
     } else {
-      message = error.message || "Solicitud invalida";
+      message = sanitizeText(error.message || "Solicitud invalida");
     }
 
     if (status >= 500) {
-      console.error(error);
+      logger.error("Error de solicitud.", error);
     }
 
     res.status(status).json({
       message,
-      ...(status < 500 && error.code ? { code: error.code } : {}),
+      ...(status < 500 && error.code ? { code: sanitizeText(error.code) } : {}),
     });
   });
 

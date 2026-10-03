@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Download, LoaderCircle } from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { FinancialReviewNotice } from "@/components/payments/FinancialReviewNotice";
 import { Input } from "@/components/ui/input";
 import { downloadResidentPaymentReceiptRequest, getFinancialDetailRequest } from "@/services/financialDetailService";
 import { savePaymentReceipt } from "@/services/paymentReceiptService";
@@ -26,7 +27,7 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-const summaryCards: Array<{ key: keyof FinancialDetail["resumen"]; label: string; accent: string }> = [
+const summaryCards: Array<{ key: "total_cargos" | "total_recargos" | "total_pagado" | "saldo_pendiente"; label: string; accent: string }> = [
   { key: "total_cargos", label: "Total cargos", accent: "text-slate-950" },
   { key: "total_recargos", label: "Total recargos", accent: "text-amber-600" },
   { key: "total_pagado", label: "Total pagado", accent: "text-emerald-600" },
@@ -110,6 +111,8 @@ export function ResidenteFinancialDetailView() {
             ))}
           </div>
 
+          <FinancialReviewNotice {...detail.resumen} />
+          <p className="text-sm text-slate-500">Los totales incluyen todos los abonos confirmados. Las fechas filtran los movimientos de pagos y recargos.</p>
           <section className="rounded-xl border border-slate-200 bg-white">
             <div className="border-b border-slate-200 px-5 py-4">
               <h3 className="text-lg font-semibold text-slate-950">Cargos</h3>

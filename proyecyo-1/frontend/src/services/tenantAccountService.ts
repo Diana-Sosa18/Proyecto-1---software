@@ -11,7 +11,7 @@ export function getTenantAccountStatementRequest(filters: { desde?: string; hast
 
 export function payTenantObligationRequest(id_cuota: number) {
   return apiRequest<SimulatedPaymentResult>("/inquilino/pagos-simulados", {
-    method: "POST", body: JSON.stringify({ id_cuota }),
+    method: "POST", body: { id_cuota },
   });
 }
 

@@ -13,6 +13,6 @@ export function getResidentAccountStatementRequest() {
 
 export function payResidentObligationRequest(id_cuota: number) {
   return apiRequest<SimulatedPaymentResult>("/residente/pagos-simulados", {
-    method: "POST", body: JSON.stringify({ id_cuota }),
+    method: "POST", body: { id_cuota },
   });
 }

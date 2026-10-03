@@ -1,4 +1,5 @@
 const { query } = require("../database/mysql");
+const { calculateBalance, balanceDetails, toMoney, sumMoney } = require("./financialBalance");
 
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 const ACCOUNT_STATUSES = {
@@ -46,10 +47,6 @@ function buildHouseLabel(row) {
   return tower ? `${tower}-${number}` : number;
 }
 
-function toMoney(value) {
-  return Math.round(Number(value || 0) * 100 + 1e-9) / 100;
-}
-
 function isRentQuota(row) {
   const haystack = [row.servicio, row.tipo_servicio]
     .map((value) => normalizeString(value).toLowerCase())
@@ -59,10 +56,7 @@ function isRentQuota(row) {
 }
 
 function getQuotaStatus(row, currentDate = getCurrentDateInTimezone()) {
-  const amount = Number(row.monto || 0) + Number(row.recargo || 0);
-  const paid = Number(row.total_pagado || 0);
-
-  if (paid >= amount) {
+  if (calculateBalance({ ...row, pagado: row.total_pagado }).saldo === 0) {
     return ACCOUNT_STATUSES.PAID;
   }
 
@@ -72,11 +66,7 @@ function getQuotaStatus(row, currentDate = getCurrentDateInTimezone()) {
 }
 
 function mapQuota(row, currentDate = getCurrentDateInTimezone()) {
-  const baseAmount = toMoney(row.monto);
-  const surcharge = toMoney(row.recargo);
-  const amount = toMoney(baseAmount + surcharge);
-  const paid = toMoney(row.total_pagado);
-  const balance = toMoney(Math.max(amount - paid, 0));
+  const balance = calculateBalance({ ...row, pagado: row.total_pagado });
 
   return {
     id_cuota: row.id_cuota,
@@ -84,11 +74,12 @@ function mapQuota(row, currentDate = getCurrentDateInTimezone()) {
     casa_unidad: buildHouseLabel(row),
     servicio: row.servicio,
     tipo_servicio: row.tipo_servicio || "General",
-    monto: amount,
-    monto_base: baseAmount,
-    recargo: surcharge,
-    monto_pagado: paid,
-    saldo_pendiente: balance,
+    monto: balance.total,
+    monto_base: balance.monto,
+    recargo: balance.recargo,
+    monto_pagado: balance.pagado,
+    saldo_pendiente: balance.saldo,
+    ...balanceDetails(balance),
     fecha_limite: row.fecha_limite,
     ultimo_pago: row.ultimo_pago || null,
     estado: getQuotaStatus(row, currentDate),
@@ -120,6 +111,8 @@ function buildSummary(quotas, currentDate = getCurrentDateInTimezone()) {
       additionalQuotas.reduce((total, quota) => total + quota.saldo_pendiente, 0),
     ),
     total_pagado: toMoney(quotas.reduce((total, quota) => total + quota.monto_pagado, 0)),
+    sobrepago: sumMoney(quotas.map((quota) => quota.sobrepago || 0)),
+    requiere_revision: quotas.some((quota) => quota.requiere_revision),
     proximo_vencimiento: upcomingDueDates[0] || null,
     actualizado_en: new Date().toISOString(),
   };
@@ -189,7 +182,7 @@ async function listTenantAccountStatement(userId, filters = {}) {
         ON p.id_cuota = cu.id_cuota
       LEFT JOIN RECARGO_APLICADO rec
         ON rec.id_cuota = cu.id_cuota
-      WHERE cu.id_casa = ? ${desde ? "AND cu.fecha_limite >= ?" : ""} ${hasta ? "AND cu.fecha_limite <= ?" : ""}
+      WHERE cu.id_casa = ?
       GROUP BY
         cu.id_cuota,
         cu.id_casa,
@@ -208,7 +201,7 @@ async function listTenantAccountStatement(userId, filters = {}) {
         cu.fecha_limite ASC,
         cu.id_cuota ASC
     `,
-    [house.id_casa, ...(desde ? [desde] : []), ...(hasta ? [hasta] : [])],
+    [house.id_casa],
   );
 
   const cuotas = rows.map((row) => mapQuota(row, currentDate));

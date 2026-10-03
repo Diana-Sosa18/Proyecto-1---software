@@ -4,6 +4,7 @@ import { BadgeCheck, CalendarClock, Receipt, Search, TriangleAlert } from "lucid
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Input } from "@/components/ui/input";
 import { getAdminPaymentsRequest, getRecentPaymentsRequest } from "@/services/paymentsService";
+import { FinancialReviewNotice } from "@/components/payments/FinancialReviewNotice";
 import type { AdminPaymentRecord, AdminPaymentStatus, RecentPaymentRecord } from "@/types/payments";
 
 type PaymentStatusFilter = AdminPaymentStatus | "TODOS";
@@ -141,6 +142,7 @@ export function AdminPaymentsView() {
 
   return (
     <AdminLayout title="Pagos" subtitle="Listado de residentes con cuotas pendientes y su estado de mora.">
+      <FinancialReviewNotice sobrepago={payments.reduce((sum, payment) => sum + (payment.sobrepago || 0), 0)} requiere_revision={payments.some((payment) => payment.requiere_revision)} />
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {paymentStats.map(({ label, value, icon: Icon, iconClassName, valueClassName }) => (
           <article
@@ -233,7 +235,7 @@ export function AdminPaymentsView() {
                     <td className="px-5 py-3 text-sm text-slate-500">
                       {formatCurrency(payment.monto_pendiente)}
                     </td>
-                    <td className="px-5 py-3 text-sm">{formatCurrency(payment.recargo_aplicado)}</td>
+                    <td className="px-5 py-3 text-sm">{formatCurrency(payment.recargo_pendiente ?? payment.recargo_aplicado)}</td>
                     <td className="px-5 py-3 text-sm font-semibold">{formatCurrency(payment.total_pendiente)}
                     </td>
                     <td className="px-5 py-3 text-sm text-slate-500">{formatDueDate(payment.fecha_limite)}</td>
