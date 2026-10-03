@@ -5,6 +5,7 @@ const rateLimit = require("express-rate-limit");
 
 const { env } = require("./config/env");
 const { mountRecurrenteWebhook } = require("./middlewares/recurrenteRawBody");
+const { createWebhookHandler } = require("./controllers/recurrenteWebhookController");
 const { logger, sanitizeText } = require("./utils/safeLogger");
 const authRoutes = require("./routes/authRoutes");
 const activeSessionsRoutes = require("./routes/activeSessionsRoutes");
@@ -66,7 +67,7 @@ function createApp({ recurrenteWebhookHandler, recurrenteCheckoutService } = {})
     }),
   );
 
-  mountRecurrenteWebhook(app, recurrenteWebhookHandler);
+  mountRecurrenteWebhook(app, recurrenteWebhookHandler || createWebhookHandler());
   app.use(express.json({ limit: "5mb" }));
 
   app.get("/health", (_req, res) => {

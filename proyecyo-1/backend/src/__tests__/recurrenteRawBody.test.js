@@ -13,6 +13,9 @@ test("conserva exactamente bytes, espacios, Unicode y CRLF antes de express.json
   expect(Buffer.isBuffer(received)).toBe(true);
   expect(received.equals(original)).toBe(true);
 });
+test("webhook por defecto falla cerrado sin signing secret", async () => {
+  await request(createApp()).post("/webhooks/recurrente").send({ event: "test" }).expect(503);
+});
 test("rutas JSON normales siguen recibiendo objetos y health funciona", async () => {
   loginUser.mockResolvedValueOnce({ ok: true });
   const app = createApp({ recurrenteWebhookHandler: (_req, res) => res.sendStatus(204) });

@@ -82,7 +82,8 @@ async function prepareSuiteDatabase(context) {
   const target = await connect(context.name);
   try {
     const migrations = require("../../../src/database/recurrenteMigration");
-    for (const apply of [migrations.applyRecurrentePreparation, migrations.applyRecurrenteCheckoutMigration]) await apply(target);
+    for (const apply of [migrations.applyRecurrentePreparation, migrations.applyRecurrenteCheckoutMigration,
+      migrations.applyRecurrenteConfirmationMigration]) await apply(target);
   } finally { await target.end(); }
 }
 

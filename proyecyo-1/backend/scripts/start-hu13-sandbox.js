@@ -45,7 +45,7 @@ async function main() {
       if (current[0].name !== config.database) throw new Error("Base inesperada.");
       const migrations = require("../src/database/recurrenteMigration");
       await migrations.applyRecurrentePreparation(c); await migrations.applyRecurrenteCheckoutMigration(c);
-
+      await migrations.applyRecurrenteConfirmationMigration(c);
     } finally { c.release(); }
     const quotaId = await seedManualQuota(db.pool);
     const server = require("../src/app").createApp().listen(3100, "127.0.0.1");

@@ -1,5 +1,5 @@
 const fs = require("node:fs");
-const { applyRecurrentePreparation, migrationStatements, MIGRATION_PATH } = require("../recurrenteMigration");
+const { applyRecurrentePreparation, applyRecurrenteConfirmationMigration, migrationStatements, MIGRATION_PATH, CONFIRMATION_MIGRATION_PATH } = require("../recurrenteMigration");
 test("migracion aditiva clasifica historial y prepara cinco tablas sin datos de tarjeta", () => {
   const sql = fs.readFileSync(MIGRATION_PATH, "utf8");
   expect(sql).not.toMatch(/\b(DROP|TRUNCATE|DELETE|REPLACE|UPDATE)\s+(TABLE|FROM|PAGO)\b/i);
@@ -28,4 +28,11 @@ test("no modifica esquema sin adquirir bloqueo", async () => {
   const connection = { execute: jest.fn().mockResolvedValue([[{ acquired: 0 }]]), query: jest.fn() };
   await expect(applyRecurrentePreparation(connection)).rejects.toThrow(/bloqueo/);
   expect(connection.query).not.toHaveBeenCalled();
+});
+test("003 preserva tablas/columnas y libera bloqueo tras fallo DDL", async () => {
+  const sql = fs.readFileSync(CONFIRMATION_MIGRATION_PATH, "utf8");
+  expect(sql).not.toMatch(/\bDROP\s+(TABLE|DATABASE|COLUMN)\b|\bTRUNCATE\b|\bDELETE\s+FROM/i);
+  const connection = { execute: jest.fn().mockResolvedValue([[{ acquired: 1 }]]), query: jest.fn().mockRejectedValue(new Error("DDL failure")) };
+  await expect(applyRecurrenteConfirmationMigration(connection)).rejects.toThrow("DDL failure");
+  expect(connection.execute.mock.calls.at(-1)[0]).toContain("RELEASE_LOCK");
 });
