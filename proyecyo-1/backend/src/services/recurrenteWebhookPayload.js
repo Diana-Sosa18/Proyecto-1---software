@@ -1,6 +1,7 @@
 const { createHash } = require("node:crypto");
 const { isUtf8 } = require("node:buffer");
 const { Webhook } = require("svix");
+const { inspectAttempt } = require("./recurrenteAttemptPayload");
 
 const object = (v) => v && typeof v === "object" && !Array.isArray(v);
 const externalId = (v) => typeof v === "string" && /^[A-Za-z0-9_-]{1,191}$/.test(v) ? v : null;
@@ -81,6 +82,9 @@ function inspectEvent(payload, sandboxId) {
     return { ...info, disposition: "IGNORADO", code: "WEBHOOK_ENVIRONMENT_MISMATCH" };
   }
   const paymentIntent = eventType === "payment_intent.succeeded";
+  if (["payment_intent.failed", "intent.failed", "intent.canceled"].includes(eventType)) {
+    return inspectAttempt(payload, info, { object, externalId, paymentTime });
+  }
   if ((!paymentIntent && eventType !== "intent.succeeded")
     || (!paymentIntent && payload.type !== "payment")
     || (paymentIntent && payload.type !== undefined && payload.type !== "payment")) {

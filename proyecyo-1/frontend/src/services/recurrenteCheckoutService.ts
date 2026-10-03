@@ -1,5 +1,14 @@
 import { apiRequest } from "@/services/api";
-import type { RecurrenteCheckout } from "@/types/recurrenteCheckout";
+import type { RecurrenteCheckout, RecurrenteCheckoutStatus } from "@/types/recurrenteCheckout";
+
+export function getResidentCheckoutStatusRequest(reference: string) {
+  return apiRequest<RecurrenteCheckoutStatus>(`/residente/pagos/recurrente/checkouts/${encodeURIComponent(reference)}`);
+}
+export function retryResidentCheckoutRequest(referencia_local: string) {
+  return apiRequest<RecurrenteCheckout>("/residente/pagos/recurrente/reintentar", {
+    method: "POST", body: { referencia_local },
+  });
+}
 
 export function createResidentCheckoutRequest(id_cuota: number) {
   return apiRequest<RecurrenteCheckout>("/residente/pagos/recurrente/checkout", {

@@ -7,7 +7,7 @@ const { openSuiteDatabase, prepareSuiteDatabase, closeSuiteDatabase } = require(
 const suite = process.argv[2];
 const repeatArg = process.argv.slice(3);
 const repeat = repeatArg.length === 0 ? 1 : repeatArg.length === 1 && repeatArg[0] === "--repeat=2" ? 2 : 0;
-const suites = new Set(["phase0", "hu13", "hu14", "functional", "backend"]);
+const suites = new Set(["phase0", "hu13", "hu14", "hu15", "functional", "backend"]);
 
 function execute() {
   let executable = process.execPath;

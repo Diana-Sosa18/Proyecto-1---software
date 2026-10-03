@@ -9,7 +9,7 @@ if (process.env.RUN_PHASE0_MYSQL_TESTS !== "1") {
   require("./support/suiteIsolation").assertOwnedSuiteDatabase();
   configureTestEnvironment(); // Blanks real provider/email credentials even if a local .env exists.
   const db = require("../../src/database/mysql");
-  const { applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration } = require("../../src/database/recurrenteMigration");
+  const { applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration, applyRecurrenteAttemptsMigration } = require("../../src/database/recurrenteMigration");
   const { createCheckoutService } = require("../../src/services/recurrenteCheckoutService");
   const { createRecurrenteClient } = require("../../src/services/recurrenteClient");
   const { payObligation } = require("../../src/services/simulatedPaymentsService");
@@ -60,7 +60,7 @@ if (process.env.RUN_PHASE0_MYSQL_TESTS !== "1") {
       connection = await connect();
       for (const [name, ensure] of Object.entries(db)) if (name.startsWith("ensure")) await ensure();
       await applyRecurrentePreparation(connection); await applyRecurrenteCheckoutMigration(connection);
-      await applyRecurrenteConfirmationMigration(connection);
+      await applyRecurrenteConfirmationMigration(connection); await applyRecurrenteAttemptsMigration(connection);
     });
     after(async () => { await connection?.end(); await db.pool.end(); });
     test("002 repetible conserva todas las filas previas y agrega columnas, CHECK e indice", async () => {

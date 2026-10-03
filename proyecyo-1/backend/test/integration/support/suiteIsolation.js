@@ -83,7 +83,7 @@ async function prepareSuiteDatabase(context) {
   try {
     const migrations = require("../../../src/database/recurrenteMigration");
     for (const apply of [migrations.applyRecurrentePreparation, migrations.applyRecurrenteCheckoutMigration,
-      migrations.applyRecurrenteConfirmationMigration]) await apply(target);
+      migrations.applyRecurrenteConfirmationMigration, migrations.applyRecurrenteAttemptsMigration]) await apply(target);
   } finally { await target.end(); }
 }
 

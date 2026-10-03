@@ -2,6 +2,7 @@ const { createHash } = require("node:crypto");
 const { pool: defaultPool } = require("../database/mysql");
 const { calculateBalance, assertCollectible, toCents } = require("./financialBalance");
 const { safeError } = require("./recurrenteWebhookPayload");
+const { recordAttempt } = require("./recurrenteAttemptService");
 const terminal = ["PROCESADO", "IGNORADO", "REVISION"];
 const legacyIgnoreCodes = ["WEBHOOK_UNSUPPORTED_EVENT", "WEBHOOK_ENVIRONMENT_MISMATCH"];
 const money = (cents) => `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
@@ -44,7 +45,7 @@ function createWebhookService({ pool = defaultPool } = {}) {
         await c.commit(); inTransaction = false;
         return state === "PROCESADO" ? "processed" : state === "REVISION" ? "review" : "ignored";
       }
-      if (event.disposition !== "PAYMENT") return await complete(event.disposition, event.code);
+      if (!["PAYMENT", "ATTEMPT"].includes(event.disposition)) return await complete(event.disposition, event.code);
 
       const [refs] = await c.execute("SELECT id_checkout,id_cuota FROM CHECKOUT_RECURRENTE WHERE ambiente='sandbox' AND id_externo=?", [event.checkoutId]);
       if (!refs[0]) {
@@ -69,6 +70,7 @@ function createWebhookService({ pool = defaultPool } = {}) {
       if (local.moneda !== "GTQ" || local.moneda !== event.currency) return await complete("REVISION", "WEBHOOK_CURRENCY_MISMATCH");
       if (Number(local.monto_centavos) !== event.amount) return await complete("REVISION", "WEBHOOK_AMOUNT_MISMATCH");
 
+      if (event.disposition === "ATTEMPT") return await recordAttempt(c, local, event, inbox, complete);
 
       const [transactions] = await c.execute(`SELECT * FROM TRANSACCION_RECURRENTE
         WHERE ambiente='sandbox' AND (id_externo=? OR (? IS NOT NULL AND id_pago_externo=?)) FOR UPDATE`,

@@ -54,7 +54,7 @@ function createCheckoutService({ pool = defaultPool, client = createRecurrenteCl
     local.id_checkout = result.insertId;
     return { local, reused: false, marker: "CHECKOUT_CREATING" };
   }
-  async function reserve(userId, quotaId, sandboxId) {
+  async function reserve(userId, quotaId, sandboxId, reference) {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -64,14 +64,19 @@ function createCheckoutService({ pool = defaultPool, client = createRecurrenteCl
       if (amount < 500) throw new CheckoutError("CHECKOUT_MINIMUM");
       const [active] = await connection.execute(`SELECT id_checkout, referencia_local, id_externo,
         id_cuota, id_usuario, id_residente, id_casa, monto_centavos, capital_centavos, recargo_centavos,
-        moneda, ambiente, sandbox_id, estado, checkout_url, estado_proveedor
+        moneda, ambiente, sandbox_id, estado, checkout_url, estado_proveedor, verificado_en
         FROM CHECKOUT_RECURRENTE WHERE id_cuota = ? AND ${BLOCKING_CHECKOUT_CONDITION}
         ORDER BY id_checkout FOR UPDATE`, [quotaId]);
       if (active.some((row) => row.estado === "INCIERTO")) throw new CheckoutError("CHECKOUT_UNCERTAIN");
       if (active.length > 1) throw new CheckoutError("CHECKOUT_INCOMPATIBLE");
       if (active.length) {
         const local = active[0];
-        if (!compatible(local, quota, userId, sandboxId)) throw new CheckoutError("CHECKOUT_INCOMPATIBLE");
+        if (reference && local.referencia_local !== reference) throw new CheckoutError("CHECKOUT_INCOMPATIBLE");
+        // A requested retry may verify an old amount to establish expiration;
+        // it may never reuse that amount or an operation of another owner/tenant.
+        const identityMatches = compatible({ ...local, monto_centavos: amount,
+          capital_centavos: toCents(quota.balance.capital_pendiente), recargo_centavos: toCents(quota.balance.recargo_pendiente) }, quota, userId, sandboxId);
+        if (!compatible(local, quota, userId, sandboxId) && (!reference || !identityMatches)) throw new CheckoutError("CHECKOUT_INCOMPATIBLE");
         if (local.estado === "CREADO") throw new CheckoutError("CHECKOUT_IN_PROGRESS");
         if (!validateCheckoutUrl(local.checkout_url, local.id_externo)) {
           throw new CheckoutError("CHECKOUT_NOT_USABLE");
@@ -119,10 +124,27 @@ function createCheckoutService({ pool = defaultPool, client = createRecurrenteCl
     try {
       await connection.beginTransaction();
       const quota = await lockedQuota(connection, userId, local.id_cuota);
+      if (operation.reused && metadata.estado_proveedor === "expired") {
+        // Expiration is established by authenticated GET, never by failed intent,
+        // cancel_url, elapsed time or an unverified local enum. Reserve a successor
+        // under the SAME quota lock before committing the release of the old one.
+        const [closed] = await connection.execute(`UPDATE CHECKOUT_RECURRENTE SET estado='EXPIRADO',
+          estado_proveedor='expired',error_codigo=NULL,verificado_en=NOW(6)
+          WHERE id_checkout=? AND estado='INCIERTO' AND error_codigo=?`, [local.id_checkout, marker]);
+        if (closed.affectedRows !== 1) throw new CheckoutError("CHECKOUT_UNCERTAIN");
+        const amount = toCents(quota.balance.saldo);
+        const [blocking] = await connection.execute(`SELECT id_checkout FROM CHECKOUT_RECURRENTE
+          WHERE id_cuota=? AND ${BLOCKING_CHECKOUT_CONDITION} FOR UPDATE`, [local.id_cuota]);
+        const conflict = blocking.length ? "CHECKOUT_INCOMPATIBLE" : !amount ? "QUOTA_PAID"
+          : amount < 500 ? "CHECKOUT_MINIMUM" : null;
+        const next = conflict ? null : await insertLocal(connection, quota, userId, sandboxId);
+        await connection.commit();
+        return { conflict, next };
+      }
       const conflict = !compatible(local, quota, userId, sandboxId) ? "CHECKOUT_INCOMPATIBLE"
         : metadata.estado_proveedor !== "unpaid" ? "CHECKOUT_NOT_USABLE" : null;
       const [result] = await connection.execute(`UPDATE CHECKOUT_RECURRENTE
-        SET id_externo=?,checkout_url=?,estado_proveedor=?,estado='PENDIENTE',error_codigo=?
+        SET id_externo=?,checkout_url=?,estado_proveedor=?,estado='PENDIENTE',error_codigo=?${operation.reused ? ",verificado_en=NOW(6)" : ""}
         WHERE id_checkout=? AND estado='INCIERTO' AND error_codigo=?`,
       [metadata.id_externo, metadata.checkout_url, metadata.estado_proveedor, conflict, local.id_checkout, marker]);
       if (result.affectedRows !== 1) throw new CheckoutError("CHECKOUT_UNCERTAIN");
@@ -153,6 +175,7 @@ function createCheckoutService({ pool = defaultPool, client = createRecurrenteCl
       throw safe;
     }
     if (outcome.conflict) throw new CheckoutError(outcome.conflict);
+    if (outcome.next) return runOperation(outcome.next, userId, sandboxId);
     return outcome.result;
   }
   async function startResidentCheckout(userId, quotaId) {
@@ -160,6 +183,46 @@ function createCheckoutService({ pool = defaultPool, client = createRecurrenteCl
     const sandboxId = client.sandboxId(); // Configuration only: no request before ownership/balance checks.
     return runOperation(await reserve(userId, quotaId, sandboxId), userId, sandboxId);
   }
-  return { startResidentCheckout };
+  async function residentLocal(userId, reference) {
+    if (typeof reference !== "string" || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(reference)) {
+      throw new CheckoutError("INVALID_CHECKOUT_REFERENCE");
+    }
+    const c = await pool.getConnection();
+    try {
+      const [rows] = await c.execute(`SELECT co.* FROM CHECKOUT_RECURRENTE co
+        JOIN CUOTA cu ON cu.id_cuota=co.id_cuota AND cu.id_casa=co.id_casa
+        JOIN CASA ca ON ca.id_casa=cu.id_casa AND ca.id_residente=co.id_residente
+        JOIN RESIDENTE r ON r.id_residente=ca.id_residente AND r.id_usuario=co.id_usuario
+        JOIN USUARIO u ON u.id_usuario=r.id_usuario AND u.activo=TRUE
+        JOIN TIPO_USUARIO tu ON tu.id_tipo_usuario=u.id_tipo_usuario AND LOWER(tu.nombre)='residente'
+        WHERE co.referencia_local=? AND co.id_usuario=? AND co.ambiente='sandbox' AND co.sandbox_id=?`,
+      [reference, userId, client.sandboxId()]);
+      if (!rows[0]) throw new CheckoutError("CHECKOUT_NOT_FOUND");
+      return rows[0];
+    } finally { c.release(); }
+  }
+  async function retryResidentCheckout(userId, reference) {
+    const local = await residentLocal(userId, reference), sandboxId = client.sandboxId();
+    if (local.estado === "CONFIRMADO" || local.estado_proveedor === "paid") throw new CheckoutError("CHECKOUT_NOT_USABLE");
+    // A reference is not authorization or a decision about money. Reserve repeats
+    // current membership, balance and blocking-state checks under the quota lock.
+    return runOperation(await reserve(userId, Number(local.id_cuota), sandboxId, reference), userId, sandboxId);
+  }
+  async function residentCheckoutStatus(userId, reference) {
+    const local = await residentLocal(userId, reference), c = await pool.getConnection();
+    try {
+      const [attempts] = await c.execute(`SELECT resultado_intento,motivo_codigo FROM EVENTO_RECURRENTE
+        WHERE id_checkout=? AND estado='PROCESADO' AND resultado_intento IS NOT NULL ORDER BY id_evento DESC LIMIT 1`, [local.id_checkout]);
+      const [balances] = await c.execute(`SELECT cu.monto,
+        COALESCE((SELECT SUM(monto_recargo) FROM RECARGO_APLICADO WHERE id_cuota=cu.id_cuota),0) recargo,
+        COALESCE((SELECT SUM(monto_pagado) FROM PAGO WHERE id_cuota=cu.id_cuota),0) pagado FROM CUOTA cu WHERE id_cuota=?`, [local.id_cuota]);
+      const balance = calculateBalance(balances[0]);
+      const [other] = await c.execute(`SELECT id_checkout FROM CHECKOUT_RECURRENTE
+        WHERE id_cuota=? AND id_checkout<>? AND ${BLOCKING_CHECKOUT_CONDITION} LIMIT 1`, [local.id_cuota, local.id_checkout]);
+      const { checkoutStatus } = require("./recurrenteCheckoutStatus");
+      return { referencia_local: reference, ...checkoutStatus(local, attempts[0], balance, other.length > 0) };
+    } finally { c.release(); }
+  }
+  return { startResidentCheckout, retryResidentCheckout, residentCheckoutStatus };
 }
 module.exports = { createCheckoutService };

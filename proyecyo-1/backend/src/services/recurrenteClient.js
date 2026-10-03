@@ -67,6 +67,7 @@ function createRecurrenteClient({ fetchImpl = (...args) => globalThis.fetch(...a
     };
     if (!allowed.id_externo || !allowed.estado_proveedor || !allowed.checkout_url
       || (expected.id_externo && data.id !== expected.id_externo)
+      || (expected.estado_proveedor === "paid" && data.status !== "paid")
       || (expected.id_externo && (data.currency !== "GTQ" || data.total_in_cents !== expected.monto_centavos))
       || (data.live_mode !== undefined && data.live_mode !== false)
       || (data.sandbox_id !== undefined && data.sandbox_id !== config.sandboxId)

@@ -1,4 +1,6 @@
 const ERRORS = {
+  INVALID_CHECKOUT_REFERENCE: [400, "La referencia del checkout no es válida."],
+  CHECKOUT_NOT_FOUND: [404, "No se encontró un checkout asociado a tu usuario."],
   INVALID_QUOTA: [400, "Envía únicamente una identificación válida de la cuota."],
   RESIDENT_REQUIRED: [403, "Acceso restringido a residentes autorizados."],
   QUOTA_NOT_FOUND: [404, "La cuota no existe."],

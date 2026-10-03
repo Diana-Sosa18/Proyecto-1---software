@@ -36,3 +36,14 @@ test("003 preserva tablas/columnas y libera bloqueo tras fallo DDL", async () =>
   await expect(applyRecurrenteConfirmationMigration(connection)).rejects.toThrow("DDL failure");
   expect(connection.execute.mock.calls.at(-1)[0]).toContain("RELEASE_LOCK");
 });
+
+test("004 aditiva y repetible agrega trazabilidad sin modificar filas", async () => {
+  const { ATTEMPTS_MIGRATION_PATH, applyRecurrenteAttemptsMigration } = require("../recurrenteMigration");
+  const sql = fs.readFileSync(ATTEMPTS_MIGRATION_PATH, "utf8");
+  expect(sql).not.toMatch(/\bDROP\b|\bDELETE\b|\bUPDATE\b|\bTRUNCATE\b/i);
+  expect(sql).toContain("chk_transaccion_fallo_hu15"); expect(sql).toContain("fk_evento_checkout_hu15");
+  const c = { execute: jest.fn().mockResolvedValue([[{ acquired: 1 }]]), query: jest.fn().mockResolvedValue([]) };
+  await applyRecurrenteAttemptsMigration(c); await applyRecurrenteAttemptsMigration(c);
+  expect(c.query).toHaveBeenCalledTimes(migrationStatements(ATTEMPTS_MIGRATION_PATH).length * 2);
+  expect(c.execute.mock.calls.at(-1)[0]).toContain("RELEASE_LOCK");
+});

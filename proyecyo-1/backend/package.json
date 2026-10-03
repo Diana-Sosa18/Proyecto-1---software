@@ -9,6 +9,7 @@
     "test:phase0:functional": "node scripts/run-isolated-tests.js functional",
     "test:hu13:mysql": "node scripts/run-isolated-tests.js hu13",
     "test:hu14:mysql": "node scripts/run-isolated-tests.js hu14",
+    "test:hu15:mysql": "node scripts/run-isolated-tests.js hu15",
     "test:isolated:backend": "node scripts/run-isolated-tests.js backend",
     "start:hu13:sandbox": "node scripts/start-hu13-sandbox.js",
     "start:hu14:sandbox": "node scripts/start-hu13-sandbox.js",

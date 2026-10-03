@@ -6,14 +6,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const db = require("../src/database/mysql");
-const { applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration } = require("../src/database/recurrenteMigration");
+const { applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration, applyRecurrenteAttemptsMigration } = require("../src/database/recurrenteMigration");
 const { createApp } = require("../src/app");
 const { logger } = require("../src/utils/safeLogger");
 async function main() {
   await initializeTestSchema();
   for (const [name, ensure] of Object.entries(db)) if (name.startsWith("ensure")) await ensure();
   const connection = await db.pool.getConnection();
-  try { await applyRecurrentePreparation(connection); await applyRecurrenteCheckoutMigration(connection); await applyRecurrenteConfirmationMigration(connection); } finally { connection.release(); }
+  try { await applyRecurrentePreparation(connection); await applyRecurrenteCheckoutMigration(connection); await applyRecurrenteConfirmationMigration(connection); await applyRecurrenteAttemptsMigration(connection); } finally { connection.release(); }
   const server = createApp().listen(0, "127.0.0.1");
   await new Promise((resolve, reject) => { server.once("listening", resolve); server.once("error", reject); });
   try {

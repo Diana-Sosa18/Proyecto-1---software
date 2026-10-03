@@ -67,7 +67,7 @@ if (process.env.RUN_PHASE0_MYSQL_TESTS !== "1") {
       connection = await connect();
       for (const [name, ensure] of Object.entries(db)) if (name.startsWith("ensure")) await ensure();
       await migrations.applyRecurrentePreparation(connection); await migrations.applyRecurrenteCheckoutMigration(connection);
-      await migrations.applyRecurrenteConfirmationMigration(connection);
+      await migrations.applyRecurrenteConfirmationMigration(connection); await migrations.applyRecurrenteAttemptsMigration(connection);
     });
     after(async () => { await connection?.end(); await db.pool.end(); });
     test("003 aditiva repetible preserva todas las filas y montos", async () => {

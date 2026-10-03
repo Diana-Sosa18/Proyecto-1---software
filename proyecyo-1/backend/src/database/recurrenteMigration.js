@@ -3,6 +3,7 @@ const path = require("node:path");
 const MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/001_recurrente_preparation.sql");
 const CHECKOUT_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/002_recurrente_checkout.sql");
 const CONFIRMATION_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/003_recurrente_confirmation.sql");
+const ATTEMPTS_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/004_recurrente_attempts.sql");
 function migrationStatements(file = MIGRATION_PATH) {
   // This migration contains plain SQL, without procedures or semicolons in literals.
   return fs.readFileSync(file, "utf8").replace(/^\s*--.*$/gm, "")
@@ -22,5 +23,6 @@ async function applyMigration(connection, file, lockName) {
 const applyRecurrentePreparation = (connection) => applyMigration(connection, MIGRATION_PATH, "nexus_recurrente_phase0");
 const applyRecurrenteCheckoutMigration = (connection) => applyMigration(connection, CHECKOUT_MIGRATION_PATH, "nexus_recurrente_hu13");
 const applyRecurrenteConfirmationMigration = (connection) => applyMigration(connection, CONFIRMATION_MIGRATION_PATH, "nexus_recurrente_hu14");
-module.exports = { applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration,
-  migrationStatements, MIGRATION_PATH, CHECKOUT_MIGRATION_PATH, CONFIRMATION_MIGRATION_PATH };
+const applyRecurrenteAttemptsMigration = (connection) => applyMigration(connection, ATTEMPTS_MIGRATION_PATH, "nexus_recurrente_hu15");
+module.exports = { applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration, applyRecurrenteAttemptsMigration,
+  migrationStatements, MIGRATION_PATH, CHECKOUT_MIGRATION_PATH, CONFIRMATION_MIGRATION_PATH, ATTEMPTS_MIGRATION_PATH };

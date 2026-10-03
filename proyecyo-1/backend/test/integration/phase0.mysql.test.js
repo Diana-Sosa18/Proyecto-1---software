@@ -12,7 +12,7 @@ if (process.env.RUN_PHASE0_MYSQL_TESTS !== "1") {
   require("./support/suiteIsolation").assertOwnedSuiteDatabase();
   configureTestEnvironment();
   const db = require("../../src/database/mysql");
-  const { applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration } = require("../../src/database/recurrenteMigration");
+  const { applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration, applyRecurrenteAttemptsMigration } = require("../../src/database/recurrenteMigration");
   const { FINANCIAL_TABLES, BACKUP_TABLES } = require("../../src/database/backupTables");
   const { QUOTA_BALANCES_SQL, calculateBalance } = require("../../src/services/financialBalance");
   const { payObligation } = require("../../src/services/simulatedPaymentsService");
@@ -83,7 +83,7 @@ if (process.env.RUN_PHASE0_MYSQL_TESTS !== "1") {
       for (const [name, ensure] of Object.entries(db)) if (name.startsWith("ensure")) await ensure();
       await applyRecurrentePreparation(connection);
       await applyRecurrenteCheckoutMigration(connection);
-      await applyRecurrenteConfirmationMigration(connection);
+      await applyRecurrenteConfirmationMigration(connection); await applyRecurrenteAttemptsMigration(connection);
     });
     after(async () => { await connection?.end(); await db.pool.end(); });
 
@@ -302,7 +302,7 @@ if (process.env.RUN_PHASE0_MYSQL_TESTS !== "1") {
         }
         await target.query("SET FOREIGN_KEY_CHECKS=1");
         await applyRecurrenteCheckoutMigration(target);
-        await applyRecurrenteConfirmationMigration(target);
+        await applyRecurrenteConfirmationMigration(target); await applyRecurrenteAttemptsMigration(target);
         for (const table of BACKUP_TABLES) assert.equal((await target.query(`SELECT COUNT(*) n FROM \`${table}\``))[0][0].n, 0, `${table}: destino inicialmente vacío`);
         const types = await query("SELECT * FROM TIPO_USUARIO WHERE id_tipo_usuario=(SELECT id_tipo_usuario FROM USUARIO WHERE id_usuario=1)");
         const admin = await query("SELECT * FROM USUARIO WHERE id_usuario=1");

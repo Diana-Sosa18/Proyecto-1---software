@@ -1,6 +1,18 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createResidentCheckoutRequest, redirectToRecurrente } from "./recurrenteCheckoutService";
+import { createResidentCheckoutRequest, redirectToRecurrente, getResidentCheckoutStatusRequest, retryResidentCheckoutRequest } from "./recurrenteCheckoutService";
 
+test("estado se consulta sin crear checkout ni enviar monto/secretos", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ estado: "FALLIDO", accion: "CONTINUAR" })));
+  await getResidentCheckoutStatusRequest("opaque-reference"); const [url, options] = vi.mocked(fetch).mock.calls[0];
+  expect(url).toMatch(/\/checkouts\/opaque-reference$/); expect(options?.body).toBeUndefined();
+  expect(new Headers(options?.headers).has("X-SECRET-KEY")).toBe(false);
+});
+test("retry envía solo referencia local y no llama endpoint simulado", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ referencia_local: "opaque-reference", checkout_url: "https://app.recurrente.com/checkout-session/ch_TEST" })));
+  await retryResidentCheckoutRequest("opaque-reference"); const [url, options] = vi.mocked(fetch).mock.calls[0];
+  expect(url).toMatch(/\/recurrente\/reintentar$/); expect(options?.body).toBe('{"referencia_local":"opaque-reference"}');
+  expect(new Headers(options?.headers).has("X-SECRET-KEY")).toBe(false);
+});
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
 test("solo envia cuota y Bearer al endpoint real, sin monto ni llave", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ referencia_local: "test", checkout_url: "https://app.recurrente.com/checkout-session/ch_test" }), { status: 201 })));

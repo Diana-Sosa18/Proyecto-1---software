@@ -1,6 +1,6 @@
 const { createApp } = require("./src/app");
 const { env } = require("./src/config/env");
-const { applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration } = require("./src/database/recurrenteMigration");
+const { applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration, applyRecurrenteAttemptsMigration } = require("./src/database/recurrenteMigration");
 const { logger } = require("./src/utils/safeLogger");
 const {
   ensureVisitQrSchema,
@@ -79,7 +79,7 @@ async function startServer() {
   await ensureRemindersSchema();
   await ensureSimulatedPaymentsSchema();
   const migrationConnection = await pool.getConnection();
-  try { await applyRecurrentePreparation(migrationConnection); await applyRecurrenteCheckoutMigration(migrationConnection); await applyRecurrenteConfirmationMigration(migrationConnection); }
+  try { await applyRecurrentePreparation(migrationConnection); await applyRecurrenteCheckoutMigration(migrationConnection); await applyRecurrenteConfirmationMigration(migrationConnection); await applyRecurrenteAttemptsMigration(migrationConnection); }
   finally { migrationConnection.release(); }
   await ensureDemoRequestsSchema();
   await ensureTenantAccountSeed();

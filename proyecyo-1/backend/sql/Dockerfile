@@ -4,3 +4,4 @@ COPY init.sql /docker-entrypoint-initdb.d/init.sql
 COPY migrations/001_recurrente_preparation.sql /docker-entrypoint-initdb.d/z001_recurrente_preparation.sql
 COPY migrations/002_recurrente_checkout.sql /docker-entrypoint-initdb.d/z002_recurrente_checkout.sql
 COPY migrations/003_recurrente_confirmation.sql /docker-entrypoint-initdb.d/z003_recurrente_confirmation.sql
+COPY migrations/004_recurrente_attempts.sql /docker-entrypoint-initdb.d/z004_recurrente_attempts.sql
