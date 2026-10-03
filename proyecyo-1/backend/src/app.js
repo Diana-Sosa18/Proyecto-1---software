@@ -38,6 +38,7 @@ const residentAccountRoutes = require("./routes/residentAccountRoutes");
 const tenantAccountRoutes = require("./routes/tenantAccountRoutes");
 const paymentReceiptRoutes = require("./routes/paymentReceiptRoutes");
 const { recurrenteCheckoutRoutes } = require("./routes/recurrenteCheckoutRoutes");
+const { adminRecurrenteReconciliationRoutes } = require("./routes/adminRecurrenteReconciliationRoutes");
 
 const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -55,7 +56,7 @@ const passwordResetRateLimiter = rateLimit({
   message: { message: "Demasiadas solicitudes de recuperacion. Intenta de nuevo mas tarde." },
 });
 
-function createApp({ recurrenteWebhookHandler, recurrenteCheckoutService } = {}) {
+function createApp({ recurrenteWebhookHandler, recurrenteCheckoutService, recurrenteReconciliationService } = {}) {
   const app = express();
 
   app.use(helmet());
@@ -107,6 +108,7 @@ function createApp({ recurrenteWebhookHandler, recurrenteCheckoutService } = {})
   app.use(tenantAccountRoutes);
   app.use(paymentReceiptRoutes);
   app.use(recurrenteCheckoutRoutes(recurrenteCheckoutService));
+  app.use(adminRecurrenteReconciliationRoutes(recurrenteReconciliationService));
 
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;

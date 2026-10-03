@@ -70,7 +70,9 @@ const adminMenuItems: AdminMenuItem[] = [
     label: "Pagos",
     icon: Wallet,
     to: "/admin/pagos",
+    end: true,
   },
+  { label: "Conciliación de pagos", icon: Wallet, to: "/admin/pagos/conciliacion" },
   {
     label: "Recordatorios",
     icon: BellRing,
