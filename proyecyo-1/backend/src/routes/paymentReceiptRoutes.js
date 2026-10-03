@@ -1,7 +1,11 @@
 const express = require("express");
-const { downloadPaymentReceipt } = require("../controllers/paymentReceiptController");
+const { downloadPaymentReceipt, getPaymentReceiptData, getTransactionReceiptData, listRecurrenteReceiptData } = require("../controllers/paymentReceiptController");
 const { requireResident, requireTenant } = require("../middlewares/requireResident");
+const { requireResidentSession } = require("../middlewares/requireResidentSession");
 const router = express.Router();
+router.get("/residente/pagos/recurrente/comprobantes", requireResidentSession, listRecurrenteReceiptData);
+router.get("/residente/pagos/recurrente/transacciones/:transactionId/comprobante", requireResidentSession, getTransactionReceiptData);
+router.get("/residente/pagos/:paymentId/comprobante/datos", requireResidentSession, getPaymentReceiptData);
 router.get("/residente/pagos/:paymentId/comprobante", requireResident, downloadPaymentReceipt);
 router.get("/inquilino/pagos/:paymentId/comprobante", requireTenant, downloadPaymentReceipt);
 module.exports = router;

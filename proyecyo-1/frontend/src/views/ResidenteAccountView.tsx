@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { FinancialReviewNotice } from "@/components/payments/FinancialReviewNotice";
+import { RecurrenteReceipts } from "@/components/payments/RecurrenteReceipts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -370,6 +371,7 @@ export function ResidenteAccountView() {
           )}
         </CardContent>
       </Card>
+      {!isLoading && statement.resumen.total_pagado > 0 && <RecurrenteReceipts totalPaid={statement.resumen.total_pagado} />}
     </AppShell>
   );
 }

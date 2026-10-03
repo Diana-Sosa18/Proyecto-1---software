@@ -9,6 +9,7 @@ import { createResidentCheckoutRequest } from "@/services/recurrenteCheckoutServ
 vi.mock("@/components/layout/AppShell", () => ({ AppShell: ({ children }: { children: ReactNode }) => <main>{children}</main> }));
 vi.mock("@/services/accountService", () => ({ getResidentAccountStatementRequest: vi.fn(), payResidentObligationRequest: vi.fn() }));
 vi.mock("@/services/recurrenteCheckoutService", () => ({ createResidentCheckoutRequest: vi.fn(), redirectToRecurrente: vi.fn() }));
+vi.mock("@/services/paymentReceiptService", () => ({ getResidentRecurrenteReceiptsRequest: vi.fn(async () => []), receiptErrorMessage: () => "No fue posible consultar comprobantes." }));
 beforeEach(() => vi.resetAllMocks());
 it("retorno con status paid sigue pendiente y permite volver a la cuenta", () => {
   render(<MemoryRouter initialEntries={["/residente/pagos/retorno?status=paid&referencia=test"]}><Routes>

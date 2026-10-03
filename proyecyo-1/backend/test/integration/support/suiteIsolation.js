@@ -53,6 +53,29 @@ async function protectedSnapshot(source) {
   return result;
 }
 
+async function copyReceiptEvidence(source, target, snapshot) {
+  // Read the approved manual evidence; all writes go to the disposable copy.
+  const dependencies = [
+    ["TIPO_USUARIO", "SELECT t.* FROM TIPO_USUARIO t JOIN USUARIO u ON u.id_tipo_usuario=t.id_tipo_usuario JOIN RESIDENTE r ON r.id_usuario=u.id_usuario JOIN CASA c ON c.id_residente=r.id_residente WHERE c.id_casa IN (SELECT id_casa FROM CUOTA WHERE id_cuota IN(171,998)) GROUP BY t.id_tipo_usuario"],
+    ["USUARIO", "SELECT u.* FROM USUARIO u JOIN RESIDENTE r ON r.id_usuario=u.id_usuario JOIN CASA c ON c.id_residente=r.id_residente WHERE c.id_casa IN (SELECT id_casa FROM CUOTA WHERE id_cuota IN(171,998)) GROUP BY u.id_usuario"],
+    ["RESIDENTE", "SELECT r.* FROM RESIDENTE r JOIN CASA c ON c.id_residente=r.id_residente WHERE c.id_casa IN (SELECT id_casa FROM CUOTA WHERE id_cuota IN(171,998)) GROUP BY r.id_residente"],
+    ["CASA", "SELECT * FROM CASA WHERE id_casa IN(SELECT id_casa FROM CUOTA WHERE id_cuota IN(171,998))"],
+    ["SERVICIO", "SELECT * FROM SERVICIO WHERE id_servicio IN(SELECT id_servicio FROM CUOTA WHERE id_cuota IN(171,998))"],
+  ];
+  await target.beginTransaction();
+  try {
+    // Events reference checkouts; transactions reference both checkouts and events.
+    const financialOrder = ["CUOTA", "PAGO", "PAGO_ORIGEN", "RECARGO_APLICADO", "CHECKOUT_RECURRENTE", "EVENTO_RECURRENTE", "TRANSACCION_RECURRENTE"];
+    const rows = [...await Promise.all(dependencies.map(async ([table, sql]) => [table, (await source.query(sql))[0]])),
+      ...financialOrder.map((table) => [table, snapshot[table]])];
+    for (const [table, records] of rows) for (const row of records) {
+      const updates = Object.keys(row).map((column) => `\`${column}\`=VALUES(\`${column}\`)`).join(",");
+      await target.query(`INSERT INTO \`${table}\` SET ? ON DUPLICATE KEY UPDATE ${updates}`, row);
+    }
+    await target.commit();
+  } catch (error) { await target.rollback(); throw error; }
+}
+
 async function tableCounts(connection) {
   const { BACKUP_TABLES } = require("../../../src/database/backupTables");
   return Object.fromEntries(await Promise.all(BACKUP_TABLES.map(async (table) => [table, Number((await connection.query(`SELECT COUNT(*) n FROM \`${table}\``))[0][0].n)])));
@@ -84,6 +107,8 @@ async function prepareSuiteDatabase(context) {
     const migrations = require("../../../src/database/recurrenteMigration");
     for (const apply of [migrations.applyRecurrentePreparation, migrations.applyRecurrenteCheckoutMigration,
       migrations.applyRecurrenteConfirmationMigration, migrations.applyRecurrenteAttemptsMigration]) await apply(target);
+    await copyReceiptEvidence(context.source, target, context.snapshot);
+    assert.deepEqual(await protectedSnapshot(target), context.snapshot, "La copia de evidencia debe conservar todos los datos.");
   } finally { await target.end(); }
 }
 

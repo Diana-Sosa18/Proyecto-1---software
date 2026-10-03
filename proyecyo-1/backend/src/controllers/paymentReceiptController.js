@@ -1,4 +1,21 @@
-const { getPaymentReceipt, createPaymentReceiptPdf } = require("../services/paymentReceiptService");
+const { getPaymentReceipt, getResidentTransactionReceipt, listResidentRecurrenteReceipts, createPaymentReceiptPdf } = require("../services/paymentReceiptService");
+
+async function getPaymentReceiptData(req, res, next) {
+  try {
+    const payment = await getPaymentReceipt(req.authUser.id, req.authUser.role, req.params.paymentId);
+    res.set("Cache-Control", "private, no-store").json(payment);
+  } catch (error) { next(error); }
+}
+async function getTransactionReceiptData(req, res, next) {
+  try {
+    const payment = await getResidentTransactionReceipt(req.authUser.id, req.params.transactionId);
+    res.set("Cache-Control", "private, no-store").json(payment);
+  } catch (error) { next(error); }
+}
+async function listRecurrenteReceiptData(req, res, next) {
+  try { res.set("Cache-Control", "private, no-store").json(await listResidentRecurrenteReceipts(req.authUser.id)); }
+  catch (error) { next(error); }
+}
 
 async function downloadPaymentReceipt(req, res, next) {
   try {
@@ -11,4 +28,4 @@ async function downloadPaymentReceipt(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { downloadPaymentReceipt };
+module.exports = { downloadPaymentReceipt, getPaymentReceiptData, getTransactionReceiptData, listRecurrenteReceiptData };

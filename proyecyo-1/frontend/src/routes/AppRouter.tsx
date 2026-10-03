@@ -29,6 +29,7 @@ import { ResidenteUnifiedView } from "@/views/ResidenteUnifiedView";
 import { ResidenteView } from "@/views/ResidenteView";
 import { ResidenteAccountView } from "@/views/ResidenteAccountView";
 import { ResidentePaymentReturnView } from "@/views/ResidentePaymentReturnView";
+import { ResidentePaymentReceiptView } from "@/views/ResidentePaymentReceiptView";
 import { ResidenteVisitsView } from "@/views/ResidenteVisitsView";
 import { ResidentMonthlySummaryView } from "@/views/ResidentMonthlySummaryView";
 import { ResidenteFinancialDetailView } from "@/views/ResidenteFinancialDetailView";
@@ -85,6 +86,7 @@ export function AppRouter() {
           <Route path="/residente" element={<ResidenteView />} />
           <Route path="/residente/estado-cuenta" element={<ResidenteAccountView />} />
           <Route path="/residente/pagos/retorno" element={<ResidentePaymentReturnView />} />
+          <Route path="/residente/pagos/:paymentId/comprobante" element={<ResidentePaymentReceiptView />} />
           <Route path="/residente/unificado" element={<ResidenteUnifiedView />} />
           <Route path="/residente/reglamentos" element={<ResidenteRegulationsView />} />
           <Route path="/residente/visitas" element={<ResidenteVisitsView />} />
