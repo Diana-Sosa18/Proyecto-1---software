@@ -1,4 +1,6 @@
 const { pool, query } = require("../database/mysql");
+const { QUOTA_BALANCES_SQL } = require("./financialBalance");
+const { logger } = require("../utils/safeLogger");
 
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 const REMINDER_TYPES = ["PROXIMO_VENCIMIENTO", "VENCIDO"];
@@ -180,8 +182,8 @@ async function sendPaymentReminders(userId) {
         DATEDIFF(cu.fecha_limite, ?) AS dias_para_vencer,
         srv.nombre AS servicio,
         destinatario.id_usuario AS id_usuario,
-        GREATEST(cu.monto - COALESCE(pagos.total_pagado, 0), 0) AS saldo
-      FROM CUOTA cu
+        cu.saldo_pendiente AS saldo
+      FROM (${QUOTA_BALANCES_SQL}) cu
       INNER JOIN SERVICIO srv ON srv.id_servicio = cu.id_servicio
       INNER JOIN CASA c ON c.id_casa = cu.id_casa
       INNER JOIN (
@@ -193,12 +195,7 @@ async function sendPaymentReminders(userId) {
         INNER JOIN INQUILINO i ON i.id_inquilino = ic.id_inquilino AND i.autorizado = TRUE
         INNER JOIN USUARIO ui ON ui.id_usuario = i.id_usuario AND ui.activo = TRUE
       ) destinatario ON destinatario.id_casa = c.id_casa
-      LEFT JOIN (
-        SELECT id_cuota, SUM(monto_pagado) AS total_pagado
-        FROM PAGO
-        GROUP BY id_cuota
-      ) pagos ON pagos.id_cuota = cu.id_cuota
-      WHERE cu.monto - COALESCE(pagos.total_pagado, 0) > 0
+      WHERE cu.saldo_pendiente > 0 AND cu.sobrepago = 0
         AND (
           cu.fecha_limite < ?
           OR cu.fecha_limite BETWEEN ? AND DATE_ADD(?, INTERVAL ? DAY)
@@ -445,12 +442,12 @@ async function runScheduledReminders() {
     try {
       await sendPaymentReminders(null);
     } catch (error) {
-      console.error("No fue posible generar recordatorios de pago.", error);
+      logger.error("No fue posible generar recordatorios de pago.", error);
     }
     try {
       await sendReservationReminders();
     } catch (error) {
-      console.error("No fue posible generar recordatorios de reserva.", error);
+      logger.error("No fue posible generar recordatorios de reserva.", error);
     }
   }
   finally { schedulerRunInProgress = false; }

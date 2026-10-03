@@ -30,14 +30,14 @@ test("HU10 conserva fecha calendario y genera hora GT incluso al cambiar de día
   assert.equal(s.display("monto", "1234.5"), "1234.50");
 });
 
-test("HU10 consulta límites inclusivos y morosos con saldo después de abonos", async () => {
+test("morosos muestra deuda real actual sin acotar cuotas o abonos por el periodo", async () => {
   await s.rows("morosos", { desde: "2026-01-01", hasta: "2026-09-07" }, new Date("2026-09-08T02:00:00Z"));
   const [sql, params] = query.mock.calls[0].arguments;
-  assert.deepEqual(params, ["2026-09-07", "2026-01-01", "2026-09-07"]);
+  assert.deepEqual(params, ["2026-09-07"]);
   assert.match(sql, /SUM\(monto_pagado\)/);
-  assert.match(sql, /cu.monto > COALESCE\(pg.pagado, 0\)/);
-  assert.match(sql, /reporte.fecha >= \?/);
-  assert.match(sql, /reporte.fecha <= \?/);
+  assert.match(sql, /cu.saldo_pendiente > 0/);
+  assert.doesNotMatch(sql, /reporte.fecha >= \?/);
+  assert.doesNotMatch(sql, /reporte.fecha <= \?/);
   assert.doesNotMatch(sql, /CURDATE/);
 });
 

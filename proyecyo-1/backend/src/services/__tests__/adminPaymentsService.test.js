@@ -33,6 +33,7 @@ describe("adminPaymentsService.listDelinquentResidents", () => {
         propietario_correo: "juan@test.com",
         monto_pendiente: 1200.5,
         recargo_aplicado: 0,
+        recargo_pendiente: 0, sobrepago: 0, requiere_revision: false,
         total_pendiente: 1200.5,
         fecha_limite: "2026-01-15",
         estado: "MOROSO",

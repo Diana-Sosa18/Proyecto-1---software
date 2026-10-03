@@ -1,4 +1,5 @@
 const { query } = require("../database/mysql");
+const { calculateBalance, balanceDetails, sumMoney, toMoney, QUOTA_BALANCES_SQL } = require("./financialBalance");
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -33,7 +34,10 @@ function mapAdminPayment(row) {
     propietario_correo: row.propietario_correo,
     monto_pendiente: Number(row.monto_pendiente),
     recargo_aplicado: Number(row.recargo_aplicado || 0),
-    total_pendiente: Number(row.monto_pendiente) + Number(row.recargo_aplicado || 0),
+    recargo_pendiente: Number(row.recargo_pendiente || 0),
+    total_pendiente: toMoney(Number(row.monto_pendiente) + Number(row.recargo_pendiente || 0)),
+    sobrepago: Number(row.sobrepago || 0),
+    requiere_revision: Number(row.sobrepago || 0) > 0,
     fecha_limite: row.fecha_limite || null,
     estado: row.estado,
   };
@@ -73,10 +77,12 @@ async function listDelinquentResidents(filters = {}) {
           propietario.nombre AS propietario_nombre,
           propietario.correo AS propietario_correo,
           COALESCE(saldo.monto_pendiente, 0) AS monto_pendiente,
-          COALESCE(recargos.total_recargo, 0) AS recargo_aplicado,
+          COALESCE(saldo.recargo_aplicado, 0) AS recargo_aplicado,
+          COALESCE(saldo.recargo_pendiente, 0) AS recargo_pendiente,
+          COALESCE(saldo.sobrepago, 0) AS sobrepago,
           DATE_FORMAT(saldo.proxima_fecha_limite, '%Y-%m-%d') AS fecha_limite,
           CASE
-            WHEN COALESCE(saldo.monto_pendiente, 0) <= 0 THEN 'PAGADO'
+            WHEN COALESCE(saldo.saldo_pendiente, 0) <= 0 THEN 'PAGADO'
             WHEN COALESCE(saldo.tiene_mora, 0) = 1 THEN 'MOROSO'
             ELSE 'PENDIENTE'
           END AS estado
@@ -86,25 +92,21 @@ async function listDelinquentResidents(filters = {}) {
         LEFT JOIN (
           SELECT
             cu.id_casa,
-            SUM(GREATEST(cu.monto - COALESCE(pg.total_pagado, 0), 0)) AS monto_pendiente,
-            MIN(CASE WHEN cu.monto - COALESCE(pg.total_pagado, 0) > 0 THEN cu.fecha_limite END) AS proxima_fecha_limite,
+            SUM(cu.capital_pendiente) AS monto_pendiente,
+            SUM(cu.recargo) AS recargo_aplicado,
+            SUM(cu.recargo_pendiente) AS recargo_pendiente,
+            SUM(cu.saldo_pendiente) AS saldo_pendiente,
+            SUM(cu.sobrepago) AS sobrepago,
+            MIN(CASE WHEN cu.saldo_pendiente > 0 THEN cu.fecha_limite END) AS proxima_fecha_limite,
             MAX(
               CASE
-                WHEN cu.monto - COALESCE(pg.total_pagado, 0) > 0 AND cu.fecha_limite < CURDATE() THEN 1
+                WHEN cu.saldo_pendiente > 0 AND cu.fecha_limite < CURDATE() THEN 1
                 ELSE 0
               END
             ) AS tiene_mora
-          FROM CUOTA cu
-          LEFT JOIN (
-            SELECT id_cuota, SUM(monto_pagado) AS total_pagado
-            FROM PAGO
-            GROUP BY id_cuota
-          ) pg ON pg.id_cuota = cu.id_cuota
+          FROM (${QUOTA_BALANCES_SQL}) cu
           GROUP BY cu.id_casa
         ) saldo ON saldo.id_casa = c.id_casa
-        LEFT JOIN (
-          SELECT id_casa, SUM(monto_recargo) total_recargo FROM RECARGO_APLICADO GROUP BY id_casa
-        ) recargos ON recargos.id_casa = c.id_casa
       ) resumen
       WHERE ${sqlFilters.join(" AND ")}
       ORDER BY (resumen.estado = 'MOROSO') DESC, resumen.monto_pendiente DESC, resumen.propietario_nombre ASC
@@ -167,26 +169,35 @@ async function getMonthlyFinancialReport(monthValue, yearValue) {
     `SELECT c.id_casa, CONCAT(COALESCE(c.torre, ''), IF(c.torre IS NULL OR c.torre = '', '', '-'), c.numero) AS unidad,
             u.nombre AS usuario, s.nombre AS concepto, cu.monto,
             DATE_FORMAT(cu.fecha_limite, '%Y-%m-%d') AS fecha_limite,
-            COALESCE(pg.pagado, 0) AS pagado, COALESCE(ra.recargo, 0) AS recargo
-       FROM CUOTA cu INNER JOIN CASA c ON c.id_casa = cu.id_casa
+            cu.total_pagado AS pagado, cu.recargo
+       FROM (${QUOTA_BALANCES_SQL}) cu INNER JOIN CASA c ON c.id_casa = cu.id_casa
        INNER JOIN RESIDENTE r ON r.id_residente = c.id_residente INNER JOIN USUARIO u ON u.id_usuario = r.id_usuario
        INNER JOIN SERVICIO s ON s.id_servicio = cu.id_servicio
-       LEFT JOIN (SELECT id_cuota, SUM(monto_pagado) pagado FROM PAGO WHERE fecha_pago >= ? AND fecha_pago < DATE_ADD(?, INTERVAL 1 MONTH) GROUP BY id_cuota) pg ON pg.id_cuota = cu.id_cuota
-       LEFT JOIN (SELECT id_cuota, SUM(monto_recargo) recargo FROM RECARGO_APLICADO GROUP BY id_cuota) ra ON ra.id_cuota = cu.id_cuota
-      WHERE cu.fecha_limite >= ? AND cu.fecha_limite < DATE_ADD(?, INTERVAL 1 MONTH)
       ORDER BY cu.fecha_limite, unidad`,
-    [period.from, period.from, period.from, period.from],
+    [],
   );
-  const detalle = rows.map((row) => { const total = Number(row.monto) + Number(row.recargo); const pagado = Number(row.pagado); return {
-    ...row, id_casa: Number(row.id_casa), monto: Number(row.monto), recargo: Number(row.recargo), pagado,
-    pendiente: Math.max(total - pagado, 0), estado: pagado >= total ? "PAGADO" : row.fecha_limite < new Date().toISOString().slice(0, 10) ? "MOROSO" : "PENDIENTE",
+  const paymentRows = await query(
+    `SELECT p.id_pago, p.id_cuota, cu.id_casa, p.monto_pagado,
+       DATE_FORMAT(p.fecha_pago, '%Y-%m-%d') AS fecha_pago
+     FROM PAGO p INNER JOIN CUOTA cu ON cu.id_cuota = p.id_cuota
+     WHERE p.fecha_pago >= ? AND p.fecha_pago < DATE_ADD(?, INTERVAL 1 MONTH)
+     ORDER BY p.fecha_pago, p.id_pago`, [period.from, period.from],
+  );
+  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guatemala" }).format(new Date());
+  const detalle = rows.map((row) => { const balance = calculateBalance(row); return {
+    ...row, id_casa: Number(row.id_casa), monto: balance.monto, recargo: balance.recargo, pagado: balance.pagado,
+    ...balanceDetails(balance), pendiente: balance.saldo,
+    estado: balance.saldo === 0 ? "PAGADO" : row.fecha_limite < currentDate ? "MOROSO" : "PENDIENTE",
   }; });
+  const pagos = paymentRows.map((row) => ({ ...row, id_pago: Number(row.id_pago), id_cuota: Number(row.id_cuota),
+    id_casa: Number(row.id_casa), monto_pagado: Number(row.monto_pagado) }));
   return { periodo: { mes: period.month, anio: period.year }, resumen: {
-    total_cobrado: detalle.reduce((s, i) => s + i.pagado, 0), total_pendiente: detalle.reduce((s, i) => s + i.pendiente, 0),
-    total_mora: detalle.filter((i) => i.estado === "MOROSO").reduce((s, i) => s + i.pendiente, 0),
-    cantidad_pagos: detalle.filter((i) => i.pagado > 0).length,
+    total_cobrado: sumMoney(pagos.map((i) => i.monto_pagado)), total_pendiente: sumMoney(detalle.map((i) => i.pendiente)),
+    total_mora: sumMoney(detalle.filter((i) => i.estado === "MOROSO").map((i) => i.pendiente)),
+    cantidad_pagos: pagos.length,
+    sobrepago: sumMoney(detalle.map((i) => i.sobrepago)), requiere_revision: detalle.some((i) => i.requiere_revision),
     usuarios_morosos: new Set(detalle.filter((i) => i.estado === "MOROSO").map((i) => i.id_casa)).size,
-  }, detalle };
+  }, detalle, pagos };
 }
 
 module.exports = {

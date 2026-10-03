@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const { logger } = require("../utils/safeLogger");
 
 const { env } = require("../config/env");
 const { pool, query } = require("../database/mysql");
@@ -59,7 +60,7 @@ async function requestPasswordReset(email) {
   try {
     await sendPasswordResetEmail({ to: user.correo, name: user.nombre, resetUrl });
   } catch (error) {
-    console.error("No fue posible enviar un correo de recuperacion.", error);
+    logger.error("No fue posible enviar un correo de recuperacion.", error);
   }
 
   return GENERIC_RESPONSE;

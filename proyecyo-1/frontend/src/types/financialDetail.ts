@@ -1,6 +1,7 @@
+import type { FinancialBalanceDetails, FinancialReview } from "./financialBalance";
 export type ChargeStatus = "PAGADO" | "PARCIAL" | "PENDIENTE";
 
-export interface FinancialCharge {
+export interface FinancialCharge extends FinancialBalanceDetails {
   id_cuota: number;
   servicio: string;
   monto: number;
@@ -30,7 +31,8 @@ export interface FinancialPayment {
   numero_comprobante: string;
 }
 
-export interface FinancialSummary {
+export interface FinancialSummary extends FinancialReview {
+  total_pagado_periodo?: number;
   total_cargos: number;
   total_recargos: number;
   total_pagado: number;

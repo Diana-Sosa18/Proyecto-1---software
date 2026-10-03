@@ -1,6 +1,7 @@
+import type { FinancialBalanceDetails, FinancialReview } from "./financialBalance";
 export type AccountQuotaStatus = "PAGADA" | "PENDIENTE" | "VENCIDA";
 
-export interface AccountSummary {
+export interface AccountSummary extends FinancialReview {
   total_cuotas: number;
   cuotas_pagadas: number;
   cuotas_pendientes: number;
@@ -11,7 +12,7 @@ export interface AccountSummary {
   actualizado_en: string;
 }
 
-export interface AccountQuota {
+export interface AccountQuota extends FinancialBalanceDetails {
   id_cuota: number;
   id_casa: number;
   casa_unidad: string;

@@ -13,6 +13,7 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { FinancialReviewNotice } from "@/components/payments/FinancialReviewNotice";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -354,6 +355,8 @@ export function InquilinoAccountView() {
         </Alert>
       ) : null}
 
+      <FinancialReviewNotice {...statement.resumen} />
+      <p className="my-3 text-sm text-slate-500">El saldo incluye todos los abonos confirmados. Las fechas filtran los movimientos.</p>
       {statement.resumen.cuotas_vencidas > 0 ? (
         <Alert className="border-rose-200 bg-rose-50 text-rose-800">
           <AlertTriangle className="size-5" />

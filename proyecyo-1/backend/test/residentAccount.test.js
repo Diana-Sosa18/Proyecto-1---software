@@ -70,6 +70,7 @@ test("mapQuota converts numeric fields and house label", () => {
     recargo: 0,
     monto_pagado: 125.5,
     saldo_pendiente: 224.5,
+    capital_pendiente: 224.5, recargo_pendiente: 0, sobrepago: 0, requiere_revision: false,
     fecha_limite: "2026-08-01",
     ultimo_pago: "2026-07-25",
     estado: "VENCIDA",

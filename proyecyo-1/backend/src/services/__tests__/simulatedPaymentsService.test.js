@@ -9,16 +9,20 @@ beforeEach(() => { jest.clearAllMocks(); mockConnection.execute.mockReset(); });
 function successfulPayment() {
   mockConnection.execute
     .mockResolvedValueOnce([[quota]])
+    .mockResolvedValueOnce([[{ recargo: quota.recargo, pagado: quota.pagado }]])
+    .mockResolvedValueOnce([[]])
     .mockResolvedValueOnce([{ insertId: 21 }])
-    .mockResolvedValueOnce([{ insertId: 31 }]);
+    .mockResolvedValueOnce([{ insertId: 31 }])
+    .mockResolvedValueOnce([{ affectedRows: 1 }]);
 }
 
 test("registra un pago residente con monto y recargo calculados en backend", async () => {
   successfulPayment();
   const result = await payObligation(4, "residente", 3);
   expect(result).toMatchObject({ id_pago: 21, total: 115, recargo: 15, estado: "APROBADA" });
-  expect(mockConnection.execute.mock.calls[1][1]).toEqual([3, 115]);
-  expect(mockConnection.execute.mock.calls[2][1]).toEqual([21, 4, 8, "residente", "Mantenimiento", 115]);
+  expect(mockConnection.execute.mock.calls[3][1]).toEqual([3, 115]);
+  expect(mockConnection.execute.mock.calls[4][1]).toEqual([21, 4, 8, "residente", "Mantenimiento", 115]);
+  expect(mockConnection.execute.mock.calls[5][0]).toContain("'SIMULADO', 'academic'");
   expect(mockConnection.commit).toHaveBeenCalledTimes(1);
 });
 
@@ -27,7 +31,7 @@ test("un inquilino autorizado reutiliza el mismo flujo", async () => {
   const result = await payObligation(9, "inquilino", 3);
   expect(result.estado).toBe("APROBADA");
   expect(mockConnection.execute.mock.calls[0][0]).toContain("titular.autorizado = TRUE");
-  expect(mockConnection.execute.mock.calls[2][1][3]).toBe("inquilino");
+  expect(mockConnection.execute.mock.calls[4][1][3]).toBe("inquilino");
 });
 
 test("rechaza al inquilino sin relación autorizada", async () => {
@@ -53,8 +57,50 @@ test("rechaza un cargo pagado y un segundo intento", async () => {
 });
 
 test("un error de persistencia revierte la transacción sin confirmarla", async () => {
-  mockConnection.execute.mockResolvedValueOnce([[quota]]).mockResolvedValueOnce([{ insertId: 21 }]).mockRejectedValueOnce(new Error("db"));
+  mockConnection.execute.mockResolvedValueOnce([[quota]]).mockResolvedValueOnce([[{ recargo: 15, pagado: 0 }]])
+    .mockResolvedValueOnce([[]])
+    .mockResolvedValueOnce([{ insertId: 21 }]).mockRejectedValueOnce(new Error("db"));
   await expect(payObligation(4, "residente", 3)).rejects.toThrow("db");
   expect(mockConnection.rollback).toHaveBeenCalledTimes(1);
   expect(mockConnection.commit).not.toHaveBeenCalled();
+});
+
+test("rechaza un sobrepago previo sin modificar el historial", async () => {
+  mockConnection.execute.mockResolvedValueOnce([[quota]]).mockResolvedValueOnce([[{ recargo: 15, pagado: 120 }]]);
+  await expect(payObligation(4, "residente", 3)).rejects.toMatchObject({ status: 409, code: "FINANCIAL_OVERPAYMENT" });
+  expect(mockConnection.execute).toHaveBeenCalledTimes(2);
+  expect(mockConnection.commit).not.toHaveBeenCalled();
+});
+test("cobra solo el saldo pendiente despues de aplicar abonos a recargos", async () => {
+  mockConnection.execute.mockResolvedValueOnce([[quota]]).mockResolvedValueOnce([[{ recargo: 15, pagado: 50 }]])
+    .mockResolvedValueOnce([[]])
+    .mockResolvedValueOnce([{ insertId: 21 }]).mockResolvedValueOnce([{ insertId: 31 }]).mockResolvedValueOnce([{ affectedRows: 1 }]);
+  expect((await payObligation(4, "residente", 3)).total).toBe(65);
+});
+test("fallo al registrar el origen revierte tambien PAGO y la simulacion", async () => {
+  mockConnection.execute.mockResolvedValueOnce([[quota]])
+    .mockResolvedValueOnce([[{ recargo: 15, pagado: 0 }]])
+    .mockResolvedValueOnce([[]])
+    .mockResolvedValueOnce([{ insertId: 21 }]).mockResolvedValueOnce([{ insertId: 31 }])
+    .mockRejectedValueOnce(new Error("origin failure"));
+  await expect(payObligation(4, "residente", 3)).rejects.toThrow("origin failure");
+  expect(mockConnection.rollback).toHaveBeenCalledTimes(1);
+  expect(mockConnection.commit).not.toHaveBeenCalled();
+});
+
+test("lee abonos despues de bloquear la cuota para evitar agregados obsoletos", async () => {
+  successfulPayment();
+  await payObligation(4, "residente", 3);
+  expect(mockConnection.execute.mock.calls[0][0]).toContain("FOR UPDATE");
+  expect(mockConnection.execute.mock.calls[0][0]).not.toContain("SUM(monto_pagado)");
+  expect(mockConnection.execute.mock.calls[1][0]).toContain("SUM(monto_pagado)");
+});
+
+test.each(["CREADO", "PENDIENTE", "INCIERTO"])("bloquea la simulacion con checkout %s antes de insertar PAGO", async (estado) => {
+  mockConnection.execute.mockResolvedValueOnce([[quota]])
+    .mockResolvedValueOnce([[{ recargo: 15, pagado: 0 }]])
+    .mockResolvedValueOnce([[{ id_checkout: 1, estado }]]);
+  await expect(payObligation(4, "residente", 3)).rejects.toMatchObject({ code: "CHECKOUT_SIMULATION_BLOCKED", status: 409 });
+  expect(mockConnection.execute.mock.calls.some(([sql]) => /INSERT INTO PAGO/.test(sql))).toBe(false);
+  expect(mockConnection.rollback).toHaveBeenCalled();
 });

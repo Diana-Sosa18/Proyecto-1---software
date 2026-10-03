@@ -1,5 +1,7 @@
 const { createApp } = require("./src/app");
 const { env } = require("./src/config/env");
+const { applyRecurrentePreparation, applyRecurrenteCheckoutMigration } = require("./src/database/recurrenteMigration");
+const { logger } = require("./src/utils/safeLogger");
 const {
   ensureVisitQrSchema,
   ensureQrValidationAttemptsSchema,
@@ -21,6 +23,7 @@ const {
   ensureSimulatedPaymentsSchema,
   ensureDemoRequestsSchema,
   ensureTenantAccountSeed,
+  pool,
   query,
 } = require("./src/database/mysql");
 const { startScheduler } = require("./src/services/automaticBackupsService");
@@ -75,6 +78,9 @@ async function startServer() {
   await ensureAutomaticBackupsSchema();
   await ensureRemindersSchema();
   await ensureSimulatedPaymentsSchema();
+  const migrationConnection = await pool.getConnection();
+  try { await applyRecurrentePreparation(migrationConnection); await applyRecurrenteCheckoutMigration(migrationConnection); }
+  finally { migrationConnection.release(); }
   await ensureDemoRequestsSchema();
   await ensureTenantAccountSeed();
   startScheduler();
@@ -88,6 +94,6 @@ async function startServer() {
 }
 
 startServer().catch((error) => {
-  console.error("No fue posible iniciar el servidor.", error);
+  logger.error("No fue posible iniciar el servidor.", error);
   process.exit(1);
 });

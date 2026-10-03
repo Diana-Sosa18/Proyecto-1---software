@@ -36,7 +36,8 @@ test("consulta solo saldos impagos dentro del rango configurado", async () => {
   const result = await prepare([]);
   expect(result.enviados).toBe(0);
   const sql = query.mock.calls[1][0];
-  expect(sql).toContain("cu.monto - COALESCE(pagos.total_pagado, 0) > 0");
+  expect(sql).toContain("cu.saldo_pendiente > 0");
+  expect(sql).toContain("AS recargo_pendiente");
   expect(sql).toContain("DATE_ADD(?, INTERVAL ? DAY)");
   expect(sql).toContain("i.autorizado = TRUE");
   expect(sql).toContain("activo = TRUE");

@@ -1,6 +1,7 @@
 ﻿const PDFDocument = require("pdfkit");
 const ExcelJS = require("exceljs");
 const db = require("../database/mysql");
+const { QUOTA_BALANCES_SQL } = require("./financialBalance");
 const accesses = require("./adminAccessesService");
 const { ensureValidDate } = require("../utils/dateTimeValidation");
 
@@ -17,11 +18,10 @@ const REPORTS = {
   morosos: { title: "Morosos", columns: { fecha: "Vencimiento", residente: "Residente", unidad: "Unidad", monto: "Saldo pendiente (Q)" }, sql: `
     SELECT DATE_FORMAT(cu.fecha_limite, '%Y-%m-%d') fecha, u.nombre residente,
       CONCAT_WS('-', NULLIF(c.torre, ''), c.numero) unidad,
-      cu.monto - COALESCE(pg.pagado, 0) monto
-    FROM CUOTA cu JOIN CASA c ON c.id_casa=cu.id_casa
+      cu.saldo_pendiente monto
+    FROM (${QUOTA_BALANCES_SQL}) cu JOIN CASA c ON c.id_casa=cu.id_casa
     JOIN RESIDENTE r ON r.id_residente=c.id_residente JOIN USUARIO u ON u.id_usuario=r.id_usuario
-    LEFT JOIN (SELECT id_cuota, SUM(monto_pagado) pagado FROM PAGO GROUP BY id_cuota) pg ON pg.id_cuota=cu.id_cuota
-    WHERE cu.fecha_limite < ? AND cu.monto > COALESCE(pg.pagado, 0)` },
+    WHERE cu.fecha_limite < ? AND cu.saldo_pendiente > 0` },
   sanciones: { title: "Sanciones", columns: { fecha: "Fecha", hora: "Hora", residente: "Residente", motivo: "Motivo", monto: "Monto (Q)", estado: "Estado" }, sql: `
     SELECT DATE_FORMAT(s.fecha_generacion, '%Y-%m-%d') fecha,
       DATE_FORMAT(s.fecha_generacion, '%H:%i:%s') hora, u.nombre residente, s.motivo, s.monto, s.estado
@@ -71,8 +71,10 @@ async function rows(type, input = {}, now = new Date()) {
     data = await accesses.listAdminAccesses(filters, filters);
   } else {
     const clauses = [], params = type === "morosos" ? [localTimestamp(now).slice(0, 10)] : [];
-    if (filters.desde) { clauses.push("reporte.fecha >= ?"); params.push(filters.desde); }
-    if (filters.hasta) { clauses.push("reporte.fecha <= ?"); params.push(filters.hasta); }
+    // Delinquency is current debt, not a period movement. Date ranges must never
+    // hide outstanding quotas or restrict the payments used to calculate their balance.
+    if (type !== "morosos" && filters.desde) { clauses.push("reporte.fecha >= ?"); params.push(filters.desde); }
+    if (type !== "morosos" && filters.hasta) { clauses.push("reporte.fecha <= ?"); params.push(filters.hasta); }
     data = await db.query(`SELECT * FROM (${REPORTS[type].sql}) reporte
       ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}
       ORDER BY reporte.fecha DESC LIMIT ${MAX_ROWS + 1}`, params);
@@ -88,7 +90,9 @@ function display(key, value) {
 }
 function metadata(type, data, user, filters, now) {
   validate(type, "pdf");
-  const details = [`Período: ${filters.desde ? display("fecha", filters.desde) : "Sin límite inicial"} a ${filters.hasta ? display("fecha", filters.hasta) : "Sin límite final"}`];
+  const details = type === "morosos"
+    ? ["Saldo real actual de todas las cuotas vencidas. Las fechas del formulario solo filtran movimientos; no limitan este listado de deuda."]
+    : [`Período: ${filters.desde ? display("fecha", filters.desde) : "Sin límite inicial"} a ${filters.hasta ? display("fecha", filters.hasta) : "Sin límite final"}`];
   const labels = { search: "Búsqueda", house: "Unidad", plate: "Placa", type: "Tipo", status: "Estado" };
   for (const [key, label] of Object.entries(labels)) if (filters[key] && filters[key] !== "TODOS") details.push(`${label}: ${filters[key]}`);
   return [`NexusResidencial - Reporte de ${REPORTS[type].title}`, `Generado: ${localTimestamp(now)} (${TIMEZONE}) | Usuario: ${user}`, ...details, `Total de registros: ${data.length}`];
