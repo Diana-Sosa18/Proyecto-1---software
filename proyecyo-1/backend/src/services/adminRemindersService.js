@@ -195,7 +195,7 @@ async function sendPaymentReminders(userId) {
         INNER JOIN INQUILINO i ON i.id_inquilino = ic.id_inquilino AND i.autorizado = TRUE
         INNER JOIN USUARIO ui ON ui.id_usuario = i.id_usuario AND ui.activo = TRUE
       ) destinatario ON destinatario.id_casa = c.id_casa
-      WHERE cu.saldo_pendiente > 0 AND cu.sobrepago = 0
+      WHERE cu.saldo_pendiente > 0 AND cu.sobrepago = 0 AND cu.reembolso_inconsistente = 0
         AND (
           cu.fecha_limite < ?
           OR cu.fecha_limite BETWEEN ? AND DATE_ADD(?, INTERVAL ? DAY)

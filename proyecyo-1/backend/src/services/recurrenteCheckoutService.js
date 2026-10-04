@@ -1,10 +1,12 @@
+const { refundBlockingSql, assertRefundUnblocked } = require('./recurrenteRefundGuard');
 const { randomUUID } = require("node:crypto");
 const { pool: defaultPool } = require("../database/mysql");
-const { calculateBalance, assertCollectible, toCents } = require("./financialBalance");
+const { calculateBalance, assertCollectible, toCents, refundedQuotaSql } = require("./financialBalance");
 const { createRecurrenteClient } = require("./recurrenteClient");
 const { CheckoutError } = require("./recurrenteCheckoutErrors");
 const { BLOCKING_CHECKOUT_CONDITION } = require("./recurrenteCheckoutGuard");
 const { validateCheckoutUrl } = require("../utils/recurrenteCheckoutUrl");
+const { successReviewSql } = require('./recurrenteReviewGuard');
 
 async function lockedQuota(connection, userId, quotaId) {
   const [rows] = await connection.execute(`SELECT cu.id_cuota, cu.id_casa, cu.monto,
@@ -22,7 +24,9 @@ async function lockedQuota(connection, userId, quotaId) {
   // All applied payments, after the quota lock, without any movement-date filter.
   const [totals] = await connection.execute(`SELECT
     COALESCE((SELECT SUM(monto_recargo) FROM RECARGO_APLICADO WHERE id_cuota = ?),0) recargo,
-    COALESCE((SELECT SUM(monto_pagado) FROM PAGO WHERE id_cuota = ?),0) pagado`, [quotaId, quotaId]);
+    COALESCE((SELECT SUM(monto_pagado) FROM PAGO WHERE id_cuota = ?),0) pagado,
+    ${refundedQuotaSql(String(quotaId))} reembolsado, ${refundBlockingSql(String(quotaId))} refund_bloqueante`, [quotaId, quotaId]);
+  assertRefundUnblocked(totals[0]);
   let balance;
   try { balance = calculateBalance({ ...rows[0], ...totals[0] }); assertCollectible(balance); }
   catch (error) { throw new CheckoutError(error.code === "FINANCIAL_OVERPAYMENT" ? error.code : "INVALID_FINANCIAL_AMOUNT"); }
@@ -62,6 +66,9 @@ function createCheckoutService({ pool = defaultPool, client = createRecurrenteCl
       const amount = toCents(quota.balance.saldo);
       if (!amount) throw new CheckoutError("QUOTA_PAID");
       if (amount < 500) throw new CheckoutError("CHECKOUT_MINIMUM");
+      const [review] = await connection.execute(`SELECT id_checkout FROM CHECKOUT_RECURRENTE co
+        WHERE co.id_cuota=? AND ${successReviewSql('co.id_checkout')} LIMIT 1`,[quotaId]);
+      if (review.length) throw new CheckoutError('CHECKOUT_UNCERTAIN');
       const [active] = await connection.execute(`SELECT id_checkout, referencia_local, id_externo,
         id_cuota, id_usuario, id_residente, id_casa, monto_centavos, capital_centavos, recargo_centavos,
         moneda, ambiente, sandbox_id, estado, checkout_url, estado_proveedor, verificado_en
@@ -215,12 +222,13 @@ function createCheckoutService({ pool = defaultPool, client = createRecurrenteCl
         WHERE id_checkout=? AND estado='PROCESADO' AND resultado_intento IS NOT NULL ORDER BY id_evento DESC LIMIT 1`, [local.id_checkout]);
       const [balances] = await c.execute(`SELECT cu.monto,
         COALESCE((SELECT SUM(monto_recargo) FROM RECARGO_APLICADO WHERE id_cuota=cu.id_cuota),0) recargo,
-        COALESCE((SELECT SUM(monto_pagado) FROM PAGO WHERE id_cuota=cu.id_cuota),0) pagado FROM CUOTA cu WHERE id_cuota=?`, [local.id_cuota]);
+        COALESCE((SELECT SUM(monto_pagado) FROM PAGO WHERE id_cuota=cu.id_cuota),0) pagado, ${refundedQuotaSql("cu.id_cuota")} reembolsado, ${refundBlockingSql("cu.id_cuota")} refund_bloqueante FROM CUOTA cu WHERE id_cuota=?`, [local.id_cuota]);
       const balance = calculateBalance(balances[0]);
       const [other] = await c.execute(`SELECT id_checkout FROM CHECKOUT_RECURRENTE
         WHERE id_cuota=? AND id_checkout<>? AND ${BLOCKING_CHECKOUT_CONDITION} LIMIT 1`, [local.id_cuota, local.id_checkout]);
       const { checkoutStatus } = require("./recurrenteCheckoutStatus");
-      return { referencia_local: reference, ...checkoutStatus(local, attempts[0], balance, other.length > 0) };
+      const [review] = await c.execute(`SELECT ${successReviewSql(String(Number(local.id_checkout)))} blocking`);
+      return { referencia_local: reference, ...checkoutStatus(local, attempts[0], balance, other.length > 0, Number(balances[0].refund_bloqueante)>0,Number(review[0].blocking)>0) };
     } finally { c.release(); }
   }
   return { startResidentCheckout, retryResidentCheckout, residentCheckoutStatus };

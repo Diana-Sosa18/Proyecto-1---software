@@ -26,7 +26,7 @@ export interface TenantAccountSummary extends FinancialReview {
   saldo_pendiente: number;
   alquiler_pendiente: number;
   cuotas_adicionales_pendientes: number;
-  total_pagado: number;
+  total_pagado: number; total_reembolsado?: number; abono_neto?: number;
   proximo_vencimiento: string | null;
   actualizado_en: string;
 }
@@ -42,6 +42,7 @@ export interface TenantAccountStatement {
   resumen: TenantAccountSummary;
   alquiler: TenantAccountQuota[];
   cuotas_adicionales: TenantAccountQuota[];
+  reembolsos?: {id_reembolso:number;id_cuota:number;monto_centavos:number;fecha_reembolso:string;servicio:string}[];
   pagos: Array<{
     id_pago: number;
     id_cuota: number;

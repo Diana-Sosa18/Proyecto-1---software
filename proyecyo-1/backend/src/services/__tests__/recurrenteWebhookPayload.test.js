@@ -41,8 +41,11 @@ test("selecciona solo succeeded/payment con Sandbox explicito", () => {
 test.each([{ live_mode: true }, { live_mode: undefined }, { live_mode: "false" }, { sandbox_id: "sbx_other" }, { sandbox_id: undefined }])("ambiente no verificable no aplica", (changes) => {
   expect(inspectEvent(paymentPayload({}, changes), configuration().sandboxId).disposition).toBe("IGNORADO");
 });
-test.each([{ event_type: "refund.create" }, { event_type: "subscription.create" }, { type: "bank_transfer" }])("fuente financiera diferente se ignora", (changes) => {
+test.each([{ event_type: "subscription.create" }, { type: "bank_transfer" }])("fuente financiera diferente se ignora", (changes) => {
   expect(inspectEvent(paymentPayload({}, changes), configuration().sandboxId).disposition).toBe("IGNORADO");
+});
+test('refund.create requiere su contrato propio y no reaplica campos de pago', () => {
+  expect(inspectEvent(paymentPayload({}, { event_type: 'refund.create' }), configuration().sandboxId)).toMatchObject({ disposition: 'REFUND', code: 'REFUND_INVALID_EVIDENCE' });
 });
 test("payment_intent.succeeded incompleto se reconoce y requiere revision", () => {
   const event = inspectEvent(paymentPayload({}, { event_type: "payment_intent.succeeded" }), configuration().sandboxId);

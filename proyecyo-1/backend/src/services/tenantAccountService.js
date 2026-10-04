@@ -1,5 +1,5 @@
 const { query } = require("../database/mysql");
-const { calculateBalance, balanceDetails, toMoney, sumMoney } = require("./financialBalance");
+const { calculateBalance, balanceDetails, toMoney, sumMoney, refundedQuotaSql } = require("./financialBalance");
 
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 const ACCOUNT_STATUSES = {
@@ -111,6 +111,8 @@ function buildSummary(quotas, currentDate = getCurrentDateInTimezone()) {
       additionalQuotas.reduce((total, quota) => total + quota.saldo_pendiente, 0),
     ),
     total_pagado: toMoney(quotas.reduce((total, quota) => total + quota.monto_pagado, 0)),
+    total_reembolsado: sumMoney(quotas.map(q => q.reembolsado || 0)),
+    abono_neto: sumMoney(quotas.map(q => q.abono_neto ?? q.monto_pagado)),
     sobrepago: sumMoney(quotas.map((quota) => quota.sobrepago || 0)),
     requiere_revision: quotas.some((quota) => quota.requiere_revision),
     proximo_vencimiento: upcomingDueDates[0] || null,
@@ -172,6 +174,7 @@ async function listTenantAccountStatement(userId, filters = {}) {
         srv.tipo_servicio,
         COALESCE(MAX(rec.monto_recargo), 0) AS recargo,
         COALESCE(SUM(p.monto_pagado), 0) AS total_pagado,
+        ${refundedQuotaSql("cu.id_cuota")} AS total_reembolsado,
         DATE_FORMAT(MAX(p.fecha_pago), '%Y-%m-%d') AS ultimo_pago
       FROM CUOTA cu
       INNER JOIN CASA c
@@ -226,6 +229,14 @@ async function listTenantAccountStatement(userId, filters = {}) {
     [house.id_casa, ...(desde ? [desde] : []), ...(hasta ? [hasta] : [])],
   );
 
+  const refundRows = await query(`SELECT rr.id_reembolso,tr.id_pago,tr.id_cuota,rr.monto_centavos,
+    DATE_FORMAT(rr.fecha_contable,'%Y-%m-%d') fecha_reembolso,srv.nombre servicio
+    FROM REEMBOLSO_RECURRENTE rr JOIN TRANSACCION_RECURRENTE tr ON tr.id_transaccion=rr.id_transaccion
+    JOIN CUOTA cu ON cu.id_cuota=tr.id_cuota JOIN SERVICIO srv ON srv.id_servicio=cu.id_servicio
+    WHERE cu.id_casa=? AND rr.estado='CONFIRMADO' AND rr.aplicado_en IS NOT NULL
+    ${desde?'AND rr.fecha_contable>=?':''} ${hasta?'AND rr.fecha_contable<=?':''}
+    ORDER BY rr.fecha_contable DESC,rr.id_reembolso DESC`,
+  [house.id_casa,...(desde?[desde]:[]),...(hasta?[hasta]:[])]);
   return {
     casa: {
       id_casa: Number(house.id_casa),
@@ -241,6 +252,7 @@ async function listTenantAccountStatement(userId, filters = {}) {
       numero_comprobante: paymentReference(row.id_pago),
     })),
     recargos: surchargeRows.map((row) => ({ ...row, id_recargo: Number(row.id_recargo), id_cuota: Number(row.id_cuota), monto_recargo: toMoney(row.monto_recargo) })),
+    reembolsos: refundRows,
     periodo: { desde: desde || null, hasta: hasta || null },
   };
 }

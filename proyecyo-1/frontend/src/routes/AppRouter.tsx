@@ -9,6 +9,7 @@ import { AdminAccessesView } from "@/views/AdminAccessesView";
 import { AdminAuthorizedUsersView } from "@/views/AdminAuthorizedUsersView";
 import { AdminCommunicationsView } from "@/views/AdminCommunicationsView";
 import { AdminPaymentsView } from "@/views/AdminPaymentsView";
+import { AdminRecurrenteRefundView } from "@/views/AdminRecurrenteRefundView";
 import { AdminRecurrenteReconciliationView } from "@/views/AdminRecurrenteReconciliationView";
 import { AdminRemindersView } from "@/views/AdminRemindersView";
 import { AdminReportsView } from "@/views/AdminReportsView";
@@ -68,6 +69,7 @@ export function AppRouter() {
           <Route path="/admin/accesos-especiales" element={<AdminSpecialAccessView />} />
           <Route path="/admin/comunicados" element={<AdminCommunicationsView />} />
           <Route path="/admin/pagos" element={<AdminPaymentsView />} />
+          <Route path="/admin/pagos/reembolsos" element={<AdminRecurrenteRefundView />} />
           <Route path="/admin/pagos/conciliacion" element={<AdminRecurrenteReconciliationView />} />
           <Route path="/admin/recordatorios" element={<AdminRemindersView />} />
           <Route path="/admin/sanciones" element={<AdminSanctionsView />} />

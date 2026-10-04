@@ -57,7 +57,7 @@ async function applySurcharges(userId) {
         balance.capital_pendiente saldo
       FROM CUOTA cu INNER JOIN (${QUOTA_BALANCES_SQL}) balance ON balance.id_cuota = cu.id_cuota
       WHERE cu.fecha_limite >= ? AND DATE_ADD(cu.fecha_limite, INTERVAL ? DAY) < CURDATE()
-        AND balance.capital_pendiente > 0 AND balance.sobrepago = 0
+        AND balance.capital_pendiente > 0 AND balance.sobrepago = 0 AND balance.reembolso_inconsistente = 0
       FOR UPDATE`, [rule.vigente_desde, rule.dias_gracia]);
     let applied = 0;
     for (const fee of fees) {

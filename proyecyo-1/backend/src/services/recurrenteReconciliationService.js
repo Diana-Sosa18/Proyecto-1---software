@@ -48,14 +48,17 @@ async function loadCatalog(criteria, pool = defaultPool) {
     if (criteria.ids) { where.push(`tr.id_transaccion IN (${placeholders(criteria.ids)})`); params.push(...criteria.ids); }
     if (criteria.checkoutId) { where.push('co.id_checkout=?'); params.push(criteria.checkoutId); }
     if (criteria.externalIds) {
-      where.push(`(co.id_externo IN (${placeholders(criteria.externalIds)}) OR tr.id_externo IN (${placeholders(criteria.externalIds)}))`);
-      params.push(...criteria.externalIds, ...criteria.externalIds);
+      where.push(`(co.id_externo IN (${placeholders(criteria.externalIds)}) OR tr.id_externo IN (${placeholders(criteria.externalIds)})
+        OR EXISTS(SELECT 1 FROM INTENTO_RECURRENTE ir WHERE ir.id_transaccion=tr.id_transaccion AND ir.id_externo IN (${placeholders(criteria.externalIds)})))`);
+      params.push(...criteria.externalIds, ...criteria.externalIds,...criteria.externalIds);
     }
     if (f.residente) { where.push('co.id_residente=?'); params.push(Number(f.residente)); }
     if (f.estado_local) { where.push('COALESCE(tr.estado,co.estado)=?'); params.push(f.estado_local); }
     if (f.referencia) {
       where.push("(co.id_externo=? OR co.referencia_local=? OR tr.id_externo=? OR tr.id_pago_externo=? OR CONCAT('NXR-',LPAD(pg.id_pago,8,'0'))=? OR CAST(co.id_checkout AS CHAR)=? OR CAST(tr.id_transaccion AS CHAR)=? OR CAST(pg.id_pago AS CHAR)=? OR CAST(co.id_cuota AS CHAR)=?)");
       params.push(...Array(9).fill(f.referencia));
+      where[where.length-1]=`(${where[where.length-1]} OR EXISTS(SELECT 1 FROM INTENTO_RECURRENTE ir WHERE ir.id_transaccion=tr.id_transaccion AND ir.id_externo=?))`;
+      params.push(f.referencia);
     }
     const accountingDate = 'COALESCE(DATE(DATE_SUB(tr.fecha_proveedor_utc,INTERVAL 6 HOUR)),pg.fecha_pago)';
     if (f.desde) { where.push(`(${accountingDate} IS NULL OR ${accountingDate}>=?)`); params.push(f.desde); }
@@ -74,7 +77,7 @@ async function loadCatalog(criteria, pool = defaultPool) {
       DATE_FORMAT(tr.confirmado_en,'%Y-%m-%d %H:%i:%s.%f') confirmado_en,tr.capital_aplicado_centavos,tr.recargo_aplicado_centavos,
       tr.motivo_codigo,tr.motivo_sanitizado,DATE_FORMAT(tr.actualizado_en,'%Y-%m-%d %H:%i:%s.%f') tr_actualizado,
       pg.id_pago pg_id,pg.id_cuota pg_cuota,pg.monto_pagado,DATE_FORMAT(pg.fecha_pago,'%Y-%m-%d') fecha_pago,
-      po.origen,po.ambiente pago_ambiente,b.saldo_pendiente,b.total_pagado,b.recargo,b.sobrepago
+      po.origen,po.ambiente pago_ambiente,b.saldo_pendiente,b.total_pagado,b.total_reembolsado,b.abono_neto,b.recargo,b.sobrepago
       FROM CHECKOUT_RECURRENTE co JOIN CUOTA cu ON cu.id_cuota=co.id_cuota
       JOIN CASA ca ON ca.id_casa=cu.id_casa JOIN RESIDENTE r ON r.id_residente=ca.id_residente
       JOIN USUARIO u ON u.id_usuario=r.id_usuario JOIN SERVICIO srv ON srv.id_servicio=cu.id_servicio
@@ -99,7 +102,7 @@ async function loadCatalog(criteria, pool = defaultPool) {
         fecha_pago: row.fecha_pago, origen: row.origen, ambiente: row.pago_ambiente } : null,
       residentId: Number(row.actual_residente), residentUserId: Number(row.residente_usuario), quotaHouseId: Number(row.cuota_casa),
       residentName: row.residente_nombre, unit: row.unidad, concept: row.concepto,
-      balance: { saldo: row.saldo_pendiente, pagado: row.total_pagado, recargo: row.recargo, sobrepago: row.sobrepago },
+      balance: { saldo: row.saldo_pendiente, pagado: row.total_pagado, reembolsado: row.total_reembolsado, abono_neto: row.abono_neto, recargo: row.recargo, sobrepago: row.sobrepago },
       events: [], refunds: [],
     }));
     const filtered = mapped.filter(op => dateMatches(localDate(op), f));
@@ -107,14 +110,17 @@ async function loadCatalog(criteria, pool = defaultPool) {
     const coIds = [...new Set(operations.map(op => op.checkout.id_checkout))];
     const externalIds = [...new Set(operations.flatMap(op => [op.intent?.id_externo, op.intent?.id_pago_externo]).filter(Boolean))];
     const trIds = operations.map(op => op.intent?.id_transaccion).filter(Boolean);
-    let events = [], refunds = [];
+    let events = [], refunds = [], attempts = [];
     if (coIds.length) [events] = await c.execute(`SELECT id_evento,svix_id,tipo_evento,estado,intentos,error_codigo,id_checkout,id_operacion_externa
       FROM EVENTO_RECURRENTE WHERE id_checkout IN (${placeholders(coIds)})${externalIds.length ? ` OR id_operacion_externa IN (${placeholders(externalIds)})` : ''} ORDER BY id_evento`, [...coIds, ...externalIds]);
-    if (trIds.length) [refunds] = await c.execute(`SELECT id_reembolso,id_transaccion,estado,monto_centavos FROM REEMBOLSO_RECURRENTE
-      WHERE id_transaccion IN (${placeholders(trIds)}) AND estado NOT IN ('FALLIDO','CANCELADO') ORDER BY id_reembolso`, trIds);
+    if (trIds.length) [refunds] = await c.execute(`SELECT id_reembolso,id_transaccion,id_externo,estado,estado_proveedor,monto_centavos,moneda,ambiente,aplicado_en,capital_revertido_centavos,recargo_revertido_centavos,DATE_FORMAT(fecha_contable,'%Y-%m-%d') fecha_contable FROM REEMBOLSO_RECURRENTE
+      WHERE id_transaccion IN (${placeholders(trIds)}) ORDER BY id_reembolso`, trIds);
+    if(trIds.length) [attempts]=await c.execute(`SELECT id_intento,id_transaccion,id_externo,id_pago_externo,estado,id_evento,
+      monto_centavos,moneda,fecha_proveedor_original FROM INTENTO_RECURRENTE WHERE id_transaccion IN (${placeholders(trIds)}) ORDER BY id_intento`,trIds);
     for (const op of operations) {
       op.events = events.filter(e => Number(e.id_checkout) === op.checkout.id_checkout || [op.intent?.id_externo, op.intent?.id_pago_externo].includes(e.id_operacion_externa));
       op.refunds = refunds.filter(r => Number(r.id_transaccion) === op.intent?.id_transaccion);
+      op.attempts = attempts.filter(r=>Number(r.id_transaccion)===op.intent?.id_transaccion);
     }
     await c.commit(); return { operations, complete };
   } catch (e) { await c.rollback().catch(() => {}); throw e; }
@@ -127,7 +133,7 @@ function publicOperation(op, observation = {}, decision = compareOperation(op)) 
   return { clave: op.key, id_transaccion: op.intent?.id_transaccion ?? null, id_checkout: op.checkout.id_checkout,
     id_cuota: op.checkout.id_cuota, id_pago: op.payment?.id_pago ?? null, id_residente: op.residentId,
     residente: op.residentName, unidad: op.unit, concepto: op.concept, referencia_local: op.checkout.referencia_local,
-    numero_comprobante: op.payment && op.intent?.estado === 'CONFIRMADA' ? `NXR-${String(op.payment.id_pago).padStart(8, '0')}` : null,
+    numero_comprobante: op.payment && ['CONFIRMADA','REEMBOLSADA_PARCIAL','REEMBOLSADA'].includes(op.intent?.estado) ? `NXR-${String(op.payment.id_pago).padStart(8, '0')}` : null,
     fecha_operacion: date, sin_fecha_verificable: date === null, ...decision,
     interno: { intent_id: op.intent?.id_externo ?? null, checkout_id: op.checkout.id_externo, pago_externo: op.intent?.id_pago_externo ?? null,
       estado_transaccion: op.intent?.estado ?? null, estado_checkout: op.checkout.estado, estado_proveedor: op.checkout.estado_proveedor,
@@ -140,6 +146,10 @@ function publicOperation(op, observation = {}, decision = compareOperation(op)) 
       fecha_original: observation.intent?.createdAt ?? observation.checkout?.createdAt ?? null,
       motivo_codigo: observation.intent?.reason?.code ?? null, motivo: observation.intent?.reason?.message ?? null } : null,
     saldo_actual_centavos: toCents(op.balance.saldo), sobrepago_centavos: toCents(op.balance.sobrepago),
+    cobertura_reembolsos: { completa: false, motivo: 'SIN_LISTADO_AUTORITATIVO_DE_REEMBOLSOS' },
+    intentos: op.attempts || [],
+    reembolsos: op.refunds, devuelto_centavos: op.refunds.filter(r=>r.estado==='CONFIRMADO'&&r.aplicado_en).reduce((n,r)=>n+Number(r.monto_centavos),0),
+    abono_neto_centavos: op.intent ? Number(op.intent.monto_centavos)-op.refunds.filter(r=>r.estado==='CONFIRMADO'&&r.aplicado_en).reduce((n,r)=>n+Number(r.monto_centavos),0) : null,
     eventos: op.events.map(e => ({ id: Number(e.id_evento), svix_id: e.svix_id, tipo: e.tipo_evento, estado: e.estado, intentos: e.intentos, codigo: e.error_codigo })),
   };
 }
@@ -185,6 +195,11 @@ function createReconciliationService({ load = loadCatalog, client = createRecurr
             o.resource = 'intent'; o.reference = op.intent.id_externo;
             o.intent = await share(`${key}:intent:${op.intent.id_externo}`, () => session.getIntent(op.intent.id_externo));
           }
+          o.refunds=[];
+          for (const r of op.refunds) if(r.id_externo) {
+            o.resource='refund';o.reference=r.id_externo;
+            o.refunds.push(await share(`${key}:refund:${r.id_externo}`,()=>session.getRefund(r.id_externo)));
+          }
         } catch (e) { o.error = ERROR_CODES.includes(e.code) ? e.code : 'PROVEEDOR_NO_DISPONIBLE'; }
         observations.set(op.key, o);
       }
@@ -205,7 +220,7 @@ function createReconciliationService({ load = loadCatalog, client = createRecurr
             knownOperations.push(...batch.operations); knownComplete = knownComplete && batch.complete;
           }
           const allKnown = { operations: knownOperations, complete: knownComplete };
-          const knownIntent = new Set(allKnown.operations.map(op => op.intent?.id_externo));
+          const knownIntent = new Set(allKnown.operations.flatMap(op => [op.intent?.id_externo,...(op.attempts||[]).map(a=>a.id_externo)]));
           const knownCheckout = new Set(allKnown.operations.map(op => op.checkout.id_externo));
           candidates = [...intents.records.filter(v => v.type === 'payment' && !knownIntent.has(v.id)).map(v => ({ tipo: 'intent', id_externo: v.id, checkout_id: v.checkout?.id ?? null, estado: v.status, monto_centavos: v.amount, moneda: v.currency, fecha_operacion: officialDate(v.createdAt) })),
             ...checkouts.records.filter(v => !knownCheckout.has(v.id)).map(v => ({ tipo: 'checkout', id_externo: v.id, checkout_id: v.id, estado: v.status, monto_centavos: v.amount, moneda: v.currency, fecha_operacion: officialDate(v.createdAt) }))]

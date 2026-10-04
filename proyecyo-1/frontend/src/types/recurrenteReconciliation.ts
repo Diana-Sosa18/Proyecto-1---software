@@ -12,6 +12,8 @@ export type ReconciliationOperation = {
     estado_checkout: string | null; monto_centavos: number | null; moneda: string | null; ambiente: string | null; fecha_original: string | null;
     motivo_codigo: string | null; motivo: string | null } | null;
   saldo_actual_centavos: number; sobrepago_centavos: number;
+  cobertura_reembolsos?: { completa: boolean; motivo: string }; devuelto_centavos?: number; abono_neto_centavos?: number | null;
+  reembolsos?: {id_reembolso:number;id_externo:string|null;estado:string;monto_centavos:number}[];
   eventos: { id: number; svix_id: string; tipo: string; estado: string; intentos: number; codigo: string | null }[];
 };
 export type ReconciliationResponse = {

@@ -46,6 +46,9 @@ async function main() {
       const migrations = require("../src/database/recurrenteMigration");
       await migrations.applyRecurrentePreparation(c); await migrations.applyRecurrenteCheckoutMigration(c);
       await migrations.applyRecurrenteConfirmationMigration(c); await migrations.applyRecurrenteAttemptsMigration(c);
+      await migrations.applyRecurrenteRefundsMigration(c);
+      await migrations.applyRecurrenteIntentHistoryMigration(c);
+      await migrations.applyRecurrenteReviewPrecisionMigration(c);
     } finally { c.release(); }
     const quotaId = await seedManualQuota(db.pool);
     const server = require("../src/app").createApp().listen(3100, "127.0.0.1");

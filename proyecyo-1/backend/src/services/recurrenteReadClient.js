@@ -1,6 +1,7 @@
 const { API_BASE, getCheckoutConfig } = require('../config/recurrenteCheckout');
 const { paymentTime } = require('./recurrenteWebhookPayload');
 const { failureReason } = require('./recurrenteAttemptPayload');
+const { normalizeRefund } = require('./recurrenteRefundContract');
 
 const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const id = (v, prefix) => typeof v === 'string' && new RegExp(`^${prefix}_[A-Za-z0-9_-]{1,180}$`).test(v);
@@ -135,6 +136,9 @@ function createRecurrenteReadClient({ fetchImpl = (...args) => globalThis.fetch(
       return { context,
         async getIntent(externalId) { if (!id(externalId, 'in')) throw new VerificationError('REFERENCIA_INVALIDA'); return intent((await request(config, `${API_BASE}/intents/${externalId}`)).data); },
         async getCheckout(externalId) { if (!id(externalId, 'ch')) throw new VerificationError('REFERENCIA_INVALIDA'); return checkout((await request(config, `${API_BASE}/checkouts/${externalId}`)).data); },
+        async getRefund(externalId) { if (!id(externalId, 're')) throw new VerificationError('REFERENCIA_INVALIDA');
+          try { return normalizeRefund((await request(config, `${API_BASE}/refunds/${externalId}`)).data, paymentTime); }
+          catch (e) { throw e instanceof VerificationError ? e : new VerificationError('RESPUESTA_INVALIDA'); } },
         discoverIntents: (from, until) => list('intents', from, until),
         discoverCheckouts: (from, until) => list('checkouts', from, until),
       };

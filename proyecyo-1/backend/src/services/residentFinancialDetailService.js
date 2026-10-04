@@ -1,5 +1,5 @@
 const { query } = require("../database/mysql");
-const { calculateBalance, balanceDetails, sumMoney } = require("./financialBalance");
+const { calculateBalance, balanceDetails, sumMoney, refundedQuotaSql } = require("./financialBalance");
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -37,7 +37,7 @@ function mapCharge(row) {
     saldo: balance.saldo,
     ...balanceDetails(balance),
     fecha_limite: row.fecha_limite,
-    estado: balance.saldo === 0 ? "PAGADO" : pagado > 0 ? "PARCIAL" : "PENDIENTE",
+    estado: balance.saldo === 0 ? "PAGADO" : balance.abono_neto > 0 ? "PARCIAL" : "PENDIENTE",
   };
 }
 
@@ -103,6 +103,7 @@ async function getFinancialDetail(userId, filters = {}) {
         cu.monto,
         DATE_FORMAT(cu.fecha_limite, '%Y-%m-%d') AS fecha_limite,
         COALESCE(pagos.total_pagado, 0) AS pagado,
+        ${refundedQuotaSql("cu.id_cuota")} AS total_reembolsado,
         COALESCE(rec.monto_recargo, 0) AS recargo
       FROM CUOTA cu
       INNER JOIN SERVICIO srv ON srv.id_servicio = cu.id_servicio
@@ -176,6 +177,12 @@ async function getFinancialDetail(userId, filters = {}) {
     paymentParams,
   );
 
+  const refundWhere=["cu.id_casa=?","rr.estado='CONFIRMADO'","rr.aplicado_en IS NOT NULL"], refundParams=[house.id_casa];
+  if(desde){refundWhere.push('rr.fecha_contable>=?');refundParams.push(desde);} if(hasta){refundWhere.push('rr.fecha_contable<=?');refundParams.push(hasta);}
+  const reembolsos=await query(`SELECT rr.id_reembolso,tr.id_pago,tr.id_cuota,rr.monto_centavos,
+    DATE_FORMAT(rr.fecha_contable,'%Y-%m-%d') fecha_reembolso,srv.nombre servicio FROM REEMBOLSO_RECURRENTE rr
+    JOIN TRANSACCION_RECURRENTE tr ON tr.id_transaccion=rr.id_transaccion JOIN CUOTA cu ON cu.id_cuota=tr.id_cuota
+    JOIN SERVICIO srv ON srv.id_servicio=cu.id_servicio WHERE ${refundWhere.join(' AND ')} ORDER BY rr.fecha_contable DESC,rr.id_reembolso DESC`,refundParams);
   const cargos = charges.map(mapCharge);
   const recargos = surcharges.map(mapSurcharge);
   const pagos = payments.map(mapPayment);
@@ -194,6 +201,8 @@ async function getFinancialDetail(userId, filters = {}) {
       total_cargos: Number(totalCargos.toFixed(2)),
       total_recargos: Number(totalRecargos.toFixed(2)),
       total_pagado: Number(totalPagado.toFixed(2)),
+      total_reembolsado: sumMoney(cargos.map(c=>c.reembolsado)), abono_neto: sumMoney(cargos.map(c=>c.abono_neto)),
+      total_devuelto_periodo: sumMoney(reembolsos.map(r=>Number(r.monto_centavos)/100)),
       saldo_pendiente: sumMoney(cargos.map((item) => item.saldo)),
       total_pagado_periodo: sumMoney(pagos.map((item) => item.monto_pagado)),
       sobrepago: sumMoney(cargos.map((item) => item.sobrepago)),
@@ -201,7 +210,7 @@ async function getFinancialDetail(userId, filters = {}) {
     },
     cargos,
     recargos,
-    pagos,
+    pagos, reembolsos,
   };
 }
 

@@ -4,6 +4,7 @@ export interface FinancialReview {
   requiere_revision?: boolean;
 }
 export interface FinancialBalanceDetails extends FinancialReview {
+  cobrado_bruto?: number; reembolsado?: number; abono_neto?: number;
   capital_pendiente?: number;
   recargo_pendiente?: number;
 }

@@ -69,6 +69,9 @@ export function AdminRecurrenteReconciliationView() {
             {op.diferencias.length > 0 && <ul>{op.diferencias.map((d,i) => <li key={i}>{d.campo}: interno {text(d.interno)} / externo {text(d.externo)}</li>)}</ul>}
             {op.faltantes.length > 0 && <p>Datos faltantes: {op.faltantes.join(', ')}</p>}
             {op.externo?.motivo && <p>Motivo del intento: {op.externo.motivo} ({op.externo.motivo_codigo})</p>}
+            {op.cobertura_reembolsos && <p>Cobertura de reembolsos incompleta: solo se verifican referencias conocidas; no se demuestra ausencia de reembolsos externos.</p>}
+            {(op.reembolsos?.length || 0)>0 && <p>Devuelto: {money(op.devuelto_centavos || 0,"GTQ")} · Abono neto: {money(op.abono_neto_centavos ?? null,"GTQ")}</p>}
+            {op.id_transaccion && <a className="underline" href={`/admin/pagos/reembolsos?transaccion=${op.id_transaccion}`}>Consultar reembolsos</a>}
             <p>Eventos recibidos: {op.eventos.length}</p>
           </div></details></td></tr>)}
           {data.operaciones.length === 0 && <tr><td className="p-4" colSpan={6}>Sin operaciones para la selección.</td></tr>}

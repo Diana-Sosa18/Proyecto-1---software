@@ -67,3 +67,13 @@ it("Actualizar estado consulta solamente el backend y actualiza su decisión", a
   fireEvent.click(screen.getByRole("button", { name: "Actualizar estado" })); await screen.findByText("Pago confirmado por el servidor");
   expect(retryResidentCheckoutRequest).not.toHaveBeenCalled(); expect(redirectToRecurrente).not.toHaveBeenCalled();
 });
+it('evidencia posterior en revisión muestra verificación, sin afirmar fallo ni ofrecer cobro',async()=>{
+  vi.mocked(getResidentCheckoutStatusRequest).mockResolvedValue({...status('INCIERTO','NINGUNA'),
+    mensaje:'Recibimos información adicional del proveedor y estamos verificando el resultado. No intentes pagar nuevamente.'});
+  mount();await screen.findByText('Pago en verificación');
+  expect(screen.getByText(/No intentes pagar nuevamente/)).toBeInTheDocument();
+  expect(screen.queryByText('Pago no completado')).not.toBeInTheDocument();
+  expect(screen.queryByText('Pago confirmado por el servidor')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button',{name:/Reintentar|continuar/})).not.toBeInTheDocument();
+  expect(retryResidentCheckoutRequest).not.toHaveBeenCalled();expect(redirectToRecurrente).not.toHaveBeenCalled();
+});

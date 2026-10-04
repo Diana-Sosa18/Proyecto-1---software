@@ -79,6 +79,7 @@ test("mapQuota marks rent and converts monetary fields", () => {
     monto_pagado: 500,
     saldo_pendiente: 1700,
     capital_pendiente: 1700, recargo_pendiente: 0, sobrepago: 0, requiere_revision: false,
+    cobrado_bruto: 500, reembolsado: 0, abono_neto: 500,
     fecha_limite: "2026-08-31",
     ultimo_pago: "2026-08-05",
     estado: "PENDIENTE",

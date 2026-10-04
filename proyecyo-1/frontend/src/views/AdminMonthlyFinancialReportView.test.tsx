@@ -18,5 +18,5 @@ it("distingue movimientos mensuales de saldos acumulados y muestra sobrepagos", 
   expect(await screen.findByText("Movimientos del mes")).toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent("sobrepago");
   expect(screen.getByText(/Pago #7/)).toHaveTextContent("2026-08-10");
-  expect(screen.getByText(/Los saldos y abonos/)).toBeInTheDocument();
+  expect(screen.getByText(/Los saldos de las cuotas son actuales/)).toBeInTheDocument();
 });

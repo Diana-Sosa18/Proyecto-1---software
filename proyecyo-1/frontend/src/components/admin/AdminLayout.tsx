@@ -72,6 +72,7 @@ const adminMenuItems: AdminMenuItem[] = [
     to: "/admin/pagos",
     end: true,
   },
+  { label: "Reembolsos de pagos", icon: Wallet, to: "/admin/pagos/reembolsos" },
   { label: "Conciliación de pagos", icon: Wallet, to: "/admin/pagos/conciliacion" },
   {
     label: "Recordatorios",

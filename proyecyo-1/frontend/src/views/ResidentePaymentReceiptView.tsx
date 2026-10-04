@@ -40,6 +40,7 @@ export function ResidentePaymentReceiptView() {
     ["Monto", `Q${receipt.monto_pagado.toFixed(2)}`], ["Moneda", receipt.moneda],
     ["Proveedor", receipt.proveedor], ["Residente / titular", receipt.titular_nombre], ["Unidad", receipt.unidad],
     ...(receipt.referencia_transaccion ? [["Referencia de transacción", receipt.referencia_transaccion]] : []),
+    ...(receipt.reembolso_posterior ? [["Reembolso posterior", "Reembolsado"], ["Monto devuelto", `Q${(receipt.reembolsado || 0).toFixed(2)}`], ["Abono neto actual", `Q${(receipt.abono_neto || 0).toFixed(2)}`]] : []),
     ["Referencia interna", `Pago ${receipt.id_pago}${receipt.id_transaccion ? ` · Transacción ${receipt.id_transaccion} · Checkout ${receipt.id_checkout}` : ""}`],
   ] : [];
   return <AppShell role="residente" title="Comprobante de pago" subtitle="Pago registrado por NexusResidencial.">

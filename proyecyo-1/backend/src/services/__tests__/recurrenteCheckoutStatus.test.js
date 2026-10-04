@@ -32,3 +32,7 @@ test("checkout anterior terminal no ofrece retry si hay otra operación bloquean
 test("saldo bajo Q5 no ofrece un cobro aumentado", () => {
   expect(checkoutStatus(local, null, { saldo: 4 })).toMatchObject({ estado: "NO_COMPLETADO", accion: "NINGUNA" });
 });
+test('éxito en revisión prevalece sobre intento fallido y no ofrece retry',()=>{
+  expect(checkoutStatus(local,{resultado_intento:'FALLIDA',motivo_codigo:'INTENT_FAILED'},balance,false,false,true))
+    .toMatchObject({estado:'INCIERTO',accion:'NINGUNA',mensaje:expect.stringContaining('No intentes pagar nuevamente')});
+});

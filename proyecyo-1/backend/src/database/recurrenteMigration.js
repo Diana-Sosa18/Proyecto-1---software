@@ -4,6 +4,9 @@ const MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/001_recurre
 const CHECKOUT_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/002_recurrente_checkout.sql");
 const CONFIRMATION_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/003_recurrente_confirmation.sql");
 const ATTEMPTS_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/004_recurrente_attempts.sql");
+const REFUNDS_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/005_recurrente_refunds.sql");
+const INTENT_HISTORY_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/006_recurrente_intent_history.sql");
+const REVIEW_PRECISION_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/007_recurrente_review_precision.sql");
 function migrationStatements(file = MIGRATION_PATH) {
   // This migration contains plain SQL, without procedures or semicolons in literals.
   return fs.readFileSync(file, "utf8").replace(/^\s*--.*$/gm, "")
@@ -24,5 +27,8 @@ const applyRecurrentePreparation = (connection) => applyMigration(connection, MI
 const applyRecurrenteCheckoutMigration = (connection) => applyMigration(connection, CHECKOUT_MIGRATION_PATH, "nexus_recurrente_hu13");
 const applyRecurrenteConfirmationMigration = (connection) => applyMigration(connection, CONFIRMATION_MIGRATION_PATH, "nexus_recurrente_hu14");
 const applyRecurrenteAttemptsMigration = (connection) => applyMigration(connection, ATTEMPTS_MIGRATION_PATH, "nexus_recurrente_hu15");
-module.exports = { applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration, applyRecurrenteAttemptsMigration,
+const applyRecurrenteRefundsMigration = (connection) => applyMigration(connection, REFUNDS_MIGRATION_PATH, "nexus_recurrente_hu18");
+const applyRecurrenteIntentHistoryMigration = (connection) => applyMigration(connection, INTENT_HISTORY_MIGRATION_PATH, "nexus_recurrente_intent_history");
+const applyRecurrenteReviewPrecisionMigration = (connection) => applyMigration(connection, REVIEW_PRECISION_MIGRATION_PATH, "nexus_recurrente_review_precision");
+module.exports = { applyRecurrenteReviewPrecisionMigration, REVIEW_PRECISION_MIGRATION_PATH, applyRecurrenteIntentHistoryMigration, INTENT_HISTORY_MIGRATION_PATH, applyRecurrenteRefundsMigration, REFUNDS_MIGRATION_PATH, applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration, applyRecurrenteAttemptsMigration,
   migrationStatements, MIGRATION_PATH, CHECKOUT_MIGRATION_PATH, CONFIRMATION_MIGRATION_PATH, ATTEMPTS_MIGRATION_PATH };

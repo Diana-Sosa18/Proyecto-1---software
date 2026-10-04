@@ -9,7 +9,7 @@ import type { RecurrenteCheckoutStatus } from "@/types/recurrenteCheckout";
 const titles: Record<RecurrenteCheckoutStatus["estado"], string> = {
   PENDIENTE: "Tu pago está pendiente de verificación", CONFIRMADO: "Pago confirmado por el servidor",
   CUOTA_PAGADA: "Cuota sin saldo pendiente", RECHAZADO: "Pago rechazado", FALLIDO: "Pago no completado",
-  CANCELADO: "Intento de pago cancelado", INCIERTO: "Operación pendiente de verificación", NO_COMPLETADO: "Pago no completado",
+  CANCELADO: "Intento de pago cancelado", INCIERTO: "Pago en verificación", NO_COMPLETADO: "Pago no completado",
 };
 
 export function ResidentePaymentReturnView() {

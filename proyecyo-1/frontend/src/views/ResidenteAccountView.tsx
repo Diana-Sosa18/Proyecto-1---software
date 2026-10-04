@@ -89,7 +89,7 @@ function getProgress(quota: AccountQuota) {
     return 0;
   }
 
-  return Math.min(100, Math.round((quota.monto_pagado / quota.monto) * 100));
+  return Math.min(100, Math.round(((quota.abono_neto ?? quota.monto_pagado) / quota.monto) * 100));
 }
 
 export function ResidenteAccountView() {
@@ -342,6 +342,7 @@ export function ResidenteAccountView() {
                       </td>
                       <td className="px-5 py-4 text-sm text-slate-600">
                         {formatCurrency(quota.monto_pagado)}
+                        {(quota.reembolsado || 0)>0 && <p>Devuelto {formatCurrency(quota.reembolsado || 0)} ? Neto {formatCurrency(quota.abono_neto || 0)}</p>}
                         <p className="mt-1 text-xs text-slate-400">
                           {quota.ultimo_pago ? `Ultimo pago ${formatDate(quota.ultimo_pago)}` : "Sin pagos"}
                         </p>

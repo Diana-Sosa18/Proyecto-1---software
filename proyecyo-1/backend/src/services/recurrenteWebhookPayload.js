@@ -65,6 +65,9 @@ function paymentTime(value) {
 }
 
 function inspectEvent(payload, sandboxId) {
+  if (payload.event_type === 'refund.create') {
+    return require('./recurrenteRefundContract').inspectRefund(payload, sandboxId, paymentTime);
+  }
   const eventType = typeof payload.event_type === "string" && /^[a-z0-9_.-]{1,100}$/.test(payload.event_type)
     ? payload.event_type : "invalid";
   const checkout = object(payload.checkout) ? payload.checkout : null;
@@ -119,6 +122,7 @@ function inspectEvent(payload, sandboxId) {
   const reference = checkout?.metadata?.nexus_checkout_reference;
   if (reference !== undefined && (typeof reference !== "string" || !/^[a-f0-9-]{36}$/i.test(reference))) code = "WEBHOOK_REFERENCE_MISMATCH";
   return { ...info, externalId: canonicalId, disposition: code ? "REVISION" : "PAYMENT", code, checkoutId,
+    checkoutStatus: checkout?.status, latestIntentId: externalId(latest?.id),
     amount: payload.amount_in_cents, currency: payload.currency, time,
     paymentId, reference };
 }

@@ -7,7 +7,7 @@ export interface AccountSummary extends FinancialReview {
   cuotas_pendientes: number;
   cuotas_vencidas: number;
   saldo_pendiente: number;
-  total_pagado: number;
+  total_pagado: number; total_reembolsado?: number; abono_neto?: number;
   proximo_vencimiento: string | null;
   actualizado_en: string;
 }

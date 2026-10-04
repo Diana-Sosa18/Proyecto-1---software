@@ -169,7 +169,7 @@ async function getMonthlyFinancialReport(monthValue, yearValue) {
     `SELECT c.id_casa, CONCAT(COALESCE(c.torre, ''), IF(c.torre IS NULL OR c.torre = '', '', '-'), c.numero) AS unidad,
             u.nombre AS usuario, s.nombre AS concepto, cu.monto,
             DATE_FORMAT(cu.fecha_limite, '%Y-%m-%d') AS fecha_limite,
-            cu.total_pagado AS pagado, cu.recargo
+            cu.total_pagado AS pagado, cu.total_reembolsado, cu.recargo
        FROM (${QUOTA_BALANCES_SQL}) cu INNER JOIN CASA c ON c.id_casa = cu.id_casa
        INNER JOIN RESIDENTE r ON r.id_residente = c.id_residente INNER JOIN USUARIO u ON u.id_usuario = r.id_usuario
        INNER JOIN SERVICIO s ON s.id_servicio = cu.id_servicio
@@ -183,6 +183,12 @@ async function getMonthlyFinancialReport(monthValue, yearValue) {
      WHERE p.fecha_pago >= ? AND p.fecha_pago < DATE_ADD(?, INTERVAL 1 MONTH)
      ORDER BY p.fecha_pago, p.id_pago`, [period.from, period.from],
   );
+  const reembolsos = await query(`SELECT rr.id_reembolso,tr.id_pago,tr.id_cuota,rr.monto_centavos,
+    DATE_FORMAT(rr.fecha_contable,'%Y-%m-%d') fecha_reembolso FROM REEMBOLSO_RECURRENTE rr
+    JOIN TRANSACCION_RECURRENTE tr ON tr.id_transaccion=rr.id_transaccion
+    WHERE rr.estado='CONFIRMADO' AND rr.aplicado_en IS NOT NULL AND rr.fecha_contable>=?
+    AND rr.fecha_contable<DATE_ADD(?,INTERVAL 1 MONTH) ORDER BY rr.fecha_contable,rr.id_reembolso`,[period.from,period.from]);
+  const devueltoPeriodo = sumMoney(reembolsos.map(r=>Number(r.monto_centavos)/100));
   const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guatemala" }).format(new Date());
   const detalle = rows.map((row) => { const balance = calculateBalance(row); return {
     ...row, id_casa: Number(row.id_casa), monto: balance.monto, recargo: balance.recargo, pagado: balance.pagado,
@@ -192,12 +198,13 @@ async function getMonthlyFinancialReport(monthValue, yearValue) {
   const pagos = paymentRows.map((row) => ({ ...row, id_pago: Number(row.id_pago), id_cuota: Number(row.id_cuota),
     id_casa: Number(row.id_casa), monto_pagado: Number(row.monto_pagado) }));
   return { periodo: { mes: period.month, anio: period.year }, resumen: {
+    total_devuelto_periodo: devueltoPeriodo, cobrado_neto_periodo: (pagos.reduce((n,p)=>n+Math.round(p.monto_pagado*100),0)-Math.round(devueltoPeriodo*100))/100,
     total_cobrado: sumMoney(pagos.map((i) => i.monto_pagado)), total_pendiente: sumMoney(detalle.map((i) => i.pendiente)),
     total_mora: sumMoney(detalle.filter((i) => i.estado === "MOROSO").map((i) => i.pendiente)),
     cantidad_pagos: pagos.length,
     sobrepago: sumMoney(detalle.map((i) => i.sobrepago)), requiere_revision: detalle.some((i) => i.requiere_revision),
     usuarios_morosos: new Set(detalle.filter((i) => i.estado === "MOROSO").map((i) => i.id_casa)).size,
-  }, detalle, pagos };
+  }, detalle, pagos, reembolsos };
 }
 
 module.exports = {

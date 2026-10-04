@@ -285,8 +285,13 @@ if (process.env.RUN_PHASE0_MYSQL_TESTS !== "1") {
       assert.doesNotMatch(content, /RECURRENTE_SECRET_KEY|RECURRENTE_WEBHOOK_SECRET|whsec_|X-SECRET-KEY/i);
       const { validateBackupPayload, verifyRestoredReferences } = require("../../src/services/restoresService");
       const validation = validateBackupPayload({ filename: "fixture.sql", content });
-      for (const table of FINANCIAL_TABLES) assert(validation.tables.includes(table), table);
       const expectedRows = new Map(await Promise.all(BACKUP_TABLES.map(async (table) => [table, await snapshot(table)])));
+      // An empty append-only audit table has no INSERT to export. The dedicated
+      // recovery suite exercises its populated round trip; keep exact row counts here.
+      for (const table of FINANCIAL_TABLES) {
+        assert(BACKUP_TABLES.includes(table),table);
+        assert.equal(validation.tables.includes(table),expectedRows.get(table).length>0,table);
+      }
       const expectedStatements = [...expectedRows.values()].reduce((total, rows) => total + rows.length, 0);
       assert.equal(validation.statements.length, expectedStatements, "Exportar exactamente cada registro esperado, sin omisiones");
       for (const [table, rows] of expectedRows) if (rows.length) assert(validation.tables.includes(table), table);

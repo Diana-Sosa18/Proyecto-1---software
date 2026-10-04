@@ -34,7 +34,6 @@ function compareOperation(local, observation = {}) {
   match('asociacion.residente', Number(co.id_residente), Number(local.residentId));
   match('asociacion.usuario', Number(co.id_usuario), Number(local.residentUserId));
   match('asociacion.casa', Number(co.id_casa), Number(local.quotaHouseId));
-  if (local.refunds.length || tr?.estado.startsWith('REEMBOLSADA')) return result('PENDIENTE', 'REEMBOLSO_REQUIERE_HU18');
   if (!tr) {
     if (external.status === 'paid') differences.push({ codigo: 'PAGO_LOCAL_AUSENTE', campo: 'PAGO', interno: null, externo: 'paid' });
     if (differences.length) return result('DIFERENCIA');
@@ -61,7 +60,9 @@ function compareOperation(local, observation = {}) {
     match('intent.timestamp', paymentTime(tr.fecha_proveedor_original)?.utc, paymentTime(remote.createdAt)?.utc);
   }
   if (!remote.status) missing.push('intent.estado');
-  const expected = { succeeded: 'CONFIRMADA', failed: 'FALLIDA', canceled: 'CANCELADA', pending: 'PENDIENTE' }[remote.status];
+  const returned = local.refunds.filter(r => r.estado === 'CONFIRMADO' && r.aplicado_en).reduce((n,r)=>n+Number(r.monto_centavos),0);
+  const aggregate = returned === Number(tr.monto_centavos) && returned > 0 ? 'REEMBOLSADA' : returned > 0 ? 'REEMBOLSADA_PARCIAL' : 'CONFIRMADA';
+  const expected = { succeeded: aggregate, failed: 'FALLIDA', canceled: 'CANCELADA', pending: 'PENDIENTE' }[remote.status];
   if (expected) match('transaccion.estado', tr.estado, expected);
   if (remote.status === 'succeeded') {
     match('checkout.pagado', 'paid', external.status);
@@ -84,6 +85,31 @@ function compareOperation(local, observation = {}) {
       differences.push({ codigo: 'INTENTO_NEGATIVO_CON_APLICACION', campo: 'PAGO', interno: tr.id_pago ?? 'aplicacion', externo: null });
     }
   } else if (remote.status && (tr.id_pago || pg)) differences.push({ codigo: 'PAGO_SIN_EXITO_EXTERNO', campo: 'PAGO', interno: tr.id_pago, externo: remote.status });
+  for (const refund of local.refunds) {
+    if (!refund.estado || !Number.isSafeInteger(Number(refund.monto_centavos))) { missing.push('refund.registro_incompleto'); continue; }
+    if (!refund.id_externo) {
+      if (['SOLICITADO','PENDIENTE','INCIERTO','REVISION','CONFIRMADO'].includes(refund.estado)) missing.push(`refund.${refund.id_reembolso}.referencia`);
+      continue;
+    }
+    const seen = observation.refunds?.find(r=>r.id===refund.id_externo);
+    if (!seen) { missing.push(`refund.${refund.id_reembolso}.evidencia`); continue; }
+    match(`refund.${refund.id_reembolso}.id`,refund.id_externo,seen.id);
+    match(`refund.${refund.id_reembolso}.moneda`,refund.moneda,seen.currency);
+    match(`refund.${refund.id_reembolso}.monto_cliente`,Number(refund.monto_centavos),seen.amount);
+    if (seen.accountId != null) match(`refund.${refund.id_reembolso}.cuenta`,context?.accountId,seen.accountId);
+    const refundState={succeeded:'CONFIRMADO',failed:'FALLIDO',pending:'PENDIENTE'}[seen.status];
+    if (refundState) match(`refund.${refund.id_reembolso}.estado`,refund.estado,refundState);
+    else missing.push(`refund.${refund.id_reembolso}.estado_no_soportado`);
+    if (refund.estado==='CONFIRMADO' && (!refund.aplicado_en || !refund.fecha_contable)) missing.push(`refund.${refund.id_reembolso}.aplicacion`);
+    if (refund.estado==='CONFIRMADO' && refund.aplicado_en) {
+      match(`refund.${refund.id_reembolso}.capital_recargo`,Number(refund.monto_centavos),Number(refund.capital_revertido_centavos)+Number(refund.recargo_revertido_centavos));
+      if (!seen.time) missing.push(`refund.${refund.id_reembolso}.fecha_proveedor`);
+    }
+    if (refund.fecha_contable && seen.time) match(`refund.${refund.id_reembolso}.fecha`,refund.fecha_contable,seen.time.accountingDate);
+    if (refund.estado==='REVISION' || refund.estado==='INCIERTO' || refund.estado==='PENDIENTE') missing.push(`refund.${refund.id_reembolso}.resolucion`);
+  }
+  if (returned > Number(tr.monto_centavos)) differences.push({codigo:'EXCESO_REEMBOLSO',campo:'reembolsos.total',interno:returned,externo:Number(tr.monto_centavos)});
+  if (local.events?.some(e=>e.tipo_evento==='refund.create' && e.estado==='REVISION')) missing.push('refund.externo_en_revision');
   if (differences.length) return result('DIFERENCIA');
   if (missing.length) return result('PENDIENTE', 'EVIDENCIA_INCOMPLETA');
   if (remote.status === 'pending' || external.status === 'payment_in_progress') return result('PENDIENTE', 'OPERACION_EN_PROGRESO');

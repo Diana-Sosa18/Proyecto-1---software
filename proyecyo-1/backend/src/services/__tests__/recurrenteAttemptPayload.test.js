@@ -40,9 +40,12 @@ test("sin fecha de proveedor no se inventa fecha contable ni hora del servidor",
   const p = attemptPayload(); delete p.created_at;
   expect(inspectEvent(p, TEST_SANDBOX)).toMatchObject({ disposition: "ATTEMPT", time: null });
 });
-test.each(["payment_intent.canceled", "payment_intent.cancelled", "refund.create", "unknown.event"])(
+test.each(["payment_intent.canceled", "payment_intent.cancelled", "unknown.event"])(
   "no inventa soporte para %s", (event_type) => expect(inspectEvent({ ...attemptPayload(), event_type }, TEST_SANDBOX).disposition).toBe("IGNORADO"),
 );
+test('refund.create se deriva a HU18 sin convertir un payload de intento en reembolso válido', () => {
+  expect(inspectEvent({ ...attemptPayload(), event_type: 'refund.create' }, TEST_SANDBOX)).toMatchObject({ disposition: 'REFUND', code: 'REFUND_ENVIRONMENT_UNPROVEN' });
+});
 test.each([
   ["El banco ha rechazado la transacción.", "BANK_DECLINED"], ["Insufficient funds", "INSUFFICIENT_FUNDS"],
   ["Timeout al procesar", "INTENT_FAILED"], [null, "INTENT_FAILED"], ["insufficient_funds", "INSUFFICIENT_FUNDS"],
