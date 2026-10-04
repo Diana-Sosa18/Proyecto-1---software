@@ -111,6 +111,8 @@ export function ResidenteFinancialDetailView() {
             ))}
           </div>
 
+          {(detail.resumen.total_reembolsado || 0)>0 && <p>Pagado bruto {formatCurrency(detail.resumen.total_pagado)} ? Devuelto {formatCurrency(detail.resumen.total_reembolsado || 0)} ? Abono neto {formatCurrency(detail.resumen.abono_neto || 0)}</p>}
+          {(detail.reembolsos || []).map(r=><p key={r.id_reembolso}>Reembolso #{r.id_reembolso} ? {r.servicio} ? {r.fecha_reembolso} ? Devuelto {formatCurrency(r.monto_centavos/100)}</p>)}
           <FinancialReviewNotice {...detail.resumen} />
           <p className="text-sm text-slate-500">Los totales incluyen todos los abonos confirmados. Las fechas filtran los movimientos de pagos y recargos.</p>
           <section className="rounded-xl border border-slate-200 bg-white">
@@ -140,7 +142,7 @@ export function ResidenteFinancialDetailView() {
                         <td className="px-5 py-3 text-sm text-slate-950">{cargo.servicio}</td>
                         <td className="px-5 py-3 text-sm text-slate-500">{formatCurrency(cargo.monto)}</td>
                         <td className="px-5 py-3 text-sm text-slate-500">{formatCurrency(cargo.recargo)}</td>
-                        <td className="px-5 py-3 text-sm text-slate-500">{formatCurrency(cargo.pagado)}</td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{formatCurrency(cargo.pagado)}{(cargo.reembolsado || 0)>0 && <p>Devuelto {formatCurrency(cargo.reembolsado || 0)} ? Neto {formatCurrency(cargo.abono_neto || 0)}</p>}</td>
                         <td className="px-5 py-3 text-sm text-slate-700">{formatCurrency(cargo.saldo)}</td>
                         <td className="px-5 py-3 text-sm text-slate-500">{cargo.fecha_limite}</td>
                         <td className="px-5 py-3">

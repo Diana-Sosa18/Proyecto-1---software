@@ -32,6 +32,7 @@ export interface FinancialPayment {
 }
 
 export interface FinancialSummary extends FinancialReview {
+  total_reembolsado?: number; abono_neto?: number; total_devuelto_periodo?: number;
   total_pagado_periodo?: number;
   total_cargos: number;
   total_recargos: number;
@@ -49,6 +50,7 @@ export interface FinancialDetail {
   cargos: FinancialCharge[];
   recargos: FinancialSurcharge[];
   pagos: FinancialPayment[];
+  reembolsos?: {id_reembolso:number;id_pago:number;id_cuota:number;monto_centavos:number;fecha_reembolso:string;servicio:string}[];
 }
 
 export interface FinancialDetailFilters {

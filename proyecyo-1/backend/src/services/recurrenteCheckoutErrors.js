@@ -1,4 +1,5 @@
 const ERRORS = {
+  CHECKOUT_REFUND_BLOCKED: [409, 'Esta cuota tiene un reembolso pendiente, incierto o en revisión. No admite otro cobro.'],
   INVALID_CHECKOUT_REFERENCE: [400, "La referencia del checkout no es válida."],
   CHECKOUT_NOT_FOUND: [404, "No se encontró un checkout asociado a tu usuario."],
   INVALID_QUOTA: [400, "Envía únicamente una identificación válida de la cuota."],

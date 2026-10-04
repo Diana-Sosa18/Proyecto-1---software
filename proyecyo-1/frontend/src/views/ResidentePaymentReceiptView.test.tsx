@@ -20,6 +20,13 @@ const mount = (id = "395") => render(<MemoryRouter initialEntries={[`/residente/
   <Route path="/residente/pagos/:paymentId/comprobante" element={<ResidentePaymentReceiptView />} />
   <Route path="/residente/estado-cuenta" element={<p>Estado de cuenta TEST</p>} />
 </Routes></MemoryRouter>);
+it("comprobante permanente muestra refund y neto cero conservando número, fecha y PDF", async () => {
+  vi.mocked(getResidentPaymentReceiptRequest).mockResolvedValue({ ...receipt, reembolsado: 5, abono_neto: 0, reembolso_posterior: true, estado_transaccion: 'REEMBOLSADA' });
+  mount(); await screen.findByText('Reembolsado');
+  expect(screen.getByText('NXR-00000395')).toBeInTheDocument(); expect(screen.getByText('2026-10-02')).toBeInTheDocument();
+  expect(screen.getAllByText('Q5.00')).toHaveLength(2); expect(screen.getByText('Q0.00')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Descargar PDF' })).toBeEnabled();
+});
 it("muestra carga y después los datos confirmados con Sandbox visible", async () => {
   let resolve!: (r: PaymentReceipt) => void; vi.mocked(getResidentPaymentReceiptRequest).mockReturnValue(new Promise((r) => { resolve = r; }));
   mount(); expect(screen.getByRole("status")).toHaveTextContent("Cargando comprobante"); expect(screen.queryByRole("button", { name: "Descargar PDF" })).not.toBeInTheDocument();

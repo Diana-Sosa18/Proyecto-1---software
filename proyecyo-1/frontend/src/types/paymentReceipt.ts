@@ -12,6 +12,7 @@ export interface PaymentReceipt {
   proveedor: string;
   origen: "RECURRENTE" | "SIMULADO" | "HISTORICO";
   ambiente: "sandbox" | "production" | "academic" | "historical";
+  reembolsado?: number; abono_neto?: number; reembolso_posterior?: boolean; estado_transaccion?: string;
   id_transaccion?: number;
   id_checkout?: number;
   referencia_transaccion?: string;

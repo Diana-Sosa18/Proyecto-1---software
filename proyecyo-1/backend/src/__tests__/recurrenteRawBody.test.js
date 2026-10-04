@@ -1,5 +1,9 @@
 jest.mock("../database/mysql", () => ({ query: jest.fn(), pool: {} }));
 jest.mock("../services/authService", () => ({ loginUser: jest.fn(), getCurrentSession: jest.fn() }));
+jest.mock("../config/recurrenteWebhook", () => {
+  const actual = jest.requireActual("../config/recurrenteWebhook");
+  return { ...actual, getWebhookConfig: () => actual.getWebhookConfig({ RECURRENTE_WEBHOOK_SECRET: "", RECURRENTE_SANDBOX_ID: "" }) };
+});
 const request = require("supertest");
 const zlib = require("node:zlib");
 const { createApp } = require("../app");

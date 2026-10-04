@@ -47,8 +47,9 @@ async function protectedSnapshot(source) {
   for (const [table, column, ids] of [["CUOTA", "id_cuota", "171,998"], ["PAGO", "id_cuota", "171,998"],
     ["PAGO_ORIGEN", "id_cuota", "171,998"], ["RECARGO_APLICADO", "id_cuota", "171,998"],
     ["CHECKOUT_RECURRENTE", "id_cuota", "171,998"], ["TRANSACCION_RECURRENTE", "id_cuota", "171,998"],
-    ["EVENTO_RECURRENTE", "id_evento", "348,349,859,860"]]) {
-    result[table] = (await source.query(`SELECT * FROM ${table} WHERE ${column} IN (${ids}) ORDER BY 1`))[0];
+    ["EVENTO_RECURRENTE", "id_evento", "348,349,859,860,1072,1073,1074,1075"]]) {
+    const protectedIds=column==='id_cuota' ? '171,998,1210' : ids;
+    result[table] = (await source.query(`SELECT * FROM ${table} WHERE ${column} IN (${protectedIds}) ORDER BY 1`))[0];
   }
   return result;
 }
@@ -56,11 +57,11 @@ async function protectedSnapshot(source) {
 async function copyReceiptEvidence(source, target, snapshot) {
   // Read the approved manual evidence; all writes go to the disposable copy.
   const dependencies = [
-    ["TIPO_USUARIO", "SELECT t.* FROM TIPO_USUARIO t JOIN USUARIO u ON u.id_tipo_usuario=t.id_tipo_usuario JOIN RESIDENTE r ON r.id_usuario=u.id_usuario JOIN CASA c ON c.id_residente=r.id_residente WHERE c.id_casa IN (SELECT id_casa FROM CUOTA WHERE id_cuota IN(171,998)) GROUP BY t.id_tipo_usuario"],
-    ["USUARIO", "SELECT u.* FROM USUARIO u JOIN RESIDENTE r ON r.id_usuario=u.id_usuario JOIN CASA c ON c.id_residente=r.id_residente WHERE c.id_casa IN (SELECT id_casa FROM CUOTA WHERE id_cuota IN(171,998)) GROUP BY u.id_usuario"],
-    ["RESIDENTE", "SELECT r.* FROM RESIDENTE r JOIN CASA c ON c.id_residente=r.id_residente WHERE c.id_casa IN (SELECT id_casa FROM CUOTA WHERE id_cuota IN(171,998)) GROUP BY r.id_residente"],
-    ["CASA", "SELECT * FROM CASA WHERE id_casa IN(SELECT id_casa FROM CUOTA WHERE id_cuota IN(171,998))"],
-    ["SERVICIO", "SELECT * FROM SERVICIO WHERE id_servicio IN(SELECT id_servicio FROM CUOTA WHERE id_cuota IN(171,998))"],
+    ["TIPO_USUARIO", "SELECT t.* FROM TIPO_USUARIO t JOIN USUARIO u ON u.id_tipo_usuario=t.id_tipo_usuario JOIN RESIDENTE r ON r.id_usuario=u.id_usuario JOIN CASA c ON c.id_residente=r.id_residente WHERE c.id_casa IN (SELECT id_casa FROM CUOTA WHERE id_cuota IN(171,998,1210)) GROUP BY t.id_tipo_usuario"],
+    ["USUARIO", "SELECT u.* FROM USUARIO u JOIN RESIDENTE r ON r.id_usuario=u.id_usuario JOIN CASA c ON c.id_residente=r.id_residente WHERE c.id_casa IN (SELECT id_casa FROM CUOTA WHERE id_cuota IN(171,998,1210)) GROUP BY u.id_usuario"],
+    ["RESIDENTE", "SELECT r.* FROM RESIDENTE r JOIN CASA c ON c.id_residente=r.id_residente WHERE c.id_casa IN (SELECT id_casa FROM CUOTA WHERE id_cuota IN(171,998,1210)) GROUP BY r.id_residente"],
+    ["CASA", "SELECT * FROM CASA WHERE id_casa IN(SELECT id_casa FROM CUOTA WHERE id_cuota IN(171,998,1210))"],
+    ["SERVICIO", "SELECT * FROM SERVICIO WHERE id_servicio IN(SELECT id_servicio FROM CUOTA WHERE id_cuota IN(171,998,1210))"],
   ];
   await target.beginTransaction();
   try {
@@ -78,7 +79,15 @@ async function copyReceiptEvidence(source, target, snapshot) {
 
 async function tableCounts(connection) {
   const { BACKUP_TABLES } = require("../../../src/database/backupTables");
-  return Object.fromEntries(await Promise.all(BACKUP_TABLES.map(async (table) => [table, Number((await connection.query(`SELECT COUNT(*) n FROM \`${table}\``))[0][0].n)])));
+  const entries=[];
+  for (const table of BACKUP_TABLES) {
+    try { entries.push([table,Number((await connection.query(`SELECT COUNT(*) n FROM \`${table}\``))[0][0].n)]); }
+    catch(error) {
+      if(error.code!=='ER_NO_SUCH_TABLE' || !['INTENTO_RECURRENTE','REVISION_EVENTO_RECURRENTE','REPARACION_REVISION_RECURRENTE'].includes(table)) throw error;
+      entries.push([table,null]); // Shared manual DB may intentionally await migration 006.
+    }
+  }
+  return Object.fromEntries(entries);
 }
 
 async function openSuiteDatabase() {
@@ -108,7 +117,12 @@ async function prepareSuiteDatabase(context) {
     for (const apply of [migrations.applyRecurrentePreparation, migrations.applyRecurrenteCheckoutMigration,
       migrations.applyRecurrenteConfirmationMigration, migrations.applyRecurrenteAttemptsMigration]) await apply(target);
     await copyReceiptEvidence(context.source, target, context.snapshot);
-    assert.deepEqual(await protectedSnapshot(target), context.snapshot, "La copia de evidencia debe conservar todos los datos.");
+    // The financial copy intentionally contains only the established receipt cases.
+    const copied=await protectedSnapshot(target);
+    for(const table of Object.keys(copied)) assert.deepEqual(copied[table],context.snapshot[table],"La copia de evidencia debe conservar todos los datos.");
+    await migrations.applyRecurrenteRefundsMigration(target);
+    await migrations.applyRecurrenteIntentHistoryMigration(target);
+    await migrations.applyRecurrenteReviewPrecisionMigration(target);
   } finally { await target.end(); }
 }
 

@@ -1,3 +1,4 @@
+const { QUOTA_BALANCES_SQL } = require("./financialBalance");
 const { query } = require("../database/mysql");
 
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
@@ -239,17 +240,12 @@ async function applyAutomaticSanctions(userId) {
         TRUE,
         cu.fecha_limite,
         ?
-      FROM CUOTA cu
+      FROM (${QUOTA_BALANCES_SQL}) cu
       INNER JOIN SERVICIO srv
         ON srv.id_servicio = cu.id_servicio
-      LEFT JOIN (
-        SELECT id_cuota, SUM(monto_pagado) AS total_pagado
-        FROM PAGO
-        GROUP BY id_cuota
-      ) pagos
-        ON pagos.id_cuota = cu.id_cuota
       WHERE cu.fecha_limite < ?
-        AND COALESCE(pagos.total_pagado, 0) < cu.monto
+        AND cu.capital_pendiente > 0
+        AND cu.sobrepago = 0 AND cu.reembolso_inconsistente = 0
     `,
     [
       OVERDUE_FEE_RULE.codigo,

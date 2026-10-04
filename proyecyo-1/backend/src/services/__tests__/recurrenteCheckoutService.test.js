@@ -3,7 +3,7 @@ const { createCheckoutService } = require("../recurrenteCheckoutService");
 const { CheckoutError } = require("../recurrenteCheckoutErrors");
 const remote = { id_externo: "ch_unit_fixture", checkout_url: "https://app.recurrente.com/checkout-session/ch_unit_fixture", estado_proveedor: "unpaid" };
 
-function fixture({ monto = "100.00", recargo = "15.00", pagado = "0.00", owned = true, exists = true } = {}) {
+function fixture({ monto = "100.00", recargo = "15.00", pagado = "0.00", owned = true, exists = true, review = false } = {}) {
   const rows = [];
   const totals = { recargo, pagado };
   const connection = { beginTransaction: jest.fn(), commit: jest.fn(), rollback: jest.fn(), release: jest.fn() };
@@ -11,6 +11,7 @@ function fixture({ monto = "100.00", recargo = "15.00", pagado = "0.00", owned =
     if (sql.includes("FROM CUOTA cu")) return [owned ? [{ id_cuota: 3, id_casa: 8, id_residente: 2, monto, concepto: "Mantenimiento" }] : []];
     if (sql.startsWith("SELECT id_cuota FROM CUOTA")) return [exists ? [{ id_cuota: 3 }] : []];
     if (sql.includes("SUM(monto_recargo)")) return [[totals]];
+    if (sql.includes('FROM EVENTO_RECURRENTE er')) return [review ? [{id_checkout:1}] : []];
     if (sql.includes("FROM CHECKOUT_RECURRENTE")) return [rows.filter((r) => ["CREADO", "PENDIENTE", "INCIERTO"].includes(r.estado)).map((r) => ({ ...r }))];
     if (sql.includes("INSERT INTO CHECKOUT_RECURRENTE")) {
       const keys = ["referencia_local", "idempotency_key", "id_cuota", "id_usuario", "id_residente", "id_casa", "monto_centavos", "capital_centavos", "recargo_centavos", "sandbox_id"];
@@ -49,6 +50,10 @@ test.each([
   expect(f.connection.execute.mock.calls[0][0]).toContain("FOR UPDATE");
   expect(f.connection.execute.mock.calls[1][0]).not.toMatch(/fecha|BETWEEN/);
   expect(f.connection.execute.mock.calls.some(([sql]) => /INSERT INTO (PAGO|TRANSACCION_|EVENTO_|REEMBOLSO_)/.test(sql))).toBe(false);
+});
+test('éxito en revisión bloquea checkout antes de llamar al proveedor',async()=>{
+  const f=fixture({review:true});await expect(f.service.startResidentCheckout(4,3)).rejects.toMatchObject({code:'CHECKOUT_UNCERTAIN'});
+  expect(f.rows).toHaveLength(0);expect(f.client.createCheckout).not.toHaveBeenCalled();expect(f.client.getCheckout).not.toHaveBeenCalled();
 });
 test.each([
   [{ owned: false }, "QUOTA_NOT_OWNED"], [{ owned: false, exists: false }, "QUOTA_NOT_FOUND"],

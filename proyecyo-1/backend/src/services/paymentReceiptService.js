@@ -1,5 +1,6 @@
 const PDFDocument = require("pdfkit");
 const { query } = require("../database/mysql");
+const { HISTORICAL_SUCCESS } = require("./recurrenteRefundContract");
 const { toCents } = require("./financialBalance");
 
 function receiptError(code, status, message) {
@@ -46,6 +47,7 @@ async function receiptRows(userId, role, paymentId) {
             tr.confirmado_en, tr.capital_aplicado_centavos, tr.recargo_aplicado_centavos,
             co.id_checkout, co.id_cuota AS checkout_cuota, co.id_casa AS checkout_casa,
             co.id_usuario AS checkout_usuario, co.estado AS checkout_estado,
+            COALESCE((SELECT SUM(rr.monto_centavos) FROM REEMBOLSO_RECURRENTE rr WHERE rr.id_transaccion=tr.id_transaccion AND rr.estado='CONFIRMADO' AND rr.aplicado_en IS NOT NULL),0) devuelto_centavos,
             co.estado_proveedor, co.monto_centavos AS checkout_monto,
             co.moneda AS checkout_moneda, co.ambiente AS checkout_ambiente
        FROM PAGO pg
@@ -57,7 +59,7 @@ async function receiptRows(userId, role, paymentId) {
        LEFT JOIN PAGO_ORIGEN origen ON origen.id_pago = pg.id_pago
        LEFT JOIN TRANSACCION_RECURRENTE tr ON tr.id_pago = pg.id_pago
        LEFT JOIN CHECKOUT_RECURRENTE co ON co.id_checkout = tr.id_checkout
-      WHERE ${paymentId == null ? "origen.origen='RECURRENTE' AND tr.estado='CONFIRMADA' ORDER BY pg.fecha_pago DESC, pg.id_pago DESC" : "pg.id_pago = ? LIMIT 1"}`,
+      WHERE ${paymentId == null ? "origen.origen='RECURRENTE' AND tr.estado IN ('CONFIRMADA','REEMBOLSADA_PARCIAL','REEMBOLSADA') ORDER BY pg.fecha_pago DESC, pg.id_pago DESC" : "pg.id_pago = ? LIMIT 1"}`,
     paymentId == null ? [userId] : [userId, paymentId],
   );
   return rows;
@@ -88,6 +90,8 @@ function mapReceipt(row) {
     // Explicit allowlist: no credentials, signatures, checkout URLs or raw payloads.
     const { titular_correo, ...publicPayment } = payment;
     return { ...publicPayment, estado: "CONFIRMADO", moneda: "GTQ", proveedor: "Recurrente",
+      reembolsado: Number(row.devuelto_centavos || 0) / 100, abono_neto: (Number(row.monto_centavos) - Number(row.devuelto_centavos || 0)) / 100,
+      estado_transaccion: row.transaccion_estado, reembolso_posterior: Number(row.devuelto_centavos || 0) > 0,
       origen: "RECURRENTE", ambiente: row.pago_ambiente, id_transaccion: Number(row.id_transaccion),
       id_checkout: Number(row.id_checkout), referencia_transaccion: row.referencia_transaccion,
       referencia_pago_externa: row.referencia_pago_externa || null };
@@ -103,8 +107,9 @@ function confirmedRelationship(row) {
     const positiveId = (value) => Number.isSafeInteger(Number(value)) && Number(value) > 0;
     const cents = Number(row.monto_centavos), capital = Number(row.capital_aplicado_centavos), surcharge = Number(row.recargo_aplicado_centavos);
     return row.pago_origen === "RECURRENTE" && ["sandbox", "production"].includes(row.pago_ambiente)
+      && Number(row.devuelto_centavos || 0) >= 0 && Number(row.devuelto_centavos || 0) <= Number(row.monto_centavos)
       && positiveId(row.id_transaccion) && positiveId(row.id_checkout)
-      && row.transaccion_estado === "CONFIRMADA" && !!row.confirmado_en
+      && HISTORICAL_SUCCESS.includes(row.transaccion_estado) && !!row.confirmado_en
       && row.checkout_estado === "CONFIRMADO" && row.estado_proveedor === "paid"
       && equal(row.transaccion_pago, row.id_pago) && equal(row.transaccion_cuota, row.id_cuota)
       && equal(row.checkout_cuota, row.id_cuota) && equal(row.transaccion_casa, row.id_casa)
@@ -129,7 +134,7 @@ async function getResidentTransactionReceipt(userId, transactionIdInput) {
     INNER JOIN RESIDENTE r ON r.id_residente=ca.id_residente AND r.id_usuario=?
     WHERE tr.id_transaccion=? LIMIT 1`, [userId, transactionId]);
   if (!rows[0]) throw receiptError("RECEIPT_NOT_FOUND", 404, "No se encontró el comprobante solicitado para este usuario.");
-  if (rows[0].estado !== "CONFIRMADA" || !rows[0].id_pago) throw notConfirmed();
+  if (!HISTORICAL_SUCCESS.includes(rows[0].estado) || !rows[0].id_pago) throw notConfirmed();
   return getPaymentReceipt(userId, "residente", rows[0].id_pago);
 }
 
@@ -169,6 +174,7 @@ function createPaymentReceiptPdf(payment) {
       ["Moneda", payment.moneda || "GTQ"], ["Estado", payment.estado === "CONFIRMADO" ? "Confirmado" : "Aplicado"],
       ["Proveedor", payment.proveedor || "Histórico"],
     ];
+    if (payment.reembolso_posterior) rows.push(["Reembolso posterior", "Reembolsado"], ["Monto devuelto", `Q${payment.reembolsado.toFixed(2)}`], ["Abono neto actual", `Q${payment.abono_neto.toFixed(2)}`]);
     if (payment.origen === "RECURRENTE") rows.push(["Transacción externa", payment.referencia_transaccion],
       ["Referencia interna", `Pago ${payment.id_pago} · Transacción ${payment.id_transaccion} · Checkout ${payment.id_checkout}`]);
     else if (payment.titular_correo) rows.push(["Correo", payment.titular_correo]);

@@ -178,13 +178,18 @@ if (process.env.RUN_PHASE0_MYSQL_TESTS !== "1") {
     for (const [name, changes] of [
       ["sandbox ajeno", { sandbox_id: "sbx_foreign" }], ["produccion", { live_mode: true }],
       ["sin live_mode", { live_mode: undefined }], ["sin sandbox_id", { sandbox_id: undefined }],
-      ["reembolso", { event_type: "refund.create" }],
       ["suscripcion", { event_type: "subscription.create" }], ["otro metodo", { type: "bank_transfer" }],
     ]) {
       test(`${name}: inbox ignorado sin transaccion ni PAGO`, async () => {
         const f = await fixture(); assert.equal(await deliver({ ...f.payload, ...changes }), "ignored"); await noPayment(f.id);
       });
     }
+    test("refund.create incompleto: inbox en revision sin transaccion ni PAGO", async () => {
+      const f = await fixture(), svixId = `msg_TEST_${randomUUID()}`;
+      assert.equal(await deliver({ ...f.payload, event_type: "refund.create", refund: { id: `re_TEST_${randomUUID()}`, status: "unsupported" } }, { svixId }), "review");
+      assert.equal((await eventRow(svixId)).estado, "REVISION");
+      await noPayment(f.id);
+    });
     test("payment_intent incompleto despues del unificado requiere revision sin otro PAGO", async () => {
       const f = await fixture(); await deliver(f.payload);
       assert.equal(await deliver({ ...f.payload, event_type: "payment_intent.succeeded" }), "review"); await onePayment(f.id);

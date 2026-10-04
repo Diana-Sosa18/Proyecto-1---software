@@ -1,0 +1,25 @@
+jest.mock('../../services/authService',()=>({getCurrentSession:jest.fn()}));
+jest.mock('../../services/activeSessionsService',()=>({assertActiveSession:jest.fn()}));
+jest.mock('../../database/mysql',()=>({pool:{},query:jest.fn()}));
+const express=require('express'),request=require('supertest');
+const {getCurrentSession}=require('../../services/authService'),{assertActiveSession}=require('../../services/activeSessionsService');
+const {createSessionToken}=require('../../services/sessionTokenService');
+const {adminRecurrenteRefundRoutes}=require('../adminRecurrenteRefundRoutes');
+const {RefundError}=require('../../services/recurrenteRefundContract');
+const s={eligibility:jest.fn(),history:jest.fn(),request:jest.fn(),verify:jest.fn()},app=express();app.use(express.json());app.use(adminRecurrenteRefundRoutes(s));
+app.use((e,_req,res,_next)=>res.status(e.status||500).json({message:e.status<500?e.message:'Error interno'}));
+const auth=()=>`Bearer ${createSessionToken(1,'hu18-fixture-session')}`;
+const routes=[['get','/admin/pagos/recurrente/100/refund-eligibility','eligibility'],['get','/admin/pagos/recurrente/100/refunds','history'],['post','/admin/pagos/recurrente/100/refunds','request'],['post','/admin/pagos/recurrente/reembolsos/101/verificar','verify']];
+beforeEach(()=>{jest.clearAllMocks();getCurrentSession.mockResolvedValue({id:1,role:'admin'});assertActiveSession.mockResolvedValue();for(const method of Object.values(s))method.mockResolvedValue({result:'processed'});});
+test.each(routes)('ADMIN válido %s %s pasa identidad del servidor y no-store',async(method,path,name)=>{
+ const r=await request(app)[method](path).set('Authorization',auth()).send({}).expect(200);expect(r.headers['cache-control']).toBe('no-store');expect(s[name].mock.calls[0][0]).toEqual({id:1,role:'admin'});expect(getCurrentSession).toHaveBeenCalledWith(1);
+});
+test.each(['residente','inquilino','guardia'])('rol %s no puede reembolsar',async role=>{getCurrentSession.mockResolvedValue({id:1,role});await request(app).post(routes[2][1]).set('Authorization',auth()).send({}).expect(403);expect(s.request).not.toHaveBeenCalled();});
+test.each(routes)('sin token ni headers falsificados no accede %s %s',async(method,path)=>{await request(app)[method](path).set('x-user-id','1').set('x-user-role','admin').expect(401);for(const f of Object.values(s))expect(f).not.toHaveBeenCalled();});
+test('sesión revocada no llega al cliente',async()=>{assertActiveSession.mockRejectedValue(Object.assign(new Error('Revocada'),{status:401}));await request(app).post(routes[2][1]).set('Authorization',auth()).send({}).expect(401);expect(s.request).not.toHaveBeenCalled();});
+test('token manipulado no usa headers de rescate',async()=>{await request(app).post(routes[2][1]).set('Authorization',auth()+'bad').send({}).expect(401);expect(s.request).not.toHaveBeenCalled();});
+test('verificar no acepta monto/intent para sustituir referencia persistida',async()=>{await request(app).post(routes[3][1]).set('Authorization',auth()).send({monto:500}).expect(400);expect(s.verify).not.toHaveBeenCalled();});
+test('errores del proveedor descartan causas y headers del response',async()=>{const e=new RefundError('REFUND_UNKNOWN',503,{uncertain:true});e.headers={'X-SECRET-KEY':'HU18_PRIVATE_FAKE'};s.request.mockRejectedValue(e);
+ const r=await request(app).post(routes[2][1]).set('Authorization',auth()).send({}).expect(503);expect(r.body.code).toBe('REFUND_UNKNOWN');expect(JSON.stringify(r.body)).not.toMatch(/HU18_PRIVATE|headers|secret/i);
+});
+test('no existe ruta ficticia de anular pago/refund',async()=>{await request(app).post('/admin/pagos/recurrente/100/void').set('Authorization',auth()).send({}).expect(404);});

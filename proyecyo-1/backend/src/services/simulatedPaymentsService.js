@@ -1,5 +1,6 @@
+const { refundBlockingSql, assertRefundUnblocked } = require('./recurrenteRefundGuard');
 const { pool } = require("../database/mysql");
-const { calculateBalance, assertCollectible } = require("./financialBalance");
+const { calculateBalance, assertCollectible, refundedQuotaSql } = require("./financialBalance");
 const { assertNoRecurrenteOperation } = require("./recurrenteCheckoutGuard");
 
 function httpError(message, status) {
@@ -36,9 +37,11 @@ async function payObligation(userId, role, quotaIdValue) {
     // the prior transaction's committed payment, not a stale aggregate from before the lock.
     const [totals] = await connection.execute(
       `SELECT COALESCE((SELECT SUM(monto_recargo) FROM RECARGO_APLICADO WHERE id_cuota = ?), 0) AS recargo,
-              COALESCE((SELECT SUM(monto_pagado) FROM PAGO WHERE id_cuota = ?), 0) AS pagado`,
+              COALESCE((SELECT SUM(monto_pagado) FROM PAGO WHERE id_cuota = ?), 0) AS pagado,
+    ${refundedQuotaSql(String(quotaId))} reembolsado, ${refundBlockingSql(String(quotaId))} refund_bloqueante`,
       [quotaId, quotaId],
     );
+    assertRefundUnblocked(totals[0]);
     const quota = { ...rows[0], ...totals[0] };
     const calculated = calculateBalance(quota);
     assertCollectible(calculated);

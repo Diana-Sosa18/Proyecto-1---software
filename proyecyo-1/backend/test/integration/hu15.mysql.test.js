@@ -19,7 +19,7 @@ if (process.env.RUN_PHASE0_MYSQL_TESTS !== "1") {
   const { payObligation } = require("../../src/services/simulatedPaymentsService");
   const { listResidentAccountStatement } = require("../../src/services/residentAccountService");
   const { QUOTA_BALANCES_SQL } = require("../../src/services/financialBalance");
-  const { configuration, signed, TEST_SANDBOX, paymentPayload } = require("./support/recurrenteWebhookFixtures");
+  const { configuration, signed, TEST_SANDBOX, paymentPayload, observedPaymentPair } = require("./support/recurrenteWebhookFixtures");
   const { attemptPayload, legacyAttempt } = require("./support/recurrenteAttemptFixtures");
   let connection;
   const query = async (sql, p = []) => (await connection.query(sql, p))[0];
@@ -163,9 +163,16 @@ if (process.env.RUN_PHASE0_MYSQL_TESTS !== "1") {
       assert.equal((await transactions(f.id))[0].estado, "FALLIDA"); await unchanged(f);
     });
     test("HU14 éxito después de otro intento fallido del mismo checkout confirma una sola aplicación", async () => {
-      const f = await fixture(); await deliver(f.payload);
-      const succeeded = paymentPayload(f.local); assert.equal(await deliver(succeeded), "processed"); assert.equal(await deliver(succeeded), "duplicate");
-      const t = await transactions(f.id); assert.equal(t.length, 2); assert.equal(t.filter((r) => r.id_pago).length, 1);
+      const f = await fixture(), pair=observedPaymentPair(f.local);
+      // The old fixture omitted the failed payment identity and dated its success
+      // before the failure. Reproduce the observed contract and approved chronology.
+      f.payload.payment=pair.intent.payment;f.payload.checkout.payment=pair.intent.payment;
+      f.payload.checkout.latest_intent={id:f.payload.id,type:'PaymentIntent'};
+      await deliver(f.payload);
+      const succeeded = pair.intent; assert.equal(await deliver(succeeded), "processed"); assert.equal(await deliver(succeeded), "duplicate");
+      const t = await transactions(f.id); assert.equal(t.length, 1); assert.equal(t.filter((r) => r.id_pago).length, 1);
+      const history=await query('SELECT id_externo,estado FROM INTENTO_RECURRENTE WHERE id_transaccion=? ORDER BY id_intento',[t[0].id_transaccion]);
+      assert.deepEqual(history,[{id_externo:f.payload.id,estado:'FALLIDA'},{id_externo:succeeded.id,estado:'CONFIRMADA'}]);
       const confirmed = t.find((r) => r.id_pago); assert.equal(confirmed.estado, "CONFIRMADA"); assert.equal(confirmed.capital_aplicado_centavos, 10000); assert.equal(confirmed.recargo_aplicado_centavos, 1500);
       assert.equal((await query("SELECT COUNT(*) n FROM PAGO WHERE id_cuota=?", [f.id]))[0].n, 1);
       assert.equal(Number((await balance(f.id)).saldo_pendiente), 0); assert.equal((await checkout(f.local.id_checkout)).estado, "CONFIRMADO");

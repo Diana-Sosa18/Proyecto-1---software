@@ -103,7 +103,7 @@ function getProgress(quota: TenantAccountQuota) {
     return 0;
   }
 
-  return Math.min(100, Math.round((quota.monto_pagado / quota.monto) * 100));
+  return Math.min(100, Math.round(((quota.abono_neto ?? quota.monto_pagado) / quota.monto) * 100));
 }
 
 function filterQuotas(quotas: TenantAccountQuota[], filter: TenantAccountFilter) {
@@ -173,6 +173,7 @@ function QuotaTable({
                     </td>
                     <td className="px-5 py-4 text-sm text-slate-600">
                       {formatCurrency(quota.monto_pagado)}
+                        {(quota.reembolsado || 0)>0 && <p>Devuelto {formatCurrency(quota.reembolsado || 0)} ? Neto {formatCurrency(quota.abono_neto || 0)}</p>}
                       <p className="mt-1 text-xs text-slate-400">
                         {quota.ultimo_pago ? `Ultimo pago ${formatDate(quota.ultimo_pago)}` : "Sin pagos"}
                       </p>
@@ -355,6 +356,7 @@ export function InquilinoAccountView() {
         </Alert>
       ) : null}
 
+      {(statement.reembolsos || []).map(r=><p key={r.id_reembolso}>Reembolso #{r.id_reembolso} ? {r.servicio} ? {r.fecha_reembolso} ? Devuelto {formatCurrency(r.monto_centavos/100)}</p>)}
       <FinancialReviewNotice {...statement.resumen} />
       <p className="my-3 text-sm text-slate-500">El saldo incluye todos los abonos confirmados. Las fechas filtran los movimientos.</p>
       {statement.resumen.cuotas_vencidas > 0 ? (

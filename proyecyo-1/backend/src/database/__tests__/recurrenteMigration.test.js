@@ -47,3 +47,29 @@ test("004 aditiva y repetible agrega trazabilidad sin modificar filas", async ()
   expect(c.query).toHaveBeenCalledTimes(migrationStatements(ATTEMPTS_MIGRATION_PATH).length * 2);
   expect(c.execute.mock.calls.at(-1)[0]).toContain("RELEASE_LOCK");
 });
+
+test('005 ampl?a estados y trazabilidad sin backfill financiero ni destrucci?n',async()=>{
+ const {REFUNDS_MIGRATION_PATH,applyRecurrenteRefundsMigration}=require('../recurrenteMigration');
+ const sql=fs.readFileSync(REFUNDS_MIGRATION_PATH,'utf8');expect(sql).not.toMatch(/DROP\s+(TABLE|COLUMN|DATABASE)|DELETE\s+FROM|TRUNCATE|UPDATE\s+(PAGO|TRANSACCION_RECURRENTE)/i);
+ for(const field of ['motivo','request_fingerprint','aplicado_en','fecha_contable','capital_revertido_centavos','recargo_revertido_centavos','cuenta_proveedor'])expect(sql).toContain(field);
+ const c={execute:jest.fn().mockResolvedValue([[{acquired:1}]]),query:jest.fn().mockResolvedValue([])};
+ await applyRecurrenteRefundsMigration(c);await applyRecurrenteRefundsMigration(c);expect(c.query).toHaveBeenCalledTimes(migrationStatements(REFUNDS_MIGRATION_PATH).length*2);expect(c.execute.mock.calls.at(-1)[0]).toContain('RELEASE_LOCK');
+});
+test('006 solo crea historial aditivo, es reaplicable y usa bloqueo propio',async()=>{
+ const {INTENT_HISTORY_MIGRATION_PATH,applyRecurrenteIntentHistoryMigration}=require('../recurrenteMigration');
+ const sql=require('node:fs').readFileSync(INTENT_HISTORY_MIGRATION_PATH,'utf8');
+ expect(sql).not.toMatch(/\bDROP\s+(TABLE|COLUMN|DATABASE)|\bDELETE\s+FROM|\bTRUNCATE/i);
+ expect(sql).toContain('CREATE TABLE IF NOT EXISTS INTENTO_RECURRENTE');expect(sql).toContain('CREATE TABLE IF NOT EXISTS REVISION_EVENTO_RECURRENTE');
+ const c={execute:jest.fn(async()=>[[{acquired:1}]]),query:jest.fn(async()=>[])};
+ await applyRecurrenteIntentHistoryMigration(c);await applyRecurrenteIntentHistoryMigration(c);
+ expect(c.query).toHaveBeenCalledTimes(migrationStatements(INTENT_HISTORY_MIGRATION_PATH).length*2);
+});
+test('007 only adds precision-repair evidence; preserves 006 and existing rows',async()=>{
+ const {REVIEW_PRECISION_MIGRATION_PATH,applyRecurrenteReviewPrecisionMigration}=require('../recurrenteMigration');
+ const sql=fs.readFileSync(REVIEW_PRECISION_MIGRATION_PATH,'utf8');
+ expect(sql).not.toMatch(/\b(DROP|TRUNCATE|UPDATE|DELETE|ALTER)\b/i);
+ expect(sql).toContain('DATETIME(6)');expect(sql).toContain('uq_reparacion_revision');
+ const c={execute:jest.fn(async()=>[[{acquired:1}]]),query:jest.fn(async()=>[])};
+ await applyRecurrenteReviewPrecisionMigration(c);await applyRecurrenteReviewPrecisionMigration(c);
+ expect(c.query).toHaveBeenCalledTimes(migrationStatements(REVIEW_PRECISION_MIGRATION_PATH).length*2);
+});

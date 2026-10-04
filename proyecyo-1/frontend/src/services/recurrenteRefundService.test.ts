@@ -1,0 +1,10 @@
+import {beforeEach,expect,it,vi} from 'vitest';
+import {apiRequest,ApiError} from './api';
+import {refundEligibility,refundHistory,requestTotalRefund,verifyRefund,refundError} from './recurrenteRefundService';
+vi.mock('./api',async original=>({...await original<typeof import('./api')>(),apiRequest:vi.fn()}));
+beforeEach(()=>vi.clearAllMocks());
+it('GET elegibilidad e historial son locales',async()=>{await refundEligibility(800);await refundHistory(800);expect(apiRequest).toHaveBeenNthCalledWith(1,'/admin/pagos/recurrente/800/refund-eligibility');expect(apiRequest).toHaveBeenNthCalledWith(2,'/admin/pagos/recurrente/800/refunds');});
+it('POST nunca envía monto/moneda/intent/secret',async()=>{await requestTotalRefund(800,'Motivo TEST','uuid-TEST');expect(apiRequest).toHaveBeenCalledWith('/admin/pagos/recurrente/800/refunds',{method:'POST',body:{motivo:'Motivo TEST',idempotency_key:'uuid-TEST'}});});
+it('verificar refund conocido sin resend',async()=>{await verifyRefund(80);expect(apiRequest).toHaveBeenCalledWith('/admin/pagos/recurrente/reembolsos/80/verificar',{method:'POST',body:{}});});
+it.each(['REFUND_UNKNOWN','REFUND_PERSISTENCE'])('error %s no recomienda retry financiero',code=>expect(refundError(new ApiError('FAKE_PRIVATE',503,{code}))).toContain('No repitas'));
+it('error arbitrario no expone contenido proveedor',()=>expect(refundError(new Error('FAKE_PRIVATE'))).not.toContain('FAKE_PRIVATE'));

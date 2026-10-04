@@ -1,0 +1,30 @@
+{
+  "event_type": "refund.create",
+  "sandbox_id": "sbx_hu14_fixture",
+  "intentable": {
+    "id": "pa_TEST_LEGACY_PARENT",
+    "type": "PaymentIntent",
+    "live_mode": false,
+    "amount_in_cents": 500,
+    "currency": "GTQ",
+    "payment": { "id": "pa_TEST_PHYSICAL_PAYMENT" },
+    "checkout": {
+      "id": "ch_TEST_OBSERVED_REFUND",
+      "live_mode": false,
+      "status": "paid",
+      "total_in_cents": 500,
+      "currency": "GTQ",
+      "payment": { "id": "pa_TEST_PHYSICAL_PAYMENT" },
+      "latest_intent": { "id": "in_TEST_CANONICAL", "type": "PaymentIntent" }
+    }
+  },
+  "refund": {
+    "id": "re_TEST_OBSERVED_REFUND",
+    "status": "succeeded",
+    "customer_refunded_amount_in_cents": 500,
+    "account_refunded_amount_in_cents": 500,
+    "currency": "GTQ",
+    "account_id": "ac_HU18_FAKE",
+    "created_at": "2026-10-04T14:12:13.955-06:00"
+  }
+}
