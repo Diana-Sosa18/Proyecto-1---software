@@ -20,7 +20,9 @@ import { AdminSanctionHistoryView } from "@/views/AdminSanctionHistoryView";
 import { AdminSettingsView } from "@/views/AdminSettingsView";
 import { AdminSpecialAccessView } from "@/views/AdminSpecialAccessView";
 import { AdminView } from "@/views/AdminView";
+import { GuardiaDashboardView } from "@/views/GuardiaDashboardView";
 import { GuardiaView } from "@/views/GuardiaView";
+import { InquilinoDashboardView } from "@/views/InquilinoDashboardView";
 import { InquilinoView } from "@/views/InquilinoView";
 import { InquilinoAccountView } from "@/views/InquilinoAccountView";
 import { LoginView } from "@/views/LoginView";
@@ -30,6 +32,7 @@ import { ResidenteRegulationsView } from "@/views/ResidenteRegulationsView";
 import { ResidenteUnifiedView } from "@/views/ResidenteUnifiedView";
 import { ResidenteView } from "@/views/ResidenteView";
 import { ResidenteAccountView } from "@/views/ResidenteAccountView";
+import { ResidenteProvidersView } from "@/views/ResidenteProvidersView";
 import { ResidentePaymentReturnView } from "@/views/ResidentePaymentReturnView";
 import { ResidentePaymentReceiptView } from "@/views/ResidentePaymentReceiptView";
 import { ResidenteVisitsView } from "@/views/ResidenteVisitsView";
@@ -83,11 +86,18 @@ export function AppRouter() {
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["guardia"]} />}>
-          <Route path="/guardia" element={<GuardiaView />} />
+          <Route path="/guardia" element={<GuardiaDashboardView />} />
+          <Route path="/guardia/control" element={<GuardiaView section="control" />} />
+          <Route path="/guardia/visitas" element={<GuardiaView section="visitas" />} />
+          <Route path="/guardia/historial" element={<GuardiaView section="historial" />} />
+          <Route path="/guardia/alertas" element={<GuardiaView section="alertas" />} />
+          <Route path="/guardia/sesiones" element={<ActiveSessionsView />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["residente"]} />}>
           <Route path="/residente" element={<ResidenteView />} />
+          <Route path="/residente/pagos" element={<ResidenteAccountView />} />
+          {/* Alias historico: se mantiene para enlaces y bookmarks existentes. */}
           <Route path="/residente/estado-cuenta" element={<ResidenteAccountView />} />
           <Route path="/residente/pagos/retorno" element={<ResidentePaymentReturnView />} />
           <Route path="/residente/pagos/:paymentId/comprobante" element={<ResidentePaymentReceiptView />} />
@@ -99,10 +109,19 @@ export function AppRouter() {
           <Route path="/residente/resumen-mensual" element={<ResidentMonthlySummaryView />} />
           <Route path="/residente/detalle-financiero" element={<ResidenteFinancialDetailView />} />
           <Route path="/residente/notificaciones" element={<ResidentNotificationsView />} />
+          <Route path="/residente/comunicados" element={<ResidentNotificationsView initialFilter="COMUNICADOS" />} />
+          <Route path="/residente/proveedores" element={<ResidenteProvidersView />} />
+          <Route path="/residente/sesiones" element={<ActiveSessionsView />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["inquilino"]} />}>
-          <Route path="/inquilino" element={<InquilinoView />} />
+          <Route path="/inquilino" element={<InquilinoDashboardView />} />
+          <Route path="/inquilino/visitas" element={<InquilinoView section="visitas" />} />
+          <Route path="/inquilino/proveedores" element={<InquilinoView section="proveedores" />} />
+          <Route path="/inquilino/permisos" element={<InquilinoView section="permisos" />} />
+          <Route path="/inquilino/notificaciones" element={<ResidentNotificationsView role="inquilino" />} />
+          <Route path="/inquilino/comunicados" element={<ResidentNotificationsView role="inquilino" initialFilter="COMUNICADOS" />} />
+          <Route path="/inquilino/sesiones" element={<ActiveSessionsView />} />
           <Route path="/inquilino/estado-cuenta" element={<InquilinoAccountView />} />
           <Route path="/inquilino/historial-financiero" element={<InquilinoAccountView />} />
         </Route>

@@ -2,31 +2,24 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
   AlertTriangle,
-  Bell,
   BriefcaseBusiness,
-  CalendarClock,
   CalendarDays,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock3,
-  CreditCard,
   KeyRound,
   Pencil,
   Power,
   ShieldAlert,
   ShieldCheck,
   Trash2,
-  UserCheck,
   UserRoundPlus,
   X,
   XCircle,
   Zap,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
-import { StatCard } from "@/components/layout/StatCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,38 +44,18 @@ import {
   getTenantAuthorizationRequestsRequest,
   getTenantPermissionsRequest,
 } from "@/services/sprintStoriesService";
-import { getTenantAccountStatementRequest } from "@/services/tenantAccountService";
-import { getNotificationsRequest, markNotificationAsReadRequest } from "@/services/notificationsService";
 import type {
   TenantProvider,
   TenantProviderHistoryRecord,
   TenantProviderStatus,
 } from "@/types/providers";
 import type { AuthorizationRequest, TenantPermission } from "@/types/sprintStories";
-import type { TenantAccountSummary } from "@/types/tenantAccount";
-import type { NotificationRecord } from "@/types/notifications";
 import type { FrequentVisitor, VisitPayload, VisitRecord, VisitType } from "@/types/visits";
 import { getVehiclePlateError, normalizeVehiclePlate } from "@/utils/vehiclePlate";
 
 type VisitFormState = VisitPayload;
 type AccessFilter = "TODOS" | "APROBADO" | "UTILIZADO" | "RECHAZADO" | "PENDIENTE";
-type TenantAlertType = "VISITA" | "SOLICITUD" | "PAGO";
 type ProviderFilterStatus = TenantProviderStatus | "TODOS";
-
-type TenantAlert = {
-  id: string;
-  notificationId?: number;
-  tipo: TenantAlertType;
-  titulo: string;
-  descripcion: string;
-  tiempo: string;
-};
-
-const tenantAlertStyles: Record<TenantAlertType, string> = {
-  VISITA: "border-blue-200 bg-blue-50 text-blue-800",
-  SOLICITUD: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  PAGO: "border-amber-200 bg-amber-50 text-amber-800",
-};
 
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 const PROVIDER_FORM_STORAGE_KEY = "nexus.tenant-provider-draft";
@@ -189,10 +162,6 @@ function formatDateTime(dateTime: string | null) {
   }).format(new Date(dateTime.replace(" ", "T")));
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("es-GT", { style: "currency", currency: "GTQ" }).format(value);
-}
-
 function getAccessStatus(visit: VisitRecord): Exclude<AccessFilter, "TODOS"> {
   if (
     visit.estado_acceso === "INGRESO_REGISTRADO" ||
@@ -210,11 +179,6 @@ function getAccessStatus(visit: VisitRecord): Exclude<AccessFilter, "TODOS"> {
   return "APROBADO";
 }
 
-function countTodayVisits(visits: VisitRecord[]) {
-  const today = getDateInTimezone(new Date());
-  return visits.filter((visit) => visit.fecha === today).length;
-}
-
 function countActiveProviders(providers: TenantProvider[]) {
   return providers.filter((provider) => provider.activo).length;
 }
@@ -223,8 +187,24 @@ function isAccessEditable(visit: VisitRecord) {
   return visit.estado_acceso === "AUTORIZADA" && visit.qr_status === "VALID";
 }
 
-export function InquilinoView() {
-  const navigate = useNavigate();
+export type InquilinoSection = "visitas" | "proveedores" | "permisos";
+
+const sectionHeadings: Record<InquilinoSection, { title: string; subtitle: string }> = {
+  visitas: {
+    title: "Mis visitas",
+    subtitle: "Autorice visitas y dé seguimiento a los accesos asociados a su unidad.",
+  },
+  proveedores: {
+    title: "Proveedores",
+    subtitle: "Registre proveedores de servicio y consulte su estado de validación e historial.",
+  },
+  permisos: {
+    title: "Permisos y solicitudes",
+    subtitle: "Permisos asignados por el propietario y solicitudes de autorización enviadas.",
+  },
+};
+
+export function InquilinoView({ section }: { section: InquilinoSection }) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<VisitFormState>(createInitialForm);
   const [providerForm, setProviderForm] = useState<VisitFormState>(createInitialProviderForm);
@@ -241,13 +221,13 @@ export function InquilinoView() {
   const [providerHistoryDateFilter, setProviderHistoryDateFilter] = useState("");
   const [permissions, setPermissions] = useState<TenantPermission[]>([]);
   const [authorizationRequests, setAuthorizationRequests] = useState<AuthorizationRequest[]>([]);
-  const [accountSummary, setAccountSummary] = useState<TenantAccountSummary | null>(null);
-  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [authorizationModalOpen, setAuthorizationModalOpen] = useState(false);
   const [authorizationAction, setAuthorizationAction] = useState("Reserva fuera de horario permitido");
   const [authorizationReason, setAuthorizationReason] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<AccessFilter>("TODOS");
   const [isLoading, setIsLoading] = useState(true);
+  // Errores de cargas secundarias: se muestran en su seccion en lugar de un falso estado vacio.
+  const [loadErrors, setLoadErrors] = useState<Partial<Record<"frequent" | "providers" | "permissions" | "authorizations", string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRegisteringProvider, setIsRegisteringProvider] = useState(false);
   const [isUpdatingAccess, setIsUpdatingAccess] = useState(false);
@@ -273,8 +253,6 @@ export function InquilinoView() {
           providerHistoryResult,
           permissionsResult,
           authorizationsResult,
-          accountResult,
-          notificationsResult,
         ] = await Promise.allSettled([
           getVisitsRequest(),
           getFrequentVisitorsRequest(),
@@ -282,8 +260,6 @@ export function InquilinoView() {
           getTenantProviderHistoryRequest(),
           getTenantPermissionsRequest(),
           getTenantAuthorizationRequestsRequest(),
-          getTenantAccountStatementRequest(),
-          getNotificationsRequest(),
         ]);
 
         if (!active) {
@@ -300,6 +276,18 @@ export function InquilinoView() {
           );
         }
 
+        const failure = (result: PromiseSettledResult<unknown>, fallback: string) =>
+          result.status === "rejected"
+            ? result.reason instanceof Error && result.reason.message
+              ? result.reason.message
+              : fallback
+            : undefined;
+        setLoadErrors({
+          frequent: failure(frequentResult, "No fue posible cargar los visitantes frecuentes."),
+          providers: failure(providersResult, "No fue posible cargar los proveedores."),
+          permissions: failure(permissionsResult, "No fue posible cargar los permisos."),
+          authorizations: failure(authorizationsResult, "No fue posible cargar las solicitudes."),
+        });
         setFrequentVisitors(frequentResult.status === "fulfilled" ? frequentResult.value : []);
         setProviders(providersResult.status === "fulfilled" ? providersResult.value : []);
         setProviderHistory(providerHistoryResult.status === "fulfilled" ? providerHistoryResult.value : []);
@@ -307,8 +295,6 @@ export function InquilinoView() {
         setAuthorizationRequests(
           authorizationsResult.status === "fulfilled" ? authorizationsResult.value : [],
         );
-        setAccountSummary(accountResult.status === "fulfilled" ? accountResult.value.resumen : null);
-        setNotifications(notificationsResult.status === "fulfilled" ? notificationsResult.value : []);
       } finally {
         if (active) {
           setIsLoading(false);
@@ -346,62 +332,7 @@ export function InquilinoView() {
     window.localStorage.setItem(PROVIDER_FORM_STORAGE_KEY, JSON.stringify(providerForm));
   }, [providerForm]);
 
-  const todayVisits = useMemo(() => countTodayVisits(visits), [visits]);
-  const usedCount = useMemo(
-    () => visits.filter((visit) => getAccessStatus(visit) === "UTILIZADO").length,
-    [visits],
-  );
-  const activeCount = useMemo(
-    () => visits.filter((visit) => getAccessStatus(visit) === "APROBADO").length,
-    [visits],
-  );
   const activeProvidersCount = useMemo(() => countActiveProviders(providers), [providers]);
-  const nextVisit = useMemo(
-    () => visits.find((visit) => getAccessStatus(visit) === "APROBADO"),
-    [visits],
-  );
-
-  const tenantAlerts = useMemo<TenantAlert[]>(() => {
-    const alerts: TenantAlert[] = [];
-
-    if (nextVisit) {
-      alerts.push({
-        id: `visita-${nextVisit.id_acceso}`,
-        tipo: "VISITA",
-        titulo: "Visita por llegar",
-        descripcion: `${nextVisit.nombre} tiene una visita autorizada para ${formatDate(
-          nextVisit.fecha,
-        )} de ${nextVisit.hora_inicio} a ${nextVisit.hora_fin}.`,
-        tiempo: "Reciente",
-      });
-    }
-
-    alerts.push({
-      id: "solicitud-aprobada",
-      tipo: "SOLICITUD",
-      titulo: "Solicitud aprobada",
-      descripcion:
-        "Tu permiso para gestionar visitas y accesos asociados a la unidad se encuentra aprobado.",
-      tiempo: "Hoy",
-    });
-
-    notifications.filter((item) => item.tipo === "RECORDATORIO_PAGO" && !item.leido).forEach((item) => alerts.push({
-      id: `pago-${item.id_notificacion}`, notificationId: item.id_notificacion,
-      tipo: "PAGO", titulo: item.titulo, descripcion: item.mensaje, tiempo: item.creado_en,
-    }));
-
-    return alerts;
-  }, [nextVisit, notifications]);
-
-  async function handleReadPaymentAlert(notificationId: number) {
-    try {
-      const updated = await markNotificationAsReadRequest(notificationId);
-      setNotifications((current) => current.map((item) => item.id_notificacion === updated.id_notificacion ? updated : item));
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No fue posible marcar la alerta como leida.");
-    }
-  }
-
   const filteredVisits = useMemo(
     () =>
       selectedStatus === "TODOS"
@@ -829,92 +760,9 @@ export function InquilinoView() {
   return (
     <AppShell
       role="inquilino"
-      title="Panel de Inquilino"
-      subtitle="Autoriza visitas y da seguimiento a los accesos asociados a tu unidad."
+      title={sectionHeadings[section].title}
+      subtitle={sectionHeadings[section].subtitle}
     >
-      
-      <Card className="border-0 shadow-[0_16px_40px_rgba(30,41,59,0.08)]">
-  <CardHeader>
-    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-      <div>
-        <CardTitle className="flex items-center gap-2 text-2xl text-slate-900">
-          <Bell className="size-6 text-blue-600" />
-          Alertas del sistema
-        </CardTitle>
-        <CardDescription>
-          Avisos recientes para mantenerte informado sobre visitas, permisos y pagos.
-        </CardDescription>
-      </div>
-
-      <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600">
-        {tenantAlerts.length} alerta{tenantAlerts.length === 1 ? "" : "s"}
-      </span>
-    </div>
-  </CardHeader>
-
-  <CardContent className="grid gap-4 md:grid-cols-3">
-    {tenantAlerts.map((alert) => (
-      <div
-        key={alert.id}
-        className={`rounded-3xl border p-5 shadow-sm ${tenantAlertStyles[alert.tipo]}`}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-2xl bg-white/70">
-              {alert.tipo === "VISITA" ? <Clock3 className="size-5" /> : null}
-              {alert.tipo === "SOLICITUD" ? <CheckCircle2 className="size-5" /> : null}
-              {alert.tipo === "PAGO" ? <CreditCard className="size-5" /> : null}
-            </div>
-
-            <div>
-              <p className="text-base font-semibold">{alert.titulo}</p>
-              <p className="text-xs opacity-80">{alert.tiempo}</p>
-            </div>
-          </div>
-        </div>
-
-        <p className="mt-4 text-sm leading-relaxed">{alert.descripcion}</p>
-        {alert.notificationId ? <button type="button" onClick={() => void handleReadPaymentAlert(alert.notificationId!)}
-          className="mt-4 rounded-xl bg-white/80 px-3 py-2 text-xs font-semibold">Marcar como leida</button> : null}
-      </div>
-    ))}
-  </CardContent>
-</Card>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <StatCard
-          label="Estado de cuenta"
-          value={accountSummary ? formatCurrency(accountSummary.saldo_pendiente) : "Q0.00"}
-          helper={accountSummary?.cuotas_vencidas ? `${accountSummary.cuotas_vencidas} cuotas vencidas` : "Alquiler y cuotas al dia"}
-          icon={CreditCard}
-          onClick={() => navigate("/inquilino/estado-cuenta")}
-        />
-        <StatCard
-          label="Accesos activos"
-          value={String(activeCount)}
-          helper="Visitas autorizadas pendientes de ingreso"
-          icon={UserCheck}
-        />
-        <StatCard
-          label="Autorizadas hoy"
-          value={String(todayVisits)}
-          helper="Creadas para la fecha actual"
-          icon={CalendarClock}
-        />
-        <StatCard
-          label="Utilizados"
-          value={String(usedCount)}
-          helper="QR escaneados por garita"
-          icon={ShieldCheck}
-        />
-        <StatCard
-          label="Proveedores activos"
-          value={String(activeProvidersCount)}
-          helper="Servicios habilitados para tu unidad"
-          icon={BriefcaseBusiness}
-        />
-      </div>
-
       {errorMessage ? (
         <Alert variant="destructive">
           <AlertTitle>Error</AlertTitle>
@@ -929,6 +777,7 @@ export function InquilinoView() {
         </Alert>
       ) : null}
 
+      {section === "permisos" ? <>
       <Card className="border-0 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
         <CardHeader>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -938,7 +787,7 @@ export function InquilinoView() {
                 Permisos asignados
               </CardTitle>
               <CardDescription className="mt-2">
-                Permisos activos, restricciones y vigencias conectadas a la base de datos.
+                Permisos activos, restricciones y vigencias asignadas a su cuenta.
               </CardDescription>
             </div>
             <Button
@@ -953,7 +802,11 @@ export function InquilinoView() {
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.7fr)]">
           <div className="grid gap-3 md:grid-cols-2">
-            {permissions.length === 0 ? (
+            {isLoading ? (
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Cargando permisos...</div>
+            ) : loadErrors.permissions ? (
+              <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-700">{loadErrors.permissions}</p>
+            ) : permissions.length === 0 ? (
               <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
                 No hay permisos asignados.
               </div>
@@ -981,7 +834,11 @@ export function InquilinoView() {
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="font-semibold text-slate-900">Solicitudes digitales</p>
             <div className="mt-3 space-y-2">
-              {authorizationRequests.length === 0 ? (
+              {isLoading ? (
+                <p className="text-sm text-slate-500">Cargando solicitudes...</p>
+              ) : loadErrors.authorizations ? (
+                <p role="alert" className="text-sm text-rose-700">{loadErrors.authorizations}</p>
+              ) : authorizationRequests.length === 0 ? (
                 <p className="text-sm text-slate-500">Sin solicitudes registradas.</p>
               ) : (
                 authorizationRequests.slice(0, 5).map((request) => (
@@ -1000,7 +857,9 @@ export function InquilinoView() {
           </div>
         </CardContent>
       </Card>
+      </> : null}
 
+      {section === "proveedores" ? <>
       <Card className="border-0 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
         <CardHeader>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1049,6 +908,8 @@ export function InquilinoView() {
             <div className="rounded-3xl bg-slate-50 p-6 text-sm text-slate-500">
               Cargando proveedores de tu unidad...
             </div>
+          ) : loadErrors.providers ? (
+            <p role="alert" className="rounded-3xl bg-rose-50 p-6 text-sm text-rose-700">{loadErrors.providers}</p>
           ) : filteredProviders.length === 0 ? (
             <div className="rounded-3xl bg-slate-50 p-6 text-sm text-slate-500">
               No hay proveedores que coincidan con los filtros seleccionados.
@@ -1326,7 +1187,9 @@ export function InquilinoView() {
           )}
         </CardContent>
       </Card>
+      </> : null}
 
+      {section === "visitas" ? <>
       <Card className="overflow-hidden border-0 shadow-[0_18px_40px_rgba(30,41,59,0.12)]">
         <div className="bg-[linear-gradient(90deg,#a855f7_0%,#9333ea_45%,#9d00ff_100%)] px-5 py-6 text-white">
           <div className="flex items-center gap-3">
@@ -1335,7 +1198,7 @@ export function InquilinoView() {
             <span className="rounded-full bg-white/15 px-3 py-1 text-sm">1 click</span>
           </div>
           <p className="mt-3 text-lg text-white/95">
-            Autoriza visitantes frecuentes igual que en la vista de residente.
+            Autorice a sus visitantes frecuentes con un solo clic.
           </p>
         </div>
         <CardContent className="space-y-4 bg-white px-5 py-5">
@@ -1343,6 +1206,8 @@ export function InquilinoView() {
             <div className="rounded-3xl bg-slate-50 p-6 text-sm text-slate-500">
               Cargando visitantes frecuentes...
             </div>
+          ) : loadErrors.frequent ? (
+            <p role="alert" className="rounded-3xl bg-rose-50 p-6 text-sm text-rose-700">{loadErrors.frequent}</p>
           ) : frequentVisitors.length === 0 ? (
             <div className="rounded-3xl bg-slate-50 p-6 text-sm text-slate-500">
               Aun no tienes visitantes frecuentes registrados.
@@ -1699,6 +1564,7 @@ export function InquilinoView() {
           )}
         </CardContent>
       </Card>
+      </> : null}
 
       {editingVisit ? (
         <div

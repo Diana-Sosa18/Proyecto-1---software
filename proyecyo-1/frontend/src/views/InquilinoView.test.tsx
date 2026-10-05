@@ -51,7 +51,7 @@ vi.mock("@/services/notificationsService", () => ({
 function renderView() {
   return render(
     <MemoryRouter>
-      <InquilinoView />
+      <InquilinoView section="visitas" />
     </MemoryRouter>,
   );
 }
@@ -80,7 +80,8 @@ const usedVisit = {
 };
 
 describe("Accesos y permisos del inquilino", () => {
-  const renderView = () => render(<MemoryRouter><InquilinoView /></MemoryRouter>);
+  const renderView = (section: "visitas" | "permisos" = "visitas") =>
+    render(<MemoryRouter><InquilinoView section={section} /></MemoryRouter>);
   beforeEach(() => {
     window.localStorage.clear();
     vi.mocked(getVisitsRequest).mockResolvedValue([approvedVisit, usedVisit]);
@@ -111,10 +112,40 @@ describe("Accesos y permisos del inquilino", () => {
         estado: "ACTIVO",
       },
     ]);
-    renderView();
+    renderView("permisos");
 
     expect(await screen.findByText("Gestion de visitas")).toBeInTheDocument();
     expect(screen.getByText("ACTIVO")).toBeInTheDocument();
     expect(screen.getByText(/Solo dentro del horario permitido/)).toBeInTheDocument();
+  });
+
+  it("cada sección muestra solo su propia funcionalidad", async () => {
+    const { unmount } = renderView("permisos");
+    expect(await screen.findByRole("button", { name: /Solicitar autorizacion/ })).toBeInTheDocument();
+    expect(screen.queryByText("Gestion de accesos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Gestion de proveedores")).not.toBeInTheDocument();
+    unmount();
+
+    render(<MemoryRouter><InquilinoView section="proveedores" /></MemoryRouter>);
+    expect(await screen.findByText("Gestion de proveedores")).toBeInTheDocument();
+    expect(screen.queryByText("Gestion de accesos")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Solicitar autorizacion/ })).not.toBeInTheDocument();
+  });
+
+  it("no muestra alertas fijas ni resumen duplicado del dashboard", async () => {
+    renderView();
+    expect(await screen.findByText("Ana Aprobada")).toBeInTheDocument();
+    expect(screen.queryByText("Solicitud aprobada")).not.toBeInTheDocument();
+    expect(screen.queryByText("Alertas del sistema")).not.toBeInTheDocument();
+  });
+});
+
+describe("Estados de error del inquilino", () => {
+  it("muestra el error de carga de permisos en lugar de un falso vacío", async () => {
+    vi.mocked(getVisitsRequest).mockResolvedValue([]);
+    vi.mocked(getTenantPermissionsRequest).mockRejectedValue(new Error("Permisos no disponibles"));
+    render(<MemoryRouter><InquilinoView section="permisos" /></MemoryRouter>);
+    expect(await screen.findByText("Permisos no disponibles")).toBeInTheDocument();
+    expect(screen.queryByText("No hay permisos asignados.")).not.toBeInTheDocument();
   });
 });

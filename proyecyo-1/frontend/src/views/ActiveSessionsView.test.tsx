@@ -32,3 +32,9 @@ it("cierra un dispositivo ajeno a la sesion actual y lo elimina de la lista", as
   expect(closeActiveSessionRequest).toHaveBeenCalledWith("phone");
   expect(logout).not.toHaveBeenCalled();
 });
+
+it("no duplica la navegacion del sidebar para el residente", async () => {
+  render(<MemoryRouter><ActiveSessionsView /></MemoryRouter>);
+  expect(await screen.findByText("Safari en iOS")).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Volver al panel" })).not.toBeInTheDocument();
+});

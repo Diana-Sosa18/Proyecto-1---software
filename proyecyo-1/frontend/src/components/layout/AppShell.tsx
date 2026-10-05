@@ -1,7 +1,10 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { Building2, Laptop, LogOut, ShieldCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { GuardLayout } from "@/components/guardia/GuardLayout";
+import { TenantLayout } from "@/components/inquilino/TenantLayout";
+import { ResidentLayout } from "@/components/residente/ResidentLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +15,7 @@ type AppShellProps = {
   title: string;
   subtitle: string;
   children: ReactNode;
+  actions?: ReactNode;
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -21,7 +25,30 @@ const roleLabels: Record<UserRole, string> = {
   inquilino: "Inquilino",
 };
 
-export function AppShell({ role, title, subtitle, children }: AppShellProps) {
+type RoleLayoutProps = Omit<AppShellProps, "role">;
+
+// Layouts con sidebar por rol. Cada uno solo expone la navegacion de su rol;
+// los roles sin entrada (admin usa AdminLayout) conservan el shell anterior.
+const roleLayouts: Partial<Record<UserRole, ComponentType<RoleLayoutProps>>> = {
+  residente: ResidentLayout,
+  inquilino: TenantLayout,
+  guardia: GuardLayout,
+};
+
+export function AppShell({ role, title, subtitle, children, actions }: AppShellProps) {
+  const RoleLayout = roleLayouts[role];
+  if (RoleLayout) {
+    return (
+      <RoleLayout title={title} subtitle={subtitle} actions={actions}>
+        {children}
+      </RoleLayout>
+    );
+  }
+
+  return <LegacyAppShell role={role} title={title} subtitle={subtitle}>{children}</LegacyAppShell>;
+}
+
+function LegacyAppShell({ role, title, subtitle, children }: AppShellProps) {
   const { user, logout } = useAuth();
 
   return (

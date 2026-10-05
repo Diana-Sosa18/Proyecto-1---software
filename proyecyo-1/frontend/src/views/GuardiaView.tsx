@@ -10,15 +10,12 @@ import {
   QrCode,
   RefreshCw,
   ScanLine,
-  Shield,
   ShieldAlert,
-  UserCheck,
-  Users,
   XCircle,
 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
-import { StatCard } from "@/components/layout/StatCard";
+import { notifySidebarCountersChanged } from "@/components/layout/sidebarCounters";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -142,7 +139,28 @@ function canRegisterExit(visit: VisitRecord) {
   );
 }
 
-export function GuardiaView() {
+export type GuardiaSection = "control" | "visitas" | "historial" | "alertas";
+
+const sectionHeadings: Record<GuardiaSection, { title: string; subtitle: string }> = {
+  control: {
+    title: "Control de acceso",
+    subtitle: "Escanee o ingrese el código QR del visitante para registrar su ingreso o salida.",
+  },
+  visitas: {
+    title: "Visitas recientes",
+    subtitle: "Últimas visitas autorizadas: revise su estado y registre salidas desde garita.",
+  },
+  historial: {
+    title: "Historial de accesos",
+    subtitle: "Ingresos y salidas registrados, con filtros por fecha, estado y búsqueda.",
+  },
+  alertas: {
+    title: "Alertas",
+    subtitle: "Accesos cancelados por residentes o inquilinos y accesos especiales aprobados.",
+  },
+};
+
+export function GuardiaView({ section }: { section: GuardiaSection }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<number | null>(null);
@@ -266,29 +284,6 @@ export function GuardiaView() {
     () => notifications.filter((notification) => notification.tipo === "ACCESO_CANCELADO" && !notification.leido),
     [notifications],
   );
-  const pendingCount = useMemo(
-    () => visits.filter((visit) => visit.qr_status === "VALID").length,
-    [visits],
-  );
-  const registeredCount = useMemo(
-    () =>
-      visits.filter(
-        (visit) =>
-          visit.qr_status === "USED" ||
-          visit.qr_status === "EXIT_REGISTERED" ||
-          visit.estado_acceso === "SALIDA_REGISTRADA",
-      ).length,
-    [visits],
-  );
-
-  const exitCount = useMemo(
-    () =>
-      visits.filter(
-        (visit) => visit.qr_status === "EXIT_REGISTERED" || visit.estado_acceso === "SALIDA_REGISTRADA",
-      ).length,
-    [visits],
-  );
-
   function updateVisitCollection(visit: VisitRecord) {
     setVisits((current) => {
       const found = current.some((item) => item.id_acceso === visit.id_acceso);
@@ -322,6 +317,7 @@ export function GuardiaView() {
           notification.id_notificacion === notificationId ? { ...notification, leido: true } : notification,
         ),
       );
+      notifySidebarCountersChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "No fue posible marcar la alerta como leida.");
     }
@@ -331,6 +327,7 @@ export function GuardiaView() {
     try {
       await markAllGuardNotificationsAsReadRequest();
       setNotifications((current) => current.map((notification) => ({ ...notification, leido: true })));
+      notifySidebarCountersChanged();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "No fue posible marcar las alertas como leidas.");
     }
@@ -572,16 +569,9 @@ export function GuardiaView() {
   return (
     <AppShell
       role="guardia"
-      title="Panel de Guardia"
-      subtitle="Control de accesos, registro de visitas y operacion del puesto de seguridad."
+      title={sectionHeadings[section].title}
+      subtitle={sectionHeadings[section].subtitle}
     >
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Visitas del turno" value={String(visits.length)} helper={`${pendingCount} pendientes de ingreso`} icon={Users} />
-        <StatCard label="Escaneos QR" value={String(registeredCount)} helper="Ingresos ya registrados" icon={QrCode} />
-        <StatCard label="Validaciones" value={validatedVisit ? "OK" : "Lista"} helper="Control con QR en tiempo real" icon={UserCheck} />
-        <StatCard label="Salidas" value={String(exitCount)} helper="Visitantes con salida registrada" icon={Shield} />
-      </div>
-
       {errorMessage ? (
         <Alert variant="destructive">
           <AlertTitle>Error</AlertTitle>
@@ -596,6 +586,7 @@ export function GuardiaView() {
         </Alert>
       ) : null}
 
+      {section === "alertas" ? <>
       {cancellationAlerts.length > 0 ? (
         <Card className="border-rose-200 bg-rose-50/60 shadow-[0_10px_30px_rgba(244,63,94,0.08)]">
           <CardHeader>
@@ -661,10 +652,10 @@ export function GuardiaView() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-violet-900">
               <ShieldAlert className="size-5" />
-              Notificar al guardia
+              Accesos especiales
             </CardTitle>
             <CardDescription className="text-violet-700">
-              Accesos especiales aprobados por administracion.
+              Avisos de accesos especiales gestionados por administración.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -680,7 +671,14 @@ export function GuardiaView() {
           </CardContent>
         </Card>
       ) : null}
+      {cancellationAlerts.length === 0 && specialNotifications.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-slate-200 bg-white py-10 text-center text-sm text-slate-500">
+          No hay alertas pendientes. Las cancelaciones de acceso y los accesos especiales aprobados aparecerán aquí.
+        </p>
+      ) : null}
+      </> : null}
 
+      {section === "control" ? <>
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <Card className="border-slate-200">
           <CardHeader>
@@ -737,6 +735,7 @@ export function GuardiaView() {
               <p className="text-sm font-medium text-slate-900">Codigo manual</p>
               <div className="mt-3 flex flex-col gap-3 md:flex-row">
                 <input
+                  aria-label="Código QR manual"
                   value={manualCode}
                   onChange={(event) => setManualCode(event.target.value)}
                   placeholder="NEXUSVISIT:token o token"
@@ -817,7 +816,9 @@ export function GuardiaView() {
           </CardContent>
         </Card>
       </div>
+      </> : null}
 
+      {section === "visitas" ? <>
       <Card>
         <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -846,6 +847,10 @@ export function GuardiaView() {
             <div className="rounded-xl border border-slate-200 p-4 text-sm text-slate-500">
               Cargando visitas del turno...
             </div>
+          ) : visits.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500">
+              No hay visitas registradas para el turno.
+            </p>
           ) : (
             visits.map((visitor) => (
               <div
@@ -888,7 +893,9 @@ export function GuardiaView() {
           )}
         </CardContent>
       </Card>
+      </> : null}
 
+      {section === "historial" ? <>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -898,12 +905,14 @@ export function GuardiaView() {
             </div>
             <div className="grid gap-2 md:grid-cols-3">
               <input
+                aria-label="Fecha del historial"
                 type="date"
                 value={historyDate}
                 onChange={(event) => setHistoryDate(event.target.value)}
                 className="h-10 rounded-xl border border-slate-200 px-3 text-sm"
               />
               <select
+                aria-label="Filtrar por estado"
                 value={historyStatus}
                 onChange={(event) => setHistoryStatus(event.target.value)}
                 className="h-10 rounded-xl border border-slate-200 px-3 text-sm"
@@ -915,6 +924,7 @@ export function GuardiaView() {
                 <option value="CANCELADA">Canceladas</option>
               </select>
               <input
+                aria-label="Buscar visitante o casa"
                 value={historySearch}
                 onChange={(event) => setHistorySearch(event.target.value)}
                 placeholder="Visitante o casa"
@@ -975,6 +985,7 @@ export function GuardiaView() {
           </div>
         </CardContent>
       </Card>
+      </> : null}
     </AppShell>
   );
 }

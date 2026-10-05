@@ -49,3 +49,25 @@ it("muestra el contador y permite marcar una notificacion como leida", async () 
   expect(markNotificationAsReadRequest).toHaveBeenCalledWith(8);
   expect(screen.getByLabelText("0 pendientes")).toBeInTheDocument();
 });
+
+it("filtra comunicados y avisos y respeta el filtro inicial de /residente/comunicados", async () => {
+  const announcement = { ...unreadNotification, id_notificacion: 10, tipo: "COMUNICADO", titulo: "Asamblea general", leido: true };
+  vi.mocked(getNotificationsRequest).mockResolvedValue([unreadNotification, announcement]);
+  render(<MemoryRouter><ResidentNotificationsView initialFilter="COMUNICADOS" /></MemoryRouter>);
+
+  expect(await screen.findByText("Asamblea general")).toBeInTheDocument();
+  expect(screen.queryByText("Mantenimiento programado")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Comunicados" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByText("Comunicado")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Otros avisos" }));
+  expect(screen.getByText("Mantenimiento programado")).toBeInTheDocument();
+  expect(screen.queryByText("Asamblea general")).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Sin leer" }));
+  expect(screen.getByText("Mantenimiento programado")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Todos" }));
+  expect(screen.getByText("Asamblea general")).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Volver al panel" })).not.toBeInTheDocument();
+});

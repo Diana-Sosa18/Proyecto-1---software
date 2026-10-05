@@ -51,3 +51,8 @@ it("sobrepago historico deshabilita cobro", async () => {
   vi.mocked(getResidentAccountStatementRequest).mockResolvedValue({ ...pending, cuotas: [{ ...pending.cuotas[0], requiere_revision: true }] });
   mount(); expect(await screen.findByRole("button", { name: "Pagar" })).toBeDisabled();
 });
+it("no duplica la navegacion del sidebar y conserva Actualizar", async () => {
+  mount(); await screen.findByText("Mantenimiento");
+  expect(screen.queryByRole("button", { name: "Volver" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Actualizar" })).toBeEnabled();
+});

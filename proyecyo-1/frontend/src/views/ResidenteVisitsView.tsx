@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import {
-  ArrowLeft,
   CalendarDays,
   Camera,
   ChevronLeft,
@@ -12,7 +11,6 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -123,7 +121,6 @@ function getVisitStatusLabel(visit: VisitRecord) {
 }
 
 export function ResidenteVisitsView() {
-  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<VisitFormState>(createInitialForm);
   const [visits, setVisits] = useState<VisitRecord[]>([]);
@@ -411,21 +408,10 @@ export function ResidenteVisitsView() {
   return (
     <AppShell
       role="residente"
-      title="Panel de Residente"
-      subtitle="Visitas, amenidades, avisos y operacion diaria de su unidad residencial."
+      title="Mis visitas"
+      subtitle="Autorice visitas, consulte su estado y gestione sus visitantes frecuentes."
     >
       <div className="space-y-6">
-        <button
-          type="button"
-          onClick={() => navigate("/residente")}
-          className="inline-flex items-center gap-3 text-left text-slate-700 transition hover:text-slate-950"
-        >
-          <ArrowLeft className="size-5" />
-          <div>
-            <h2 className="text-2xl font-semibold text-slate-900">Autorizar Visita</h2>
-            <p className="text-sm text-slate-600">Registro rapido e intuitivo</p>
-          </div>
-        </button>
 
         {errorMessage ? (
           <Alert variant="destructive">

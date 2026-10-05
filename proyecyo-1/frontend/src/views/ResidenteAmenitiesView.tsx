@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Clock3, History, Pencil, XCircle } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, History, Pencil, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
@@ -332,22 +332,9 @@ export function ResidenteAmenitiesView() {
   return (
     <AppShell
       role="residente"
-      title="Panel de Residente"
-      subtitle="Visitas, amenidades, avisos y operacion diaria de su unidad residencial."
-    >
-      <div className="space-y-6">
-        <button
-          type="button"
-          onClick={() => navigate("/residente")}
-          className="inline-flex items-center gap-3 text-left text-slate-700 transition hover:text-slate-950"
-        >
-          <ArrowLeft className="size-5" />
-          <div>
-            <h2 className="text-2xl font-semibold text-slate-900">Reservar amenidades</h2>
-            <p className="text-sm text-slate-600">Disponibilidad real y confirmacion inmediata</p>
-          </div>
-        </button>
-
+      title="Amenidades"
+      subtitle="Disponibilidad real, reservas y confirmación inmediata."
+      actions={
         <Button
           type="button"
           variant="outline"
@@ -355,6 +342,9 @@ export function ResidenteAmenitiesView() {
         >
           Comparar todas las amenidades
         </Button>
+      }
+    >
+      <div className="space-y-6">
 
         {errorMessage ? (
           <Alert variant="destructive">

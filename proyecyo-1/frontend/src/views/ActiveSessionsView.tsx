@@ -3,6 +3,7 @@ import { Clock3, Laptop, MapPin, ShieldCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { rolesWithSidebar } from "@/components/layout/roleNavigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,7 +58,8 @@ export function ActiveSessionsView() {
   const home = user ? `/${user.role}` : "/";
   return (
     <AppShell role={user?.role ?? "residente"} title="Sesiones activas" subtitle="Revisa los dispositivos con acceso a tu cuenta y cierra los que no reconozcas.">
-      <Link className="text-sm font-semibold text-blue-700 hover:text-blue-900" to={home}>Volver al panel</Link>
+      {/* Los roles con sidebar persistente no necesitan este enlace; admin lo conserva. */}
+      {!user || !rolesWithSidebar.has(user.role) ? <Link className="text-sm font-semibold text-blue-700 hover:text-blue-900" to={home}>Volver al panel</Link> : null}
       {error ? <Alert variant="destructive"><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
       <Card className="border-slate-200">
         <CardHeader>
