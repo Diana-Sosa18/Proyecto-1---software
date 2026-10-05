@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type DependencyList, type ReactNode } fro
 import { ArrowRight, Bell, CheckCheck, Clock3, UserRoundCheck, Wallet, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { notifySidebarCountersChanged } from "@/components/layout/sidebarCounters";
+import { notifySidebarCountersChanged, subscribeToSidebarCounters } from "@/components/layout/sidebarCounters";
 import { useUnreadNotificationsCount } from "@/components/notifications/unreadNotifications";
 import { Button } from "@/components/ui/button";
 import {
@@ -236,16 +236,29 @@ export function RecentVisitsPanel({ visits, to, empty }: { visits: Loadable<Visi
 
 /** Estado y acciones del centro de avisos (notificaciones propias del usuario). */
 export function useNotificationCenter() {
-  const [notifications, setNotifications] = useLoadable(
-    getNotificationsRequest,
-    "No fue posible cargar las notificaciones.",
-    [],
-  );
+  const [notifications, setNotifications] = useState<Loadable<NotificationRecord[]>>({ status: "loading" });
   // Total real de no leidas (misma fuente que el badge del sidebar). El listado
   // solo trae las 20 notificaciones mas recientes y sirve como vista previa.
   const unreadTotal = useUnreadNotificationsCount();
   const [actionError, setActionError] = useState("");
   const [updating, setUpdating] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    let generation = 0;
+    const reload = () => {
+      const request = ++generation;
+      getNotificationsRequest()
+        .then(data => { if (active && request === generation) setNotifications({ status: "ready", data }); })
+        .catch(error => {
+          if (active && request === generation) setNotifications(current => current.status === "ready" ? current
+            : { status: "error", message: errorMessage(error, "No fue posible cargar las notificaciones.") });
+        });
+    };
+    reload();
+    const unsubscribe = subscribeToSidebarCounters(reload);
+    return () => { active = false; unsubscribe(); };
+  }, [setNotifications]);
 
   const unread = useMemo(
     () => (notifications.status === "ready" ? notifications.data.filter((item) => !item.leido) : []),

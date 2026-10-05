@@ -1,5 +1,6 @@
 const { createHash } = require("node:crypto");
 const { recordIntentEvidence } = require('./recurrenteIntentHistory');
+const { enqueueAttempt } = require('./financialNotificationOutbox');
 
 // Called inside HU14's signed inbox transaction, after the same quota/checkout
 // ownership, environment, currency and authorized-amount checks. Never writes
@@ -63,6 +64,7 @@ async function recordAttempt(c, local, event, inbox, complete) {
     transaction={id_transaccion:created.insertId,ambiente:local.ambiente};
   }
   if (!await recordIntentEvidence(c,transaction,event,inbox,event.attemptState)) throw Object.assign(new Error('Conflicting intent identity.'),{code:'WEBHOOK_EVENT_CONFLICT'});
+  await enqueueAttempt(c, local, event);
   return complete("PROCESADO");
 }
 module.exports = { recordAttempt };

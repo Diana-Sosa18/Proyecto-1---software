@@ -1,44 +1,21 @@
-const mockConnection = { beginTransaction: jest.fn(), execute: jest.fn(), commit: jest.fn(), rollback: jest.fn(), release: jest.fn() };
-jest.mock("../../database/mysql", () => ({ query: jest.fn(), pool: { getConnection: jest.fn(async () => mockConnection) } }));
-const { query } = require("../../database/mysql");
-const { sendPaymentReminders } = require("../adminRemindersService");
-
-function quota(id_usuario, id_cuota = 1) { return { id_usuario, id_cuota, id_casa: 2, saldo: 100,
-  servicio: "Alquiler", fecha_limite: "2099-01-02", dias_para_vencer: 1 }; }
-
-beforeEach(() => { jest.clearAllMocks(); mockConnection.execute.mockReset(); });
-
-async function prepare(quotas, existing = []) {
-  query.mockResolvedValueOnce([{ clave: "recordatorios_activo", valor: "true" }, { clave: "recordatorios_dias_antes", valor: "3" }])
-    .mockResolvedValueOnce(quotas);
-  mockConnection.execute.mockImplementation(async (sql) => {
-    if (sql.includes("SELECT id_recordatorio")) return [existing];
-    if (sql.includes("INSERT INTO NOTIFICACION")) return [{ insertId: 44 }];
-    return [{}];
-  });
-  return sendPaymentReminders(null);
-}
-
-test("genera recordatorios separados para residente e inquilino correctos", async () => {
-  const result = await prepare([quota(10), quota(20)]);
-  expect(result.enviados).toBe(2);
-  const notificationCalls = mockConnection.execute.mock.calls.filter(([sql]) => sql.includes("INSERT INTO NOTIFICACION"));
-  expect(notificationCalls.map((call) => call[1][0])).toEqual([10, 20]);
+jest.mock('../../database/mysql', () => ({ query: jest.fn(), pool: {} }));
+const { __private__: rules } = require('../financialNotificationsService');
+const { calculateBalance } = require('../financialBalance');
+test('destinatarios usan relaciones activas y la unidad del estado de cuenta', async () => {
+ const c = {execute:jest.fn().mockResolvedValue([[{id_usuario:10},{id_usuario:20}]])};
+ expect(await rules.recipients(c,27)).toEqual([10,20]);
+ const [sql,args]=c.execute.mock.calls[0];expect(args).toEqual([27,27]);
+ expect(sql).toContain('i.autorizado=TRUE');expect(sql).toContain('u.activo=TRUE');expect(sql).toContain('LIMIT 1');
 });
-
-test("no duplica cuota, usuario, tipo y fecha", async () => {
-  const result = await prepare([quota(10)], [{ id_recordatorio: 1 }]);
-  expect(result.enviados).toBe(0);
-  expect(mockConnection.execute.mock.calls[0][1].slice(0, 2)).toEqual([1, 10]);
+test('recordatorio excluye alquiler/renta del propietario sin ampliar permisos',async()=>{
+ const c={execute:jest.fn().mockResolvedValue([[]])};await rules.recipients(c,1);
+ expect(c.execute.mock.calls[0][0]).toContain("LOWER(s.nombre) NOT LIKE '%renta%'");
+ expect(c.execute.mock.calls[0][0]).toContain("LOWER(COALESCE(s.tipo_servicio,'')) <> 'alquiler'");
 });
-
-test("consulta solo saldos impagos dentro del rango configurado", async () => {
-  const result = await prepare([]);
-  expect(result.enviados).toBe(0);
-  const sql = query.mock.calls[1][0];
-  expect(sql).toContain("cu.saldo_pendiente > 0");
-  expect(sql).toContain("AS recargo_pendiente");
-  expect(sql).toContain("DATE_ADD(?, INTERVAL ? DAY)");
-  expect(sql).toContain("i.autorizado = TRUE");
-  expect(sql).toContain("activo = TRUE");
+test('mensaje utiliza saldo can?nico y recargos realmente pendientes',()=>{
+ const q={id_cuota:1,servicio:'Mantenimiento',vencimiento:'2026-10-01',balance:calculateBalance({monto:100,recargo:15,pagado:10})};
+ const data=rules.deadlineData(q,10,0,{type:'CUOTA_VENCIDA',window:'INICIAL',date:'2026-10-04'});
+ expect(data.monto_centavos).toBe(10500);expect(data.recargo_centavos).toBe(500);
+ expect(data.mensaje).toContain('Q105.00');expect(data.mensaje).toContain('recargos pendientes de Q5.00');
+ expect(data.mensaje).not.toContain('evitar recargos');
 });

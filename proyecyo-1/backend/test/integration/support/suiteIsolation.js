@@ -83,7 +83,7 @@ async function tableCounts(connection) {
   for (const table of BACKUP_TABLES) {
     try { entries.push([table,Number((await connection.query(`SELECT COUNT(*) n FROM \`${table}\``))[0][0].n)]); }
     catch(error) {
-      if(error.code!=='ER_NO_SUCH_TABLE' || !['INTENTO_RECURRENTE','REVISION_EVENTO_RECURRENTE','REPARACION_REVISION_RECURRENTE'].includes(table)) throw error;
+      if(error.code!=='ER_NO_SUCH_TABLE' || !['INTENTO_RECURRENTE','REVISION_EVENTO_RECURRENTE','REPARACION_REVISION_RECURRENTE','CICLO_NOTIFICACION_CUOTA','ENTREGA_NOTIFICACION_FINANCIERA'].includes(table)) throw error;
       entries.push([table,null]); // Shared manual DB may intentionally await migration 006.
     }
   }
@@ -123,6 +123,7 @@ async function prepareSuiteDatabase(context) {
     await migrations.applyRecurrenteRefundsMigration(target);
     await migrations.applyRecurrenteIntentHistoryMigration(target);
     await migrations.applyRecurrenteReviewPrecisionMigration(target);
+    await migrations.applyFinancialNotificationsMigration(target);
   } finally { await target.end(); }
 }
 

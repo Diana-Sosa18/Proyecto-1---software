@@ -24,14 +24,16 @@ export function useUnreadNotificationsCount() {
 
   useEffect(() => {
     let active = true;
+    let generation = 0;
 
     function load() {
+      const request = ++generation;
       loadUnreadNotificationsCount()
         .then((data) => {
-          if (active) setState({ status: "ready", data });
+          if (active && request === generation) setState({ status: "ready", data });
         })
         .catch((error) => {
-          if (active) {
+          if (active && request === generation) {
             setState({
               status: "error",
               message: error instanceof Error && error.message ? error.message : "No fue posible contar los avisos.",

@@ -7,6 +7,7 @@ const ATTEMPTS_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/00
 const REFUNDS_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/005_recurrente_refunds.sql");
 const INTENT_HISTORY_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/006_recurrente_intent_history.sql");
 const REVIEW_PRECISION_MIGRATION_PATH = path.resolve(__dirname, "../../sql/migrations/007_recurrente_review_precision.sql");
+const FINANCIAL_NOTIFICATIONS_MIGRATION_PATH = path.resolve(__dirname, '../../sql/migrations/008_financial_notifications.sql');
 function migrationStatements(file = MIGRATION_PATH) {
   // This migration contains plain SQL, without procedures or semicolons in literals.
   return fs.readFileSync(file, "utf8").replace(/^\s*--.*$/gm, "")
@@ -30,5 +31,6 @@ const applyRecurrenteAttemptsMigration = (connection) => applyMigration(connecti
 const applyRecurrenteRefundsMigration = (connection) => applyMigration(connection, REFUNDS_MIGRATION_PATH, "nexus_recurrente_hu18");
 const applyRecurrenteIntentHistoryMigration = (connection) => applyMigration(connection, INTENT_HISTORY_MIGRATION_PATH, "nexus_recurrente_intent_history");
 const applyRecurrenteReviewPrecisionMigration = (connection) => applyMigration(connection, REVIEW_PRECISION_MIGRATION_PATH, "nexus_recurrente_review_precision");
-module.exports = { applyRecurrenteReviewPrecisionMigration, REVIEW_PRECISION_MIGRATION_PATH, applyRecurrenteIntentHistoryMigration, INTENT_HISTORY_MIGRATION_PATH, applyRecurrenteRefundsMigration, REFUNDS_MIGRATION_PATH, applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration, applyRecurrenteAttemptsMigration,
+const applyFinancialNotificationsMigration = (connection) => applyMigration(connection, FINANCIAL_NOTIFICATIONS_MIGRATION_PATH, 'nexus_financial_notifications');
+module.exports = { applyFinancialNotificationsMigration, FINANCIAL_NOTIFICATIONS_MIGRATION_PATH, applyRecurrenteReviewPrecisionMigration, REVIEW_PRECISION_MIGRATION_PATH, applyRecurrenteIntentHistoryMigration, INTENT_HISTORY_MIGRATION_PATH, applyRecurrenteRefundsMigration, REFUNDS_MIGRATION_PATH, applyRecurrentePreparation, applyRecurrenteCheckoutMigration, applyRecurrenteConfirmationMigration, applyRecurrenteAttemptsMigration,
   migrationStatements, MIGRATION_PATH, CHECKOUT_MIGRATION_PATH, CONFIRMATION_MIGRATION_PATH, ATTEMPTS_MIGRATION_PATH };
