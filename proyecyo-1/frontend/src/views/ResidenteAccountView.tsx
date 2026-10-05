@@ -6,7 +6,6 @@ import {
   RefreshCw,
   WalletCards,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { FinancialReviewNotice } from "@/components/payments/FinancialReviewNotice";
@@ -93,7 +92,6 @@ function getProgress(quota: AccountQuota) {
 }
 
 export function ResidenteAccountView() {
-  const navigate = useNavigate();
   const [statement, setStatement] = useState<AccountStatement>(emptyStatement);
   const [selectedFilter, setSelectedFilter] = useState<AccountFilter>("TODAS");
   const [isLoading, setIsLoading] = useState(true);
@@ -213,9 +211,6 @@ export function ResidenteAccountView() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate("/residente")}>
-            Volver
-          </Button>
           <Button
             type="button"
             onClick={() => void loadAccount({ silent: true })}

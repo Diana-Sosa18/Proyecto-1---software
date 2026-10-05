@@ -10,7 +10,6 @@ import {
   Download,
   LoaderCircle,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { FinancialReviewNotice } from "@/components/payments/FinancialReviewNotice";
@@ -203,7 +202,6 @@ function QuotaTable({
 }
 
 export function InquilinoAccountView() {
-  const navigate = useNavigate();
   const [statement, setStatement] = useState<TenantAccountStatement>(emptyStatement);
   const [selectedFilter, setSelectedFilter] = useState<TenantAccountFilter>("TODAS");
   const [isLoading, setIsLoading] = useState(true);
@@ -335,9 +333,6 @@ export function InquilinoAccountView() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate("/inquilino")}>
-            Volver
-          </Button>
           <Button
             type="button"
             onClick={() => void loadAccount({ silent: true })}

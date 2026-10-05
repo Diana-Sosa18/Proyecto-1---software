@@ -24,3 +24,10 @@ it("paga una obligación autorizada, refresca HU7/HU10 y anuncia el comprobante"
   expect(screen.getByText(/comprobante está disponible/)).toBeInTheDocument();
   expect(getTenantAccountStatementRequest).toHaveBeenCalledTimes(2);
 });
+
+it("no duplica la navegacion del sidebar con un boton Volver", async () => {
+  vi.mocked(getTenantAccountStatementRequest).mockResolvedValue(statement);
+  render(<MemoryRouter><InquilinoAccountView /></MemoryRouter>);
+  expect(await screen.findByRole("button", { name: "Pagar" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Volver" })).not.toBeInTheDocument();
+});

@@ -1,426 +1,188 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, CheckCheck, CreditCard, ShieldCheck, UserRoundCheck, Wallet } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Bell, BriefcaseBusiness, CalendarDays, UserRoundCheck, Wallet } from "lucide-react";
+import { Link } from "react-router-dom";
 
+import {
+  balanceHelper,
+  formatCurrency,
+  formatDay,
+  isActiveVisit,
+  KpiCard,
+  KpiGrid,
+  localDate,
+  NotificationCenterPanel,
+  Panel,
+  PanelGrid,
+  PanelLink,
+  PanelState,
+  QuotaStatusPanel,
+  RecentVisitsPanel,
+  useLoadable,
+  useNotificationCenter,
+} from "@/components/dashboard/dashboardWidgets";
 import { AppShell } from "@/components/layout/AppShell";
-import { StatCard } from "@/components/layout/StatCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  getNotificationsRequest,
-  markAllNotificationsAsReadRequest,
-  markNotificationAsReadRequest,
-} from "@/services/notificationsService";
-import {
-  getOwnerProvidersRequest,
-  updateOwnerProviderValidationRequest,
-} from "@/services/providersService";
+import { useAuth } from "@/hooks/useAuth";
 import { getResidentAccountStatementRequest } from "@/services/accountService";
+import { getAmenitiesReservationsRequest } from "@/services/amenitiesService";
+import { getOwnerProvidersRequest } from "@/services/providersService";
 import { getVisitsRequest } from "@/services/visitsService";
-import type { NotificationRecord } from "@/types/notifications";
+import type { AmenityReservation } from "@/types/amenities";
 import type { AdminProviderRecord } from "@/types/providers";
-import type { VisitRecord } from "@/types/visits";
-import type { AccountSummary } from "@/types/account";
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("es-GT", { style: "currency", currency: "GTQ" }).format(value);
-}
+const ACTIVE_RESERVATION_STATES: AmenityReservation["estado_actual"][] = ["PENDIENTE", "CONFIRMADA", "EN_CURSO"];
+
+const reservationStatusLabels: Record<AmenityReservation["estado_actual"], string> = {
+  PENDIENTE: "Pendiente",
+  CONFIRMADA: "Confirmada",
+  EN_CURSO: "En curso",
+  FINALIZADA: "Finalizada",
+  CANCELADA: "Cancelada",
+};
 
 export function ResidenteView() {
-  const navigate = useNavigate();
-  const [visits, setVisits] = useState<VisitRecord[]>([]);
-  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const { user } = useAuth();
+  const [account] = useLoadable(
+    () => getResidentAccountStatementRequest().then((response) => response.resumen),
+    "No fue posible cargar el estado de cuenta.",
+    [],
+  );
+  const [visits] = useLoadable(getVisitsRequest, "No fue posible cargar las visitas.", []);
+  const [reservations] = useLoadable(
+    () => getAmenitiesReservationsRequest({ from: localDate(), to: localDate(30), id_usuario: user?.id }),
+    "No fue posible cargar las reservas.",
+    [user?.id],
+  );
+  const notificationCenter = useNotificationCenter();
   const [providers, setProviders] = useState<AdminProviderRecord[]>([]);
-  const [accountSummary, setAccountSummary] = useState<AccountSummary | null>(null);
-  const [notificationsError, setNotificationsError] = useState("");
-  const [providersError, setProvidersError] = useState("");
-  const [validatingProviderId, setValidatingProviderId] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
-
-    getVisitsRequest()
+    getOwnerProvidersRequest({ status: "PENDIENTE" })
       .then((response) => {
-        if (active) {
-          setVisits(response);
-        }
+        if (active) setProviders(response);
       })
       .catch(() => {
-        if (active) {
-          setVisits([]);
-        }
+        if (active) setProviders([]);
       });
-
-    getNotificationsRequest()
-      .then((response) => {
-        if (active) {
-          setNotifications(response);
-        }
-      })
-      .catch((error) => {
-        if (active) {
-          setNotificationsError(
-            error instanceof Error ? error.message : "No fue posible cargar las notificaciones.",
-          );
-        }
-      });
-
-    getOwnerProvidersRequest()
-      .then((response) => {
-        if (active) {
-          setProviders(response);
-        }
-      })
-      .catch((error) => {
-        if (active) {
-          setProvidersError(
-            error instanceof Error ? error.message : "No fue posible cargar los proveedores por validar.",
-          );
-        }
-      });
-
-    getResidentAccountStatementRequest()
-      .then((response) => {
-        if (active) setAccountSummary(response.resumen);
-      })
-      .catch(() => {
-        if (active) setAccountSummary(null);
-      });
-
     return () => {
       active = false;
     };
   }, []);
 
-  const todayVisits = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return visits.filter((visit) => visit.fecha === today).length;
-  }, [visits]);
-
-  const unreadNotifications = useMemo(
-    () => notifications.filter((notification) => !notification.leido),
-    [notifications],
+  const today = localDate();
+  const activeVisits = useMemo(
+    () => (visits.status === "ready" ? visits.data.filter((visit) => isActiveVisit(visit, today)) : []),
+    [visits, today],
   );
-  const pendingProviders = useMemo(
-    () => providers.filter((provider) => provider.estado === "PENDIENTE"),
-    [providers],
+  const activeReservations = useMemo(
+    () =>
+      reservations.status === "ready"
+        ? reservations.data
+            .filter((reservation) => ACTIVE_RESERVATION_STATES.includes(reservation.estado_actual))
+            .sort((a, b) => `${a.fecha} ${a.hora_inicio}`.localeCompare(`${b.fecha} ${b.hora_inicio}`))
+        : [],
+    [reservations],
   );
-
-  async function markNotificationAsRead(notificationId: number) {
-    try {
-      const updated = await markNotificationAsReadRequest(notificationId);
-
-      setNotifications((current) =>
-        current.map((notification) =>
-          notification.id_notificacion === updated.id_notificacion ? updated : notification,
-        ),
-      );
-    } catch (error) {
-      setNotificationsError(
-        error instanceof Error ? error.message : "No fue posible marcar la notificacion como leida.",
-      );
-    }
-  }
-
-  async function markAllAsRead() {
-    try {
-      await markAllNotificationsAsReadRequest();
-
-      setNotifications((current) =>
-        current.map((notification) => ({
-          ...notification,
-          leido: true,
-        })),
-      );
-    } catch (error) {
-      setNotificationsError(
-        error instanceof Error ? error.message : "No fue posible marcar las notificaciones como leidas.",
-      );
-    }
-  }
-
-  async function validateProvider(provider: AdminProviderRecord) {
-    try {
-      setValidatingProviderId(provider.id_servicio);
-      setProvidersError("");
-      const updated = await updateOwnerProviderValidationRequest({
-        id_servicio: provider.id_servicio,
-        id_casa: provider.id_casa,
-        estado: "VALIDADO",
-        activo: true,
-      });
-
-      setProviders((current) =>
-        current.map((item) =>
-          item.id_servicio === updated.id_servicio && item.id_casa === updated.id_casa ? updated : item,
-        ),
-      );
-    } catch (error) {
-      setProvidersError(
-        error instanceof Error ? error.message : "No fue posible validar el proveedor.",
-      );
-    } finally {
-      setValidatingProviderId(null);
-    }
-  }
+  const pendingProviders = providers.filter((provider) => provider.estado === "PENDIENTE");
+  const summary = account.status === "ready" ? account.data : null;
+  const { unreadTotal } = notificationCenter;
+  const unreadCount = unreadTotal.status === "ready" ? unreadTotal.data : 0;
 
   return (
     <AppShell
       role="residente"
-      title="Panel de Residente"
-      subtitle="Visitas, amenidades, avisos y operacion diaria de su unidad residencial."
+      title="Dashboard"
+      subtitle="Resumen de su unidad: saldo, visitas, reservas y avisos."
     >
-      {notificationsError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Error en notificaciones</AlertTitle>
-          <AlertDescription>{notificationsError}</AlertDescription>
+      {pendingProviders.length > 0 ? (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+          <BriefcaseBusiness className="size-4" />
+          <AlertTitle>
+            {pendingProviders.length} proveedor{pendingProviders.length === 1 ? "" : "es"} pendiente
+            {pendingProviders.length === 1 ? "" : "s"} de validación
+          </AlertTitle>
+          <AlertDescription className="text-amber-800">
+            <p>Registrados por inquilinos de su unidad.</p>
+            <Link to="/residente/proveedores" className="font-semibold underline underline-offset-2 hover:text-amber-950">
+              Revisar proveedores
+            </Link>
+          </AlertDescription>
         </Alert>
       ) : null}
 
-      {unreadNotifications.length > 0 ? (
-        <Alert className="border-green-200 bg-green-50 text-green-800">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <AlertTitle className="flex items-center gap-2 text-lg">
-                <Bell className="size-5" />
-                Tienes {unreadNotifications.length} notificacion
-                {unreadNotifications.length === 1 ? "" : "es"} pendiente
-              </AlertTitle>
-
-              <AlertDescription className="mt-3 space-y-3 text-green-900">
-                {unreadNotifications.slice(0, 3).map((notification) => (
-                  <div
-                    key={notification.id_notificacion}
-                    className="rounded-2xl border border-green-100 bg-white/80 p-3"
-                  >
-                    <p className="font-semibold">{notification.titulo}</p>
-                    <p className="text-sm">{notification.mensaje}</p>
-
-                    <button
-                      type="button"
-                      onClick={() => void markNotificationAsRead(notification.id_notificacion)}
-                      className="mt-2 text-xs font-semibold text-green-700 hover:text-green-950"
-                    >
-                      Marcar como leida
-                    </button>
-                  </div>
-                ))}
-              </AlertDescription>
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void markAllAsRead()}
-              className="rounded-2xl border-green-200 bg-white text-green-700 hover:bg-green-100"
-            >
-              <CheckCheck className="size-4" />
-              Marcar todas
-            </Button>
-          </div>
-        </Alert>
-      ) : null}
-
-      {providersError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Error en proveedores</AlertTitle>
-          <AlertDescription>{providersError}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Visitas autorizadas"
-          value={String(visits.length)}
-          helper={`${todayVisits} programadas para hoy`}
-          icon={UserRoundCheck}
-          onClick={() => navigate("/residente/visitas")}
-        />
-
-        <StatCard
-          label="Reservas"
-          value="2"
-          helper="Salon y cancha activos"
-          icon={CalendarDays}
-        />
-
-        <StatCard
-          label="Avisos"
-          value={String(unreadNotifications.length)}
-          helper={
-            unreadNotifications.length === 0
-              ? "Sin notificaciones pendientes"
-              : "Notificaciones sin leer"
-          }
-          icon={Bell}
-          onClick={() => navigate("/residente/notificaciones")}
-        />
-
-        <StatCard
-          label="Proveedores"
-          value={String(pendingProviders.length)}
-          helper={
-            pendingProviders.length === 0
-              ? "Sin validaciones pendientes"
-              : "Pendientes de validar"
-          }
-          icon={BriefcaseBusiness}
-        />
-
-        <StatCard
-          label="Estado de cuenta"
-          value={accountSummary ? formatCurrency(accountSummary.saldo_pendiente) : "Q0.00"}
-          helper={accountSummary?.cuotas_vencidas ? `${accountSummary.cuotas_vencidas} cuotas vencidas` : "Sin mora activa"}
-          icon={CreditCard}
-          onClick={() => navigate("/residente/estado-cuenta")}
-        />
-
-        <StatCard
-          label="Resumen mensual"
-          value="Ver"
-          helper="Visitas, accesos y reservas"
-          icon={BarChart3}
-          onClick={() => navigate("/residente/resumen-mensual")}
-        />
-
-        <StatCard
-          label="Cargos y pagos"
-          value="Ver"
-          helper="Cargos, recargos y pagos de su unidad"
+      <KpiGrid>
+        <KpiCard
+          label="Saldo pendiente"
           icon={Wallet}
-          onClick={() => navigate("/residente/detalle-financiero")}
+          to="/residente/pagos"
+          linkLabel="Ir a mis pagos"
+          state={account}
+          value={summary ? formatCurrency(summary.saldo_pendiente) : ""}
+          helper={summary ? balanceHelper(summary) : ""}
+          tone={summary && summary.cuotas_vencidas > 0 ? "amber" : "blue"}
         />
-      </div>
+        <KpiCard
+          label="Visitas activas"
+          icon={UserRoundCheck}
+          to="/residente/visitas"
+          linkLabel="Ver mis visitas"
+          state={visits}
+          value={String(activeVisits.length)}
+          helper={`${activeVisits.filter((visit) => visit.fecha === today).length} para hoy`}
+          tone="emerald"
+        />
+        <KpiCard
+          label="Reservas activas"
+          icon={CalendarDays}
+          to="/residente/amenidades"
+          linkLabel="Ver amenidades"
+          state={reservations}
+          value={String(activeReservations.length)}
+          helper="Próximos 30 días"
+          tone="violet"
+        />
+        <KpiCard
+          label="Avisos no leídos"
+          icon={Bell}
+          to="/residente/notificaciones"
+          linkLabel="Ver avisos"
+          state={unreadTotal}
+          value={String(unreadCount)}
+          helper={unreadCount === 0 ? "Todo al día" : "Pendientes de lectura"}
+        />
+      </KpiGrid>
 
-      <Card className="border-0 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-        <CardHeader>
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-xl text-slate-900">
-                <BriefcaseBusiness className="size-5 text-blue-600" />
-                Validacion de proveedores
-              </CardTitle>
-              <CardDescription>
-                Proveedores registrados por inquilinos que requieren aprobacion del propietario.
-              </CardDescription>
-            </div>
-            <div className="rounded-2xl bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">
-              {pendingProviders.length} pendientes
-            </div>
-          </div>
-        </CardHeader>
+      <PanelGrid>
+        <QuotaStatusPanel state={account} to="/residente/pagos" linkLabel="Mis pagos" />
 
-        <CardContent className="space-y-3">
-          {providers.length === 0 ? (
-            <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-500">
-              No hay proveedores asociados a tu unidad.
-            </div>
-          ) : (
-            providers.slice(0, 6).map((provider) => {
-              const isValidating = validatingProviderId === provider.id_servicio;
-
-              return (
-                <article
-                  key={`${provider.id_casa}-${provider.id_servicio}`}
-                  className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_170px]"
-                >
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold text-slate-900">{provider.nombre}</h3>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${
-                          provider.estado === "VALIDADO"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-amber-50 text-amber-700"
-                        }`}
-                      >
-                        {provider.estado === "VALIDADO" ? "Aprobado" : "Pendiente"}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-500">{provider.descripcion}</p>
-                    <p className="mt-2 text-xs text-slate-500">
-                      Unidad {provider.casa_unidad} - Registrado por {provider.registrado_por || "sin registro"}
+        <Panel title="Próximas reservas" icon={CalendarDays} action={<PanelLink to="/residente/amenidades">Reservar</PanelLink>}>
+          {activeReservations.length > 0 ? (
+            <ul className="divide-y divide-slate-100">
+              {activeReservations.slice(0, 4).map((reservation) => (
+                <li key={reservation.reservation_key} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-900">{reservation.amenidad_nombre}</p>
+                    <p className="text-xs text-slate-500">
+                      {formatDay(reservation.fecha)} · {reservation.hora_inicio} – {reservation.hora_fin}
                     </p>
                   </div>
-
-                  <div className="flex items-center justify-start md:justify-end">
-                    <Button
-                      type="button"
-                      onClick={() => void validateProvider(provider)}
-                      disabled={isValidating || provider.estado === "VALIDADO"}
-                      className="h-10 rounded-2xl bg-blue-600 text-white hover:bg-blue-700"
-                    >
-                      {isValidating ? (
-                        <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      ) : (
-                        <ShieldCheck className="size-4" />
-                      )}
-                      Aprobar
-                    </Button>
-                  </div>
-                </article>
-              );
-            })
+                  <span className="shrink-0 rounded-full bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700">
+                    {reservationStatusLabels[reservation.estado_actual]}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <PanelState state={reservations} empty="No tiene reservas activas en los próximos 30 días." />
           )}
-        </CardContent>
-      </Card>
+        </Panel>
+      </PanelGrid>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {[
-          {
-            title: "Estado de cuenta",
-            description: "Revise saldo pendiente, cuotas pagadas y vencimientos.",
-            path: "/residente/estado-cuenta",
-          },
-          {
-            title: "Visitas",
-            description: "Autorice ingresos temporales, recurrentes o permanentes.",
-            path: "/residente/visitas",
-          },
-          {
-            title: "Amenidades",
-            description: "Consulte disponibilidad y confirme sus reservas.",
-            path: "/residente/amenidades",
-          },
-          {
-            title: "Accesos y reservas",
-            description: "Revise accesos activos y reservas vigentes en una sola pantalla.",
-            path: "/residente/unificado",
-          },
-          {
-            title: "Reglamentos",
-            description: "Consulte reglas por categoria con buscador y detalle.",
-            path: "/residente/reglamentos",
-          },
-          {
-            title: "Resumen mensual",
-            description: "Consulte sus visitas, accesos, reservas y actividades por mes.",
-            path: "/residente/resumen-mensual",
-          },
-        ].map((section) => (
-          <Card
-            key={section.title}
-            className={
-              section.path
-                ? "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md"
-                : ""
-            }
-            onClick={section.path ? () => navigate(section.path) : undefined}
-          >
-            <CardHeader>
-              <CardTitle>{section.title}</CardTitle>
-              <CardDescription>{section.description}</CardDescription>
-            </CardHeader>
-
-            <CardContent>
-              <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-                Modulo listo para conectar con sus datos reales desde la API.
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <PanelGrid>
+        <RecentVisitsPanel visits={visits} to="/residente/visitas" empty="Aún no ha autorizado visitas." />
+        <NotificationCenterPanel center={notificationCenter} to="/residente/notificaciones" />
+      </PanelGrid>
     </AppShell>
   );
 }

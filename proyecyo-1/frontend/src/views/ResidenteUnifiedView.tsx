@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, KeyRound } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { CalendarDays, KeyRound } from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +10,13 @@ import type { AmenityReservation } from "@/types/amenities";
 import type { VisitRecord } from "@/types/visits";
 
 type UnifiedFilter = "TODOS" | "ACCESOS" | "RESERVAS" | "ACTIVOS";
+
+const filterLabels: Record<UnifiedFilter, string> = {
+  TODOS: "Todos",
+  ACTIVOS: "Activos",
+  ACCESOS: "Accesos",
+  RESERVAS: "Reservas",
+};
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -23,11 +29,12 @@ function futureDate(days: number) {
 }
 
 export function ResidenteUnifiedView() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [reservations, setReservations] = useState<AmenityReservation[]>([]);
   const [filter, setFilter] = useState<UnifiedFilter>("TODOS");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -42,15 +49,20 @@ export function ResidenteUnifiedView() {
     ])
       .then(([visitsResponse, reservationsResponse]) => {
         if (active) {
+          setError("");
           setVisits(visitsResponse);
           setReservations(reservationsResponse);
         }
       })
-      .catch(() => {
+      .catch((reason) => {
         if (active) {
           setVisits([]);
           setReservations([]);
+          setError(reason instanceof Error && reason.message ? reason.message : "No fue posible cargar accesos y reservas.");
         }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
 
     return () => {
@@ -82,47 +94,41 @@ export function ResidenteUnifiedView() {
   }, [filter, reservations, visits]);
 
   return (
-    <AppShell role="residente" title="Panel de Residente" subtitle="Accesos y reservas en una sola pantalla.">
-      <button
-        type="button"
-        onClick={() => navigate("/residente")}
-        className="inline-flex items-center gap-3 text-left text-slate-700 transition hover:text-slate-950"
-      >
-        <ArrowLeft className="size-5" />
-        <div>
-          <h2 className="text-2xl font-semibold text-slate-900">Accesos y reservas</h2>
-          <p className="text-sm text-slate-600">Vista unificada con estados visuales y filtros rapidos</p>
-        </div>
-      </button>
+    <AppShell role="residente" title="Accesos y reservas" subtitle="Vista unificada de accesos y reservas con filtros rápidos.">
 
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <CardTitle>Resumen unificado</CardTitle>
-              <CardDescription>Datos reales de accesos y reservas activas.</CardDescription>
+              <CardDescription>Accesos autorizados y reservas de los próximos 30 días.</CardDescription>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar accesos y reservas">
               {(["TODOS", "ACTIVOS", "ACCESOS", "RESERVAS"] as UnifiedFilter[]).map((item) => (
                 <button
                   key={item}
                   type="button"
+                  aria-pressed={filter === item}
                   onClick={() => setFilter(item)}
-                  className={`rounded-full px-4 py-2 text-sm font-medium ${
-                    filter === item ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
+                  className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                    filter === item ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
-                  {item}
+                  {filterLabels[item]}
                 </button>
               ))}
             </div>
           </div>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
-          {items.length === 0 ? (
-            <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-500">
+          {loading ? (
+            <p className="py-8 text-center text-sm text-slate-500 md:col-span-2">Cargando accesos y reservas...</p>
+          ) : error ? (
+            <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700 md:col-span-2">{error}</p>
+          ) : items.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500 md:col-span-2">
               No hay datos para el filtro seleccionado.
-            </div>
+            </p>
           ) : (
             items.map((item) => (
               <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4">
