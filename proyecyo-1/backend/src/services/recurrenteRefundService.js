@@ -6,6 +6,7 @@ const { BLOCKING_CHECKOUT_CONDITION } = require('./recurrenteCheckoutGuard');
 const { createRecurrenteRefundClient } = require('./recurrenteRefundClient');
 const { RefundError, HISTORICAL_SUCCESS, RESERVED, providerId, object } = require('./recurrenteRefundContract');
 const { paymentReference } = require('./paymentReceiptService');
+const { enqueueRefund } = require('./financialNotificationOutbox');
 const positive = v => /^\d+$/.test(String(v)) && Number.isSafeInteger(Number(v)) && Number(v) > 0;
 const centsMoney = n => `${Math.floor(n / 100)}.${String(n % 100).padStart(2, '0')}`;
 function admin(actor) { if (!positive(actor?.id) || actor.role !== 'admin') throw new RefundError('REFUND_FORBIDDEN', 403); }
@@ -148,6 +149,7 @@ async function applyRefundEvidence(c, refundId, evidence, channel, context, even
   const total = limits.devuelto_centavos + Number(rr.monto_centavos);
   await c.execute('UPDATE TRANSACCION_RECURRENTE SET estado=? WHERE id_transaccion=?',
     [total === Number(local.monto_centavos) ? 'REEMBOLSADA' : 'REEMBOLSADA_PARCIAL', local.id_transaccion]);
+  await enqueueRefund(c, local, rr, before, after, evidence.time.accountingDate);
   const [updated] = await c.execute('SELECT * FROM REEMBOLSO_RECURRENTE WHERE id_reembolso=?', [rr.id_reembolso]);
   return { result: 'processed', refund: publicRefund(updated[0]) };
 }

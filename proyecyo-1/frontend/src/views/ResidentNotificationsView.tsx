@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bell, Check, CheckCheck, Clock3 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { notificationAction } from "@/components/notifications/notificationActions";
+import { subscribeToSidebarCounters } from "@/components/layout/sidebarCounters";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { notifyResidentBadgesChanged } from "@/components/residente/residentBadges";
@@ -30,6 +33,14 @@ const typeLabels: Record<string, string> = {
   ACCESO_ESPECIAL: "Acceso especial",
   SOLICITUD_AUTORIZACION: "Autorización",
   RECORDATORIO_RESERVA: "Reserva",
+  RECORDATORIO_PAGO: "Cuota",
+  CUOTA_PROXIMA: "Cuota próxima",
+  CUOTA_HOY: "Vence hoy",
+  CUOTA_VENCIDA: "Cuota vencida",
+  PAGO_CONFIRMADO: "Pago confirmado",
+  PAGO_NO_COMPLETADO: "Pago no completado",
+  PAGO_CANCELADO: "Intento cancelado",
+  REEMBOLSO_CONFIRMADO: "Reembolso",
 };
 
 function matchesFilter(notification: NotificationRecord, filter: NotificationFilter) {
@@ -65,20 +76,28 @@ export function ResidentNotificationsView({ initialFilter = "TODOS", role = "res
 
   useEffect(() => {
     let active = true;
-    Promise.all([getNotificationsRequest(), getUnreadNotificationsRequest()])
+    let generation = 0;
+    function load() {
+      const request = ++generation;
+      Promise.all([getNotificationsRequest(), getUnreadNotificationsRequest()])
       .then(([records, counter]) => {
-        if (!active) return;
+        if (!active || request !== generation) return;
         setNotifications(records);
         setUnread(counter.unread);
+        setError("");
       })
       .catch((reason) => {
-        if (active) setError(reason instanceof Error ? reason.message : "No fue posible cargar las notificaciones.");
+        if (active && request === generation) setError(reason instanceof Error ? reason.message : "No fue posible cargar las notificaciones.");
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active && request === generation) setLoading(false);
       });
+    }
+    load();
+    const unsubscribe = subscribeToSidebarCounters(load);
     return () => {
       active = false;
+      unsubscribe();
     };
   }, []);
 
@@ -91,7 +110,6 @@ export function ResidentNotificationsView({ initialFilter = "TODOS", role = "res
       setNotifications((current) => current.map((item) => (
         item.id_notificacion === updated.id_notificacion ? updated : item
       )));
-      setUnread((current) => Math.max(0, current - 1));
       notifyResidentBadgesChanged();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "No fue posible actualizar la notificacion.");
@@ -106,7 +124,6 @@ export function ResidentNotificationsView({ initialFilter = "TODOS", role = "res
       setError("");
       await markAllNotificationsAsReadRequest();
       setNotifications((current) => current.map((item) => ({ ...item, leido: true })));
-      setUnread(0);
       notifyResidentBadgesChanged();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "No fue posible actualizar las notificaciones.");
@@ -195,6 +212,11 @@ export function ResidentNotificationsView({ initialFilter = "TODOS", role = "res
                       </span>
                     </div>
                     <p className="mt-2 text-sm text-slate-700">{notification.mensaje}</p>
+                    {notificationAction(notification, role) ? (
+                      <Link className="mt-2 inline-block text-sm font-semibold text-blue-700 underline" to={notificationAction(notification, role)!.to}>
+                        {notificationAction(notification, role)!.label}
+                      </Link>
+                    ) : null}
                     <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-500"><Clock3 className="size-3.5" /> {formatDate(notification.creado_en)}</p>
                   </div>
                   {!notification.leido ? (

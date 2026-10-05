@@ -5,6 +5,7 @@ const { pool: defaultPool } = require("../database/mysql");
 const { calculateBalance, assertCollectible, toCents, refundedQuotaSql } = require("./financialBalance");
 const { safeError } = require("./recurrenteWebhookPayload");
 const { recordAttempt } = require("./recurrenteAttemptService");
+const { enqueuePayment } = require('./financialNotificationOutbox');
 const { recordIntentEvidence, strongSuccessTransition } = require('./recurrenteIntentHistory');
 const { archiveReview } = require('./recurrenteReviewAudit');
 const { reviewReceiptMatches, previewReview } = require('./recurrenteRecoveryPreview');
@@ -173,6 +174,7 @@ function createWebhookService({ pool = defaultPool } = {}) {
       }
       if (!await recordIntentEvidence(c,transaction,event,inbox,'CONFIRMADA')) throw safeError('WEBHOOK_EVENT_CONFLICT',409);
       await c.execute("UPDATE CHECKOUT_RECURRENTE SET estado='CONFIRMADO',estado_proveedor='paid',error_codigo=NULL WHERE id_checkout=?", [local.id_checkout]);
+      await enqueuePayment(c, local, payment.insertId, event);
       return await complete("PROCESADO");
     } catch (error) {
       if (inTransaction) await c.rollback().catch(() => {});

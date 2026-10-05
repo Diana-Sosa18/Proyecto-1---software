@@ -8,6 +8,8 @@ function normalizeNotification(row) {
     tipo: row.tipo,
     titulo: row.titulo,
     mensaje: row.mensaje,
+    accion_codigo: ['ESTADO_CUENTA','COMPROBANTE_PAGO'].includes(row.accion_codigo) ? row.accion_codigo : null,
+    id_pago: row.id_pago || null,
     leido: Boolean(row.leido),
     creado_en: row.creado_en,
     leido_en: row.leido_en || null,
@@ -26,6 +28,7 @@ async function listNotifications(userId) {
         n.tipo,
         n.titulo,
         n.mensaje,
+        e.accion_codigo,e.id_pago,
         n.leido,
         DATE_FORMAT(n.creado_en, '%Y-%m-%d %H:%i:%s') AS creado_en,
         DATE_FORMAT(n.leido_en, '%Y-%m-%d %H:%i:%s') AS leido_en,
@@ -36,6 +39,7 @@ async function listNotifications(userId) {
           c.numero
         ) AS casa
       FROM NOTIFICACION n
+      LEFT JOIN ENTREGA_NOTIFICACION_FINANCIERA e ON e.id_notificacion=n.id_notificacion AND e.id_usuario=n.id_usuario
       LEFT JOIN ACCESO a ON a.id_acceso = n.id_acceso
       LEFT JOIN VISITANTE v ON v.id_visitante = a.id_visitante
       LEFT JOIN CASA c ON c.id_casa = a.id_casa
@@ -90,6 +94,7 @@ async function markNotificationAsRead(userId, notificationId) {
         n.tipo,
         n.titulo,
         n.mensaje,
+        e.accion_codigo,e.id_pago,
         n.leido,
         DATE_FORMAT(n.creado_en, '%Y-%m-%d %H:%i:%s') AS creado_en,
         DATE_FORMAT(n.leido_en, '%Y-%m-%d %H:%i:%s') AS leido_en,
@@ -100,6 +105,7 @@ async function markNotificationAsRead(userId, notificationId) {
           c.numero
         ) AS casa
       FROM NOTIFICACION n
+      LEFT JOIN ENTREGA_NOTIFICACION_FINANCIERA e ON e.id_notificacion=n.id_notificacion AND e.id_usuario=n.id_usuario
       LEFT JOIN ACCESO a ON a.id_acceso = n.id_acceso
       LEFT JOIN VISITANTE v ON v.id_visitante = a.id_visitante
       LEFT JOIN CASA c ON c.id_casa = a.id_casa
@@ -129,7 +135,7 @@ async function markAllNotificationsAsRead(userId) {
     [userId],
   );
 
-  return { unread: 0 };
+  return { unread: await countUnreadNotifications(userId) };
 }
 
 module.exports = {

@@ -1,6 +1,13 @@
 export type NotificationType =
   | "LLEGADA_VISITA"
   | "ACCESO_CANCELADO"
+  | "PAGO_CONFIRMADO"
+  | "PAGO_NO_COMPLETADO"
+  | "PAGO_CANCELADO"
+  | "REEMBOLSO_CONFIRMADO"
+  | "CUOTA_PROXIMA"
+  | "CUOTA_HOY"
+  | "CUOTA_VENCIDA"
   | string;
 
 export interface NotificationRecord {
@@ -15,6 +22,8 @@ export interface NotificationRecord {
   leido_en: string | null;
   visitante?: string | null;
   casa?: string | null;
+  accion_codigo?: "ESTADO_CUENTA" | "COMPROBANTE_PAGO" | null;
+  id_pago?: number | null;
 }
 
 export interface UnreadNotificationsResponse {

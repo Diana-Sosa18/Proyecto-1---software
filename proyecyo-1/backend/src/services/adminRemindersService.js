@@ -17,7 +17,7 @@ const DEFAULT_CONFIG = {
   activo: true,
   dias_antes: 3,
 };
-const REMINDER_INTERVAL_MS = 60 * 60 * 1000;
+const REMINDER_INTERVAL_MS = 5 * 60 * 1000;
 let reminderScheduler = null;
 let schedulerRunInProgress = false;
 
@@ -92,7 +92,7 @@ function buildReminderTemplate({ tipo, servicio, monto, fecha_limite, dias_para_
 
     return {
       titulo: "Pago vencido pendiente",
-      mensaje: `Su cuota${servicioTexto} por ${montoTexto} vencio el ${fecha_limite} (hace ${diasVencida} ${plural}). Regularice su pago para evitar recargos.`,
+      mensaje: `Su cuota${servicioTexto} por ${montoTexto} vencio el ${fecha_limite} (hace ${diasVencida} ${plural}). Consulte su saldo actual en el estado de cuenta.`,
     };
   }
 
@@ -165,137 +165,21 @@ async function saveReminderConfig(payload = {}) {
 }
 
 async function sendPaymentReminders(userId) {
-  const config = await getReminderConfig();
-  const currentDate = getCurrentDateInTimezone();
-
-  if (!config.activo) {
-    return { enviados: 0, fecha_revision: currentDate, activo: false };
-  }
-
-  const pendingQuotas = await query(
-    `
-      SELECT
-        cu.id_cuota,
-        cu.id_casa,
-        cu.monto AS cuota_monto,
-        DATE_FORMAT(cu.fecha_limite, '%Y-%m-%d') AS fecha_limite,
-        DATEDIFF(cu.fecha_limite, ?) AS dias_para_vencer,
-        srv.nombre AS servicio,
-        destinatario.id_usuario AS id_usuario,
-        cu.saldo_pendiente AS saldo
-      FROM (${QUOTA_BALANCES_SQL}) cu
-      INNER JOIN SERVICIO srv ON srv.id_servicio = cu.id_servicio
-      INNER JOIN CASA c ON c.id_casa = cu.id_casa
-      INNER JOIN (
-        SELECT cp.id_casa, up.id_usuario FROM CASA cp
-        INNER JOIN RESIDENTE rp ON rp.id_residente = cp.id_residente
-        INNER JOIN USUARIO up ON up.id_usuario = rp.id_usuario AND up.activo = TRUE
-        UNION
-        SELECT ic.id_casa, ui.id_usuario FROM INQUILINO_CASA ic
-        INNER JOIN INQUILINO i ON i.id_inquilino = ic.id_inquilino AND i.autorizado = TRUE
-        INNER JOIN USUARIO ui ON ui.id_usuario = i.id_usuario AND ui.activo = TRUE
-      ) destinatario ON destinatario.id_casa = c.id_casa
-      WHERE cu.saldo_pendiente > 0 AND cu.sobrepago = 0 AND cu.reembolso_inconsistente = 0
-        AND (
-          cu.fecha_limite < ?
-          OR cu.fecha_limite BETWEEN ? AND DATE_ADD(?, INTERVAL ? DAY)
-        )
-      ORDER BY cu.fecha_limite ASC
-    `,
-    [currentDate, currentDate, currentDate, currentDate, config.dias_antes],
-  );
-
-  let enviados = 0;
-
-  for (const quota of pendingQuotas) {
-    const diasParaVencer = Number(quota.dias_para_vencer || 0);
-    const tipo = diasParaVencer < 0 ? "VENCIDO" : "PROXIMO_VENCIMIENTO";
-    const { titulo, mensaje } = buildReminderTemplate({
-      tipo,
-      servicio: quota.servicio,
-      monto: quota.saldo,
-      fecha_limite: quota.fecha_limite,
-      dias_para_vencer: diasParaVencer,
-    });
-
-    const connection = await pool.getConnection();
-
-    try {
-      await connection.beginTransaction();
-
-      const [existing] = await connection.execute(
-        `
-          SELECT id_recordatorio
-          FROM RECORDATORIO_PAGO
-          WHERE id_cuota = ? AND id_usuario = ? AND tipo = ? AND fecha_envio = ?
-          LIMIT 1
-        `,
-        [quota.id_cuota, quota.id_usuario, tipo, currentDate],
-      );
-
-      if (existing.length > 0) {
-        await connection.rollback();
-        continue;
-      }
-
-      const [notificationResult] = await connection.execute(
-        `
-          INSERT INTO NOTIFICACION (id_usuario, id_acceso, tipo, titulo, mensaje, leido)
-          VALUES (?, NULL, ?, ?, ?, FALSE)
-        `,
-        [quota.id_usuario, NOTIFICATION_TYPE, titulo, mensaje],
-      );
-
-      await connection.execute(
-        `
-          INSERT INTO RECORDATORIO_PAGO (
-            id_casa,
-            id_cuota,
-            id_usuario,
-            id_notificacion,
-            tipo,
-            titulo,
-            mensaje,
-            monto,
-            fecha_limite,
-            dias_para_vencer,
-            fecha_envio
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        [
-          quota.id_casa,
-          quota.id_cuota,
-          quota.id_usuario,
-          notificationResult.insertId,
-          tipo,
-          titulo,
-          mensaje,
-          Number(quota.saldo || 0),
-          quota.fecha_limite,
-          diasParaVencer,
-          currentDate,
-        ],
-      );
-
-      await connection.commit();
-      enviados += 1;
-    } catch (error) {
-      await connection.rollback();
-
-      // La restriccion unica evita duplicados si dos procesos corren a la vez.
-      if (error && error.code === "ER_DUP_ENTRY") {
-        continue;
-      }
-
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }
-
-  return { enviados, fecha_revision: currentDate, activo: true };
+  const { createFinancialNotificationsService } = require('./financialNotificationsService');
+  const service = createFinancialNotificationsService();
+  const generated = await service.generateDeadlines();
+  const delivered = await service.consume();
+  return { enviados: delivered.recordatorios, errores: delivered.errores, fecha_revision: generated.fecha_revision, activo: generated.activo };
 }
+
+const REMINDER_HISTORY_SQL = `SELECT id_recordatorio,id_casa,id_cuota,id_usuario,tipo,titulo,mensaje,monto,
+  fecha_limite,dias_para_vencer,fecha_envio,enviado_en FROM RECORDATORIO_PAGO
+  UNION ALL SELECT -e.id_entrega,q.id_casa,e.id_cuota,e.id_usuario,
+    IF(e.tipo_evento='CUOTA_VENCIDA','VENCIDO','PROXIMO_VENCIMIENTO'),e.titulo,e.mensaje,
+    CAST(e.monto_centavos/100 AS DECIMAL(20,2)),e.fecha_vencimiento,
+    DATEDIFF(e.fecha_vencimiento,e.fecha_entrega),e.fecha_entrega,e.entregado_en
+  FROM ENTREGA_NOTIFICACION_FINANCIERA e JOIN CUOTA q ON q.id_cuota=e.id_cuota
+  WHERE e.estado='ENTREGADA' AND e.tipo_evento IN ('CUOTA_PROXIMA','CUOTA_HOY','CUOTA_VENCIDA')`;
 
 async function getReminderSummary() {
   const rows = await query(`
@@ -303,9 +187,9 @@ async function getReminderSummary() {
       COUNT(*) AS total,
       SUM(CASE WHEN tipo = 'PROXIMO_VENCIMIENTO' THEN 1 ELSE 0 END) AS proximos,
       SUM(CASE WHEN tipo = 'VENCIDO' THEN 1 ELSE 0 END) AS vencidos,
-      SUM(CASE WHEN fecha_envio = CURDATE() THEN 1 ELSE 0 END) AS enviados_hoy
-    FROM RECORDATORIO_PAGO
-  `);
+      SUM(CASE WHEN fecha_envio = ? THEN 1 ELSE 0 END) AS enviados_hoy
+    FROM (${REMINDER_HISTORY_SQL}) rp
+  `, [getCurrentDateInTimezone()]);
 
   const summary = rows[0] || {};
 
@@ -362,7 +246,7 @@ async function listReminders(filters = {}) {
         u.nombre AS residente,
         u.correo,
         srv.nombre AS servicio
-      FROM RECORDATORIO_PAGO rp
+      FROM (${REMINDER_HISTORY_SQL}) rp
       INNER JOIN CASA c ON c.id_casa = rp.id_casa
       INNER JOIN USUARIO u ON u.id_usuario = rp.id_usuario
       LEFT JOIN CUOTA cu ON cu.id_cuota = rp.id_cuota
@@ -440,7 +324,8 @@ async function runScheduledReminders() {
   schedulerRunInProgress = true;
   try {
     try {
-      await sendPaymentReminders(null);
+      const result = await sendPaymentReminders(null);
+      if (result.errores) logger.error('Hay entregas financieras pendientes de reintento.');
     } catch (error) {
       logger.error("No fue posible generar recordatorios de pago.", error);
     }

@@ -38,6 +38,8 @@ beforeEach(() => {
 
 it("muestra el contador y permite marcar una notificacion como leida", async () => {
   vi.mocked(markNotificationAsReadRequest).mockResolvedValue({ ...unreadNotification, leido: true, leido_en: "2026-09-29 09:00:00" });
+  vi.mocked(getNotificationsRequest).mockResolvedValueOnce([unreadNotification]).mockResolvedValue([{...unreadNotification,leido:true}]);
+  vi.mocked(getUnreadNotificationsRequest).mockResolvedValueOnce({unread:1}).mockResolvedValue({unread:0});
   render(<MemoryRouter><ResidentNotificationsView /></MemoryRouter>);
 
   expect(await screen.findByText("Mantenimiento programado")).toBeInTheDocument();

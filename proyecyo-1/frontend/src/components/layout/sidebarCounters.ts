@@ -10,7 +10,16 @@ export function notifySidebarCountersChanged() {
 /** Suscribe un listener a los cambios de contadores; devuelve la funcion para desuscribir. */
 export function subscribeToSidebarCounters(listener: () => void) {
   window.addEventListener(SIDEBAR_COUNTERS_CHANGED_EVENT, listener);
-  return () => window.removeEventListener(SIDEBAR_COUNTERS_CHANGED_EVENT, listener);
+  window.addEventListener("focus", listener);
+  const refreshVisible = () => { if (document.visibilityState === "visible") listener(); };
+  document.addEventListener("visibilitychange", refreshVisible);
+  const interval = window.setInterval(refreshVisible, 60_000);
+  return () => {
+    window.removeEventListener(SIDEBAR_COUNTERS_CHANGED_EVENT, listener);
+    window.removeEventListener("focus", listener);
+    document.removeEventListener("visibilitychange", refreshVisible);
+    window.clearInterval(interval);
+  };
 }
 
 export type SidebarCounters<Key extends string> = Partial<Record<Key, number>>;
@@ -25,15 +34,17 @@ export function useSidebarCounters<Key extends string>(loaders: Record<Key, () =
 
   useEffect(() => {
     let active = true;
+    let generation = 0;
 
     function load() {
+      const request = ++generation;
       (Object.keys(loaders) as Key[]).forEach((key) => {
         loaders[key]()
           .then((value) => {
-            if (active) setCounters((current) => ({ ...current, [key]: value }));
+            if (active && request === generation) setCounters((current) => ({ ...current, [key]: value }));
           })
           .catch(() => {
-            if (active) setCounters((current) => ({ ...current, [key]: undefined }));
+            if (active && request === generation) setCounters((current) => ({ ...current, [key]: undefined }));
           });
       });
     }
