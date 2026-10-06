@@ -1,4 +1,5 @@
 const { pool, query } = require("../database/mysql");
+const { guatemalaToday } = require("../utils/guatemalaTime");
 
 const ALLOWED_RECIPIENT_TYPES = ["todos", "residente", "inquilino", "guardia", "admin"];
 
@@ -116,9 +117,10 @@ async function sendAnnouncement(adminUserId, payload = {}) {
           enviado_en,
           total_destinatarios
         )
-        VALUES (?, ?, CURDATE(), ?, ?, NOW(), ?)
+        VALUES (?, ?, ?, ?, ?, NOW(), ?)
       `,
-      [titulo, descripcion, adminUserId, tipoDestinatario, recipients.length],
+      // fecha es el dia calendario de Guatemala; enviado_en sigue siendo el instante UTC.
+      [titulo, descripcion, guatemalaToday(), adminUserId, tipoDestinatario, recipients.length],
     );
 
     const announcementId = insertResult.insertId;

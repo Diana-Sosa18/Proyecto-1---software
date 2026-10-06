@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, KeyRound } from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { TenantRequestsPanel } from "@/components/residente/TenantRequestsPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAmenitiesReservationsRequest } from "@/services/amenitiesService";
 import { getVisitsRequest } from "@/services/visitsService";
 import type { AmenityReservation } from "@/types/amenities";
 import type { VisitRecord } from "@/types/visits";
+import { guatemalaToday } from "@/utils/guatemalaTime";
 
 type UnifiedFilter = "TODOS" | "ACCESOS" | "RESERVAS" | "ACTIVOS";
 
@@ -18,14 +20,30 @@ const filterLabels: Record<UnifiedFilter, string> = {
   RESERVAS: "Reservas",
 };
 
+// HU32: estados reales de ACCESO; solo AUTORIZADA es "Activo".
+function accessStatusLabel(estado?: string) {
+  switch (estado) {
+    case "INGRESO_REGISTRADO":
+    case "SALIDA_REGISTRADA":
+      return "Utilizado";
+    case "CANCELADA":
+      return "Cancelado";
+    case "RECHAZADA":
+      return "Rechazado";
+    case "PENDIENTE_APROBACION":
+      return "Por aprobar";
+    default:
+      return "Activo";
+  }
+}
+
+// "Hoy" y el rango de 30 dias se calculan en America/Guatemala, no en UTC.
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  return guatemalaToday();
 }
 
 function futureDate(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  return guatemalaToday(days);
 }
 
 export function ResidenteUnifiedView() {
@@ -76,7 +94,7 @@ export function ResidenteUnifiedView() {
       type: "ACCESOS" as const,
       title: visit.nombre,
       subtitle: `${visit.casa} | ${visit.fecha} | ${visit.hora_inicio} - ${visit.hora_fin}`,
-      status: visit.estado_acceso === "INGRESO_REGISTRADO" ? "Utilizado" : visit.estado_acceso === "CANCELADA" ? "Cancelado" : "Activo",
+      status: accessStatusLabel(visit.estado_acceso),
       active: visit.estado_acceso === "AUTORIZADA",
     }));
     const reservationItems = reservations.map((reservation) => ({
@@ -95,6 +113,7 @@ export function ResidenteUnifiedView() {
 
   return (
     <AppShell role="residente" title="Accesos y reservas" subtitle="Vista unificada de accesos y reservas con filtros rápidos.">
+      <TenantRequestsPanel />
 
       <Card>
         <CardHeader>

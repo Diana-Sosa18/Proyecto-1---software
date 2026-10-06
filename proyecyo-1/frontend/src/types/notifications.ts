@@ -29,3 +29,10 @@ export interface NotificationRecord {
 export interface UnreadNotificationsResponse {
   unread: number;
 }
+
+export type NotificationPageFilter = "TODOS" | "SIN_LEER" | "COMUNICADOS" | "OTROS";
+
+export interface NotificationPage {
+  items: NotificationRecord[];
+  next_cursor: string | null;
+}

@@ -52,6 +52,7 @@ import type {
 import type { AuthorizationRequest, TenantPermission } from "@/types/sprintStories";
 import type { FrequentVisitor, VisitPayload, VisitRecord, VisitType } from "@/types/visits";
 import { getVehiclePlateError, normalizeVehiclePlate } from "@/utils/vehiclePlate";
+import { formatUtcTimestamp } from "@/utils/guatemalaTime";
 
 type VisitFormState = VisitPayload;
 type AccessFilter = "TODOS" | "APROBADO" | "UTILIZADO" | "RECHAZADO" | "PENDIENTE";
@@ -153,13 +154,8 @@ function formatDateTime(dateTime: string | null) {
     return "Sin registro";
   }
 
-  return new Intl.DateTimeFormat("es-GT", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(dateTime.replace(" ", "T")));
+  // Registro/cambios de proveedores son instantes UTC (CURRENT_TIMESTAMP).
+  return formatUtcTimestamp(dateTime, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function getAccessStatus(visit: VisitRecord): Exclude<AccessFilter, "TODOS"> {
@@ -186,6 +182,13 @@ function countActiveProviders(providers: TenantProvider[]) {
 function isAccessEditable(visit: VisitRecord) {
   return visit.estado_acceso === "AUTORIZADA" && visit.qr_status === "VALID";
 }
+
+// Estados reales de SOLICITUD_AUTORIZACION_DIGITAL; el propietario los resuelve (HU32).
+const requestStatusStyles: Record<string, { label: string; className: string }> = {
+  PENDIENTE: { label: "Pendiente", className: "bg-amber-50 text-amber-700" },
+  APROBADO: { label: "Aprobada", className: "bg-emerald-50 text-emerald-700" },
+  RECHAZADO: { label: "Rechazada", className: "bg-rose-50 text-rose-700" },
+};
 
 export type InquilinoSection = "visitas" | "proveedores" | "permisos";
 
@@ -222,12 +225,13 @@ export function InquilinoView({ section }: { section: InquilinoSection }) {
   const [permissions, setPermissions] = useState<TenantPermission[]>([]);
   const [authorizationRequests, setAuthorizationRequests] = useState<AuthorizationRequest[]>([]);
   const [authorizationModalOpen, setAuthorizationModalOpen] = useState(false);
-  const [authorizationAction, setAuthorizationAction] = useState("Reserva fuera de horario permitido");
+  // Sin valor sugerido: el inquilino no puede reservar amenidades (HU32, coherencia de permisos).
+  const [authorizationAction, setAuthorizationAction] = useState("");
   const [authorizationReason, setAuthorizationReason] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<AccessFilter>("TODOS");
   const [isLoading, setIsLoading] = useState(true);
   // Errores de cargas secundarias: se muestran en su seccion en lugar de un falso estado vacio.
-  const [loadErrors, setLoadErrors] = useState<Partial<Record<"frequent" | "providers" | "permissions" | "authorizations", string>>>({});
+  const [loadErrors, setLoadErrors] = useState<Partial<Record<"frequent" | "providers" | "providerHistory" | "permissions" | "authorizations", string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRegisteringProvider, setIsRegisteringProvider] = useState(false);
   const [isUpdatingAccess, setIsUpdatingAccess] = useState(false);
@@ -285,6 +289,7 @@ export function InquilinoView({ section }: { section: InquilinoSection }) {
         setLoadErrors({
           frequent: failure(frequentResult, "No fue posible cargar los visitantes frecuentes."),
           providers: failure(providersResult, "No fue posible cargar los proveedores."),
+          providerHistory: failure(providerHistoryResult, "No fue posible cargar el historial de proveedores."),
           permissions: failure(permissionsResult, "No fue posible cargar los permisos."),
           authorizations: failure(authorizationsResult, "No fue posible cargar las solicitudes."),
         });
@@ -457,11 +462,16 @@ export function InquilinoView({ section }: { section: InquilinoSection }) {
     setStep((current) => Math.max(current - 1, 1));
   }
 
+  // Si la recarga falla se conserva la ultima lista conocida y se informa el error (error != vacio).
   async function refreshFrequentVisitors() {
     try {
       setFrequentVisitors(await getFrequentVisitorsRequest());
-    } catch {
-      setFrequentVisitors([]);
+      setLoadErrors((current) => ({ ...current, frequent: undefined }));
+    } catch (error) {
+      setLoadErrors((current) => ({
+        ...current,
+        frequent: error instanceof Error && error.message ? error.message : "No fue posible actualizar los visitantes frecuentes.",
+      }));
     }
   }
 
@@ -469,8 +479,12 @@ export function InquilinoView({ section }: { section: InquilinoSection }) {
     try {
       setIsLoadingProviderHistory(true);
       setProviderHistory(await getTenantProviderHistoryRequest());
-    } catch {
-      setProviderHistory([]);
+      setLoadErrors((current) => ({ ...current, providerHistory: undefined }));
+    } catch (error) {
+      setLoadErrors((current) => ({
+        ...current,
+        providerHistory: error instanceof Error && error.message ? error.message : "No fue posible actualizar el historial de proveedores.",
+      }));
     } finally {
       setIsLoadingProviderHistory(false);
     }
@@ -845,11 +859,14 @@ export function InquilinoView({ section }: { section: InquilinoSection }) {
                   <div key={request.id_solicitud} className="rounded-xl bg-white p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium text-slate-800">{request.accion}</p>
-                      <span className="rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-700">
-                        {request.estado}
+                      <span className={`rounded-full px-2 py-1 text-xs ${requestStatusStyles[request.estado]?.className ?? "bg-slate-100 text-slate-600"}`}>
+                        {requestStatusStyles[request.estado]?.label ?? request.estado}
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">{request.motivo}</p>
+                    {request.respuesta ? (
+                      <p className="mt-1 text-xs text-slate-600">Respuesta del propietario: {request.respuesta}</p>
+                    ) : null}
                   </div>
                 ))
               )}
@@ -1150,6 +1167,8 @@ export function InquilinoView({ section }: { section: InquilinoSection }) {
             <div className="rounded-3xl bg-slate-50 p-6 text-sm text-slate-500">
               Cargando historial de proveedores...
             </div>
+          ) : loadErrors.providerHistory ? (
+            <p role="alert" className="rounded-3xl bg-rose-50 p-6 text-sm text-rose-700">{loadErrors.providerHistory}</p>
           ) : filteredProviderHistory.length === 0 ? (
             <div className="rounded-3xl bg-slate-50 p-6 text-sm text-slate-500">
               No hay cambios que coincidan con los filtros actuales.
@@ -1808,6 +1827,7 @@ export function InquilinoView({ section }: { section: InquilinoSection }) {
                 <span className="text-sm font-medium text-slate-800">Accion restringida</span>
                 <Input
                   value={authorizationAction}
+                  placeholder="Ej. Mudanza fuera de horario"
                   onChange={(event) => setAuthorizationAction(event.target.value)}
                   className="h-12 rounded-2xl border-slate-100 bg-slate-50 px-4"
                 />

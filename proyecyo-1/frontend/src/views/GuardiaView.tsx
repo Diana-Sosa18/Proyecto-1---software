@@ -35,6 +35,17 @@ import { getGuardAccessHistoryRequest } from "@/services/sprintStoriesService";
 import type { NotificationRecord } from "@/types/notifications";
 import type { GuardAccessHistoryRecord } from "@/types/sprintStories";
 import type { VisitRecord } from "@/types/visits";
+import { formatUtcTimestamp, guatemalaToday } from "@/utils/guatemalaTime";
+
+// Etiquetas de los estados reales que devuelve /guardia/historial-accesos.
+const historyStatusLabels: Record<GuardAccessHistoryRecord["estado"], { label: string; className: string }> = {
+  PENDIENTE: { label: "Pendiente", className: "bg-amber-50 text-amber-700" },
+  INGRESO: { label: "Ingresó", className: "bg-emerald-50 text-emerald-700" },
+  SALIDA: { label: "Salida", className: "bg-blue-50 text-blue-700" },
+  CANCELADA: { label: "Cancelada", className: "bg-rose-50 text-rose-700" },
+  RECHAZADA: { label: "Rechazada", className: "bg-rose-50 text-rose-700" },
+  PENDIENTE_APROBACION: { label: "Por aprobar", className: "bg-violet-50 text-violet-700" },
+};
 
 type GuardScanAction = "INGRESO" | "SALIDA";
 const REFRESH_INTERVAL_MS = 10000;
@@ -148,7 +159,7 @@ const sectionHeadings: Record<GuardiaSection, { title: string; subtitle: string 
   },
   visitas: {
     title: "Visitas recientes",
-    subtitle: "Últimas visitas autorizadas: revise su estado y registre salidas desde garita.",
+    subtitle: "Visitas de hoy y de días anteriores: revise su estado y registre salidas desde garita.",
   },
   historial: {
     title: "Historial de accesos",
@@ -169,7 +180,10 @@ export function GuardiaView({ section }: { section: GuardiaSection }) {
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [specialNotifications, setSpecialNotifications] = useState<NotificationRecord[]>([]);
   const [accessHistory, setAccessHistory] = useState<GuardAccessHistoryRecord[]>([]);
-  const [historyDate, setHistoryDate] = useState(new Date().toISOString().slice(0, 10));
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState("");
+  const [alertsError, setAlertsError] = useState("");
+  const [historyDate, setHistoryDate] = useState(() => guatemalaToday());
   const [historyStatus, setHistoryStatus] = useState("TODOS");
   const [historySearch, setHistorySearch] = useState("");
   const [validatedVisit, setValidatedVisit] = useState<VisitRecord | null>(null);
@@ -219,12 +233,14 @@ export function GuardiaView({ section }: { section: GuardiaSection }) {
           getNotificationsRequest(),
         ]);
         if (active) {
+          setAlertsError("");
           setNotifications(guardData);
           setSpecialNotifications(allData.filter((item) => item.tipo === "ACCESO_ESPECIAL"));
         }
-      } catch {
+      } catch (error) {
+        // Se conservan las ultimas alertas conocidas y se informa el fallo (error != vacio).
         if (active) {
-          setSpecialNotifications([]);
+          setAlertsError(error instanceof Error && error.message ? error.message : "No fue posible cargar las alertas.");
         }
       }
     }
@@ -254,12 +270,15 @@ export function GuardiaView({ section }: { section: GuardiaSection }) {
           search: historySearch,
         });
         if (active) {
+          setHistoryError("");
           setAccessHistory(response);
         }
-      } catch {
+      } catch (error) {
         if (active) {
-          setAccessHistory([]);
+          setHistoryError(error instanceof Error && error.message ? error.message : "No fue posible cargar el historial.");
         }
+      } finally {
+        if (active) setHistoryLoading(false);
       }
     }
 
@@ -590,9 +609,9 @@ export function GuardiaView({ section }: { section: GuardiaSection }) {
       {cancellationAlerts.length > 0 ? (
         <Card className="border-rose-200 bg-rose-50/60 shadow-[0_10px_30px_rgba(244,63,94,0.08)]">
           <CardHeader>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-full bg-rose-100 text-rose-700">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-700">
                   <BellRing className="size-5 animate-pulse" />
                 </div>
                 <div>
@@ -627,7 +646,7 @@ export function GuardiaView({ section }: { section: GuardiaSection }) {
                   <div className="text-sm">
                     <p className="font-medium text-slate-900">{alert.titulo}</p>
                     <p className="text-slate-600">{alert.mensaje}</p>
-                    <p className="mt-1 text-xs text-slate-400">{alert.creado_en}</p>
+                    <p className="mt-1 text-xs text-slate-400">{formatUtcTimestamp(alert.creado_en)}</p>
                   </div>
                 </div>
                 <button
@@ -671,7 +690,13 @@ export function GuardiaView({ section }: { section: GuardiaSection }) {
           </CardContent>
         </Card>
       ) : null}
-      {cancellationAlerts.length === 0 && specialNotifications.length === 0 ? (
+      {alertsError ? (
+        <Alert variant="destructive">
+          <AlertTitle>No fue posible actualizar las alertas</AlertTitle>
+          <AlertDescription>{alertsError}</AlertDescription>
+        </Alert>
+      ) : null}
+      {!alertsError && cancellationAlerts.length === 0 && specialNotifications.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-200 bg-white py-10 text-center text-sm text-slate-500">
           No hay alertas pendientes. Las cancelaciones de acceso y los accesos especiales aprobados aparecerán aquí.
         </p>
@@ -922,6 +947,8 @@ export function GuardiaView({ section }: { section: GuardiaSection }) {
                 <option value="INGRESO">Ingresos</option>
                 <option value="SALIDA">Salidas</option>
                 <option value="CANCELADA">Canceladas</option>
+                <option value="RECHAZADA">Rechazadas</option>
+                <option value="PENDIENTE_APROBACION">Por aprobar</option>
               </select>
               <input
                 aria-label="Buscar visitante o casa"
@@ -946,7 +973,17 @@ export function GuardiaView({ section }: { section: GuardiaSection }) {
                 </tr>
               </thead>
               <tbody>
-                {accessHistory.length === 0 ? (
+                {historyError ? (
+                  <tr>
+                    <td colSpan={5} role="alert" className="bg-rose-50 px-4 py-6 text-sm text-rose-700">
+                      {historyError}
+                    </td>
+                  </tr>
+                ) : historyLoading && accessHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-sm text-slate-500">Cargando historial...</td>
+                  </tr>
+                ) : accessHistory.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-6 text-sm text-slate-500">
                       Sin registros para los filtros actuales.
@@ -965,16 +1002,10 @@ export function GuardiaView({ section }: { section: GuardiaSection }) {
                       <td className="px-4 py-3">
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            record.estado === "INGRESO"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : record.estado === "SALIDA"
-                                ? "bg-blue-50 text-blue-700"
-                                : record.estado === "CANCELADA"
-                                  ? "bg-rose-50 text-rose-700"
-                                  : "bg-amber-50 text-amber-700"
+                            (historyStatusLabels[record.estado] ?? historyStatusLabels.PENDIENTE).className
                           }`}
                         >
-                          {record.estado}
+                          {(historyStatusLabels[record.estado] ?? { label: record.estado }).label}
                         </span>
                       </td>
                     </tr>

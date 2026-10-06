@@ -149,3 +149,31 @@ describe("Estados de error del inquilino", () => {
     expect(screen.queryByText("No hay permisos asignados.")).not.toBeInTheDocument();
   });
 });
+
+describe("HU32 resultado de solicitudes del inquilino", () => {
+  it("muestra el estado resuelto por el propietario y su respuesta", async () => {
+    vi.mocked(getVisitsRequest).mockResolvedValue([]);
+    vi.mocked(getTenantPermissionsRequest).mockResolvedValue([]);
+    const { getTenantAuthorizationRequestsRequest } = await import("@/services/sprintStoriesService");
+    vi.mocked(getTenantAuthorizationRequestsRequest).mockResolvedValueOnce([
+      { id_solicitud: 1, accion: "Mudanza", motivo: "Traslado", estado: "APROBADO", respuesta: null, creado_en: "2026-10-05 06:00:00", actualizado_en: "2026-10-05 07:00:00" },
+      { id_solicitud: 2, accion: "Fiesta", motivo: "Cumpleaños", estado: "RECHAZADO", respuesta: "Horario no permitido", creado_en: "2026-10-04 06:00:00", actualizado_en: "2026-10-04 07:00:00" },
+    ]);
+    render(<MemoryRouter><InquilinoView section="permisos" /></MemoryRouter>);
+    expect(await screen.findByText("Aprobada")).toBeInTheDocument();
+    expect(screen.getByText("Rechazada")).toBeInTheDocument();
+    expect(screen.getByText("Respuesta del propietario: Horario no permitido")).toBeInTheDocument();
+  });
+});
+
+describe("HU32 errores visibles del inquilino", () => {
+  it("un fallo del historial de proveedores se muestra como error, no como 'sin cambios'", async () => {
+    vi.mocked(getVisitsRequest).mockResolvedValue([]);
+    vi.mocked(getTenantPermissionsRequest).mockResolvedValue([]);
+    const { getTenantProviderHistoryRequest } = await import("@/services/providersService");
+    vi.mocked(getTenantProviderHistoryRequest).mockRejectedValueOnce(new Error("Historial no disponible"));
+    render(<MemoryRouter><InquilinoView section="proveedores" /></MemoryRouter>);
+    expect(await screen.findByText("Historial no disponible")).toBeInTheDocument();
+    expect(screen.queryByText("No hay cambios que coincidan con los filtros actuales.")).not.toBeInTheDocument();
+  });
+});

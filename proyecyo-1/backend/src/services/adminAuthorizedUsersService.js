@@ -1,4 +1,5 @@
 const { query } = require("../database/mysql");
+const { sqlGuatemalaTodayLiteral } = require("../utils/guatemalaTime");
 
 const PERMISSION_SEPARATOR = "||";
 
@@ -68,8 +69,10 @@ async function listAuthorizedTenants(filters = {}) {
             COUNT(*) AS total_permisos_activos
           FROM PERMISO_INQUILINO
           WHERE estado = 'ACTIVO'
-            AND fecha_inicio <= CURDATE()
-            AND (fecha_fin IS NULL OR fecha_fin >= CURDATE())
+            -- Capacidad no soportada para inquilinos (ver UNSUPPORTED_TENANT_PERMISSIONS).
+            AND nombre <> 'Reservas de amenidades'
+            AND fecha_inicio <= ${sqlGuatemalaTodayLiteral()}
+            AND (fecha_fin IS NULL OR fecha_fin >= ${sqlGuatemalaTodayLiteral()})
           GROUP BY id_usuario
         ) permisos ON permisos.id_usuario = u.id_usuario
         WHERE i.autorizado = TRUE

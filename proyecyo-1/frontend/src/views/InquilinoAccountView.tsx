@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { downloadTenantPaymentReceiptRequest, getTenantAccountStatementRequest, payTenantObligationRequest } from "@/services/tenantAccountService";
 import { savePaymentReceipt } from "@/services/paymentReceiptService";
 import type { AccountQuotaStatus } from "@/types/account";
+import { quotaStatusLabels, quotaStatusStyles } from "@/utils/quotaStatus";
 import type { TenantAccountQuota, TenantAccountStatement } from "@/types/tenantAccount";
 
 type TenantAccountFilter = "TODAS" | AccountQuotaStatus;
@@ -30,17 +31,8 @@ const filterLabels: Record<TenantAccountFilter, string> = {
   PAGADA: "Pagadas",
 };
 
-const statusLabels: Record<AccountQuotaStatus, string> = {
-  PAGADA: "Pagada",
-  PENDIENTE: "Pendiente",
-  VENCIDA: "Vencida",
-};
-
-const statusStyles: Record<AccountQuotaStatus, string> = {
-  PAGADA: "bg-emerald-100 text-emerald-700 ring-emerald-200",
-  PENDIENTE: "bg-amber-100 text-amber-700 ring-amber-200",
-  VENCIDA: "bg-rose-100 text-rose-700 ring-rose-200",
-};
+const statusLabels = quotaStatusLabels;
+const statusStyles = quotaStatusStyles;
 
 const emptyStatement: TenantAccountStatement = {
   casa: {
@@ -172,7 +164,7 @@ function QuotaTable({
                     </td>
                     <td className="px-5 py-4 text-sm text-slate-600">
                       {formatCurrency(quota.monto_pagado)}
-                        {(quota.reembolsado || 0)>0 && <p>Devuelto {formatCurrency(quota.reembolsado || 0)} ? Neto {formatCurrency(quota.abono_neto || 0)}</p>}
+                        {(quota.reembolsado || 0)>0 && <p>Devuelto {formatCurrency(quota.reembolsado || 0)} · Neto {formatCurrency(quota.abono_neto || 0)}</p>}
                       <p className="mt-1 text-xs text-slate-400">
                         {quota.ultimo_pago ? `Ultimo pago ${formatDate(quota.ultimo_pago)}` : "Sin pagos"}
                       </p>
@@ -351,7 +343,7 @@ export function InquilinoAccountView() {
         </Alert>
       ) : null}
 
-      {(statement.reembolsos || []).map(r=><p key={r.id_reembolso}>Reembolso #{r.id_reembolso} ? {r.servicio} ? {r.fecha_reembolso} ? Devuelto {formatCurrency(r.monto_centavos/100)}</p>)}
+      {(statement.reembolsos || []).map(r=><p key={r.id_reembolso}>Reembolso #{r.id_reembolso} · {r.servicio} · {r.fecha_reembolso} · Devuelto {formatCurrency(r.monto_centavos/100)}</p>)}
       <FinancialReviewNotice {...statement.resumen} />
       <p className="my-3 text-sm text-slate-500">El saldo incluye todos los abonos confirmados. Las fechas filtran los movimientos.</p>
       {statement.resumen.cuotas_vencidas > 0 ? (

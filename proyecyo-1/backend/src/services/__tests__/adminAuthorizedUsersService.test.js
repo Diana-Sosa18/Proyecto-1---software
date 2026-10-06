@@ -64,8 +64,10 @@ describe("adminAuthorizedUsersService.listAuthorizedTenants", () => {
 
     const [sql, params] = query.mock.calls[0];
     expect(sql).toContain("i.autorizado = TRUE");
-    expect(sql).toContain("fecha_inicio <= CURDATE()");
-    expect(sql).toContain("fecha_fin IS NULL OR fecha_fin >= CURDATE()");
+    // HU32: la vigencia se evalua con el dia de Guatemala, no con CURDATE() (dia UTC).
+    expect(sql).not.toContain("CURDATE()");
+    expect(sql).toMatch(/fecha_inicio <= '\d{4}-\d{2}-\d{2}'/);
+    expect(sql).toMatch(/fecha_fin IS NULL OR fecha_fin >= '\d{4}-\d{2}-\d{2}'/);
     expect(sql).toContain("WHERE 1 = 1");
     expect(params).toEqual([]);
   });

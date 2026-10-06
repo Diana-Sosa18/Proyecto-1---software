@@ -23,6 +23,7 @@ import type {
   AmenityReservation,
   AmenityReservationHistory,
 } from "@/types/amenities";
+import { formatUtcTimestamp } from "@/utils/guatemalaTime";
 
 type SlotSelection = {
   hora_inicio: string;
@@ -643,7 +644,7 @@ export function ResidenteAmenitiesView() {
                     </span>
                   </div>
                   <p className="mt-2 text-sm text-slate-500">{entry.detalle}</p>
-                  <p className="mt-2 text-xs text-slate-400">{entry.creado_en}</p>
+                  <p className="mt-2 text-xs text-slate-400">{formatUtcTimestamp(entry.creado_en)}</p>
                 </article>
               ))
             )}

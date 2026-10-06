@@ -1,4 +1,5 @@
 const { query } = require("../database/mysql");
+const { guatemalaDayRangeUtc } = require("../utils/guatemalaTime");
 
 const SENSITIVE_KEY = /password|contrasena|token|secret|authorization|cookie|api[_-]?key/i;
 const ALLOWED_ACTIONS = [
@@ -89,8 +90,9 @@ async function listAuditLogs(filters = {}) {
   }
   const from = ensureDate(filters.from, "La fecha inicial");
   const to = ensureDate(filters.to, "La fecha final");
-  if (from) { conditions.push("a.creado_en >= ?"); params.push(`${from} 00:00:00`); }
-  if (to) { conditions.push("a.creado_en < DATE_ADD(?, INTERVAL 1 DAY)"); params.push(`${to} 00:00:00`); }
+  // creado_en es un instante UTC; los dias del filtro son dias calendario de Guatemala.
+  if (from) { conditions.push("a.creado_en >= ?"); params.push(guatemalaDayRangeUtc(from).start); }
+  if (to) { conditions.push("a.creado_en < ?"); params.push(guatemalaDayRangeUtc(to).end); }
   if (from && to && from > to) {
     const error = new Error("La fecha inicial no puede ser posterior a la fecha final.");
     error.status = 400;

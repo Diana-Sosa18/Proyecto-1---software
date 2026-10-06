@@ -1,29 +1,10 @@
 const { query } = require("../database/mysql");
 const { calculateBalance, balanceDetails, toMoney, sumMoney, refundedQuotaSql } = require("./financialBalance");
+const { QUOTA_STATUSES, getQuotaStatus: getSharedQuotaStatus } = require("./quotaStatus");
+const { guatemalaToday } = require("../utils/guatemalaTime");
 
-const RESIDENTIAL_TIMEZONE = "America/Guatemala";
-const ACCOUNT_STATUSES = {
-  PAID: "PAGADA",
-  PENDING: "PENDIENTE",
-  OVERDUE: "VENCIDA",
-};
-
-function getCurrentDateInTimezone() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: RESIDENTIAL_TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-
-  const values = Object.fromEntries(
-    parts
-      .filter((part) => part.type !== "literal")
-      .map((part) => [part.type, part.value]),
-  );
-
-  return `${values.year}-${values.month}-${values.day}`;
-}
+const ACCOUNT_STATUSES = QUOTA_STATUSES;
+const getCurrentDateInTimezone = () => guatemalaToday();
 
 function buildHouseLabel(row) {
   const tower = String(row.torre || "").trim();
@@ -33,13 +14,8 @@ function buildHouseLabel(row) {
 }
 
 function getQuotaStatus(row, currentDate = getCurrentDateInTimezone()) {
-  if (calculateBalance({ ...row, pagado: row.total_pagado }).saldo === 0) {
-    return ACCOUNT_STATUSES.PAID;
-  }
-
-  return String(row.fecha_limite || "") < currentDate
-    ? ACCOUNT_STATUSES.OVERDUE
-    : ACCOUNT_STATUSES.PENDING;
+  const { saldo } = calculateBalance({ ...row, pagado: row.total_pagado });
+  return getSharedQuotaStatus({ saldo, fecha_limite: row.fecha_limite }, currentDate);
 }
 
 function mapQuota(row, currentDate = getCurrentDateInTimezone()) {

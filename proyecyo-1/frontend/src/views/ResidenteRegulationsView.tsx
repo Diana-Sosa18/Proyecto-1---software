@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { getResidentRegulationsRequest } from "@/services/sprintStoriesService";
 import type { Regulation } from "@/types/sprintStories";
+import { formatUtcTimestamp } from "@/utils/guatemalaTime";
 
 export function ResidenteRegulationsView() {
   const [regulations, setRegulations] = useState<Regulation[]>([]);
@@ -122,7 +123,7 @@ export function ResidenteRegulationsView() {
                   </span>
                   <h3 className="mt-4 text-2xl font-semibold text-slate-900">{selected.titulo}</h3>
                   <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-600">{selected.contenido}</p>
-                  <p className="mt-6 text-xs text-slate-400">Actualizado: {selected.actualizado_en}</p>
+                  <p className="mt-6 text-xs text-slate-400">Actualizado: {formatUtcTimestamp(selected.actualizado_en)}</p>
                 </>
               ) : (
                 <p className="text-sm text-slate-500">Seleccione un reglamento para ver el detalle.</p>

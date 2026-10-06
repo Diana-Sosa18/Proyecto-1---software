@@ -63,6 +63,8 @@ export function ResidenteView() {
         if (active) setProviders(response);
       })
       .catch(() => {
+        // Fallback deliberado: el aviso de proveedores pendientes es secundario y el
+        // badge del sidebar y la vista Proveedores muestran su propio estado/error.
         if (active) setProviders([]);
       });
     return () => {

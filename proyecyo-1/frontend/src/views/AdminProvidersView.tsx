@@ -15,6 +15,7 @@ import type {
   AdminProviderRecord,
   TenantProviderStatus,
 } from "@/types/providers";
+import { formatUtcTimestamp } from "@/utils/guatemalaTime";
 
 type ProviderStatusFilter = TenantProviderStatus | "TODOS";
 
@@ -28,13 +29,8 @@ function formatDateTime(dateTime: string | null) {
     return "Sin registro";
   }
 
-  return new Intl.DateTimeFormat("es-GT", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(dateTime.replace(" ", "T")));
+  // Registro/cambios de proveedores son instantes UTC (CURRENT_TIMESTAMP).
+  return formatUtcTimestamp(dateTime, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function HistoryRow({ entry }: { entry: AdminProviderHistoryRecord }) {

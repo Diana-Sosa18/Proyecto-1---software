@@ -26,8 +26,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getGuardAccessHistoryRequest).mockResolvedValue([
     { ...base, id_acceso: 1, visitante: "Ana Pendiente", estado: "PENDIENTE", hora_programada: "15:00" },
-    { ...base, id_acceso: 2, visitante: "Beto Dentro", estado: "INGRESO", hora_ingreso: "2026-10-04 09:10:00" },
-    { ...base, id_acceso: 3, visitante: "Carla Salió", estado: "SALIDA", hora_ingreso: "2026-10-04 08:00:00", hora_salida: "2026-10-04 09:30:00" },
+    { ...base, id_acceso: 2, visitante: "Beto Dentro", estado: "INGRESO", hora_ingreso: "09:10" },
+    { ...base, id_acceso: 3, visitante: "Carla Salió", estado: "SALIDA", hora_ingreso: "08:00", hora_salida: "09:30" },
     { ...base, id_acceso: 4, visitante: "Dani Cancelado", estado: "CANCELADA" },
   ]);
   vi.mocked(getGuardNotificationsRequest).mockResolvedValue([
@@ -85,4 +85,20 @@ describe("Dashboard de guardia", () => {
     expect(await screen.findByText("No hay ingresos pendientes para hoy.")).toBeInTheDocument();
     expect(screen.getByText("Aún no hay ingresos ni salidas registrados hoy.")).toBeInTheDocument();
   });
+});
+
+it("HU32: rechazados y por aprobar no cuentan como pendientes ni como accesos del día", async () => {
+  vi.mocked(getGuardAccessHistoryRequest).mockResolvedValue([
+    { ...base, id_acceso: 1, visitante: "Ana Pendiente", estado: "PENDIENTE" },
+    { ...base, id_acceso: 2, visitante: "Rita Rechazo", estado: "RECHAZADA" },
+    { ...base, id_acceso: 3, visitante: "Pablo Aprobación", estado: "PENDIENTE_APROBACION" },
+    { ...base, id_acceso: 4, visitante: "Dani Cancelado", estado: "CANCELADA" },
+  ]);
+  vi.mocked(getGuardNotificationsRequest).mockResolvedValue([]);
+  render(<MemoryRouter><GuardiaDashboardView /></MemoryRouter>);
+  await waitFor(() => expect(within(kpi("Pendientes de ingreso")).getByText("1")).toBeInTheDocument());
+  expect(within(kpi("Accesos de hoy")).getByText("1")).toBeInTheDocument();
+  const next = screen.getByRole("region", { name: "Próximos ingresos" });
+  expect(within(next).queryByText("Rita Rechazo")).not.toBeInTheDocument();
+  expect(within(next).queryByText("Pablo Aprobación")).not.toBeInTheDocument();
 });

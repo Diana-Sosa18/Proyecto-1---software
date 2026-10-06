@@ -29,6 +29,7 @@ import type {
   VisitScheduleConfig,
 } from "@/types/announcements";
 import { getVehiclePlateError, normalizeVehiclePlate } from "@/utils/vehiclePlate";
+import { formatUtcTimestamp } from "@/utils/guatemalaTime";
 
 function createInitialForm() {
   const today = new Intl.DateTimeFormat("en-CA", {
@@ -64,13 +65,8 @@ function isOutsideSchedule(horaInicio: string, horaFin: string, schedule: VisitS
 
 function formatDateTime(value: string) {
   if (!value) return "--";
-  return new Intl.DateTimeFormat("es-GT", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value.replace(" ", "T")));
+  // creado_en es un instante UTC; se muestra en hora de Guatemala.
+  return formatUtcTimestamp(value, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export function AdminSpecialAccessView() {

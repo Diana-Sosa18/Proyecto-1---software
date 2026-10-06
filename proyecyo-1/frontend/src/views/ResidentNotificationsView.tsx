@@ -10,14 +10,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  getNotificationsRequest,
+  getNotificationsPageRequest,
   getUnreadNotificationsRequest,
   markAllNotificationsAsReadRequest,
   markNotificationAsReadRequest,
 } from "@/services/notificationsService";
-import type { NotificationRecord } from "@/types/notifications";
+import type { NotificationPageFilter, NotificationRecord } from "@/types/notifications";
+import { formatUtcTimestamp } from "@/utils/guatemalaTime";
 
-export type NotificationFilter = "TODOS" | "SIN_LEER" | "COMUNICADOS" | "OTROS";
+export type NotificationFilter = NotificationPageFilter;
 
 const filterOptions: { value: NotificationFilter; label: string }[] = [
   { value: "TODOS", label: "Todos" },
@@ -43,6 +44,19 @@ const typeLabels: Record<string, string> = {
   REEMBOLSO_CONFIRMADO: "Reembolso",
 };
 
+// Orden del backend: creado_en DESC, id DESC.
+function compareNotifications(a: NotificationRecord, b: NotificationRecord) {
+  if (a.creado_en !== b.creado_en) return a.creado_en < b.creado_en ? 1 : -1;
+  return b.id_notificacion - a.id_notificacion;
+}
+
+/** Incorpora la primera pagina fresca sin perder lo ya cargado con "Ver mas". */
+function mergeFreshPage(current: NotificationRecord[], fresh: NotificationRecord[]) {
+  const byId = new Map(current.map((item) => [item.id_notificacion, item]));
+  for (const item of fresh) byId.set(item.id_notificacion, item);
+  return [...byId.values()].sort(compareNotifications);
+}
+
 function matchesFilter(notification: NotificationRecord, filter: NotificationFilter) {
   if (filter === "SIN_LEER") return !notification.leido;
   if (filter === "COMUNICADOS") return notification.tipo === "COMUNICADO";
@@ -50,14 +64,9 @@ function matchesFilter(notification: NotificationRecord, filter: NotificationFil
   return true;
 }
 
+// creado_en de NOTIFICACION es un instante UTC (CURRENT_TIMESTAMP).
 function formatDate(value: string) {
-  const normalized = value.includes("T") ? value : value.replace(" ", "T");
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("es-GT", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return formatUtcTimestamp(value);
 }
 
 type NotificationsViewProps = {
@@ -69,20 +78,37 @@ type NotificationsViewProps = {
 export function ResidentNotificationsView({ initialFilter = "TODOS", role = "residente" }: NotificationsViewProps) {
   const [filter, setFilter] = useState<NotificationFilter>(initialFilter);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | "all" | null>(null);
   const [error, setError] = useState("");
 
+  // Primera pagina del filtro activo (los filtros se aplican en el backend) y
+  // total real de no leidas. Las recargas por evento/foco fusionan la pagina
+  // fresca para no perder los avisos ya cargados con "Ver mas".
   useEffect(() => {
     let active = true;
     let generation = 0;
+    let firstLoad = true;
+    setLoading(true);
+    setNotifications([]);
+    setNextCursor(null);
     function load() {
       const request = ++generation;
-      Promise.all([getNotificationsRequest(), getUnreadNotificationsRequest()])
-      .then(([records, counter]) => {
+      const isFirst = firstLoad;
+      firstLoad = false;
+      Promise.all([getNotificationsPageRequest({ filtro: filter }), getUnreadNotificationsRequest()])
+      .then(([page, counter]) => {
         if (!active || request !== generation) return;
-        setNotifications(records);
+        if (isFirst) {
+          setNotifications(page.items);
+          setNextCursor(page.next_cursor);
+        } else {
+          setNotifications((current) => mergeFreshPage(current, page.items));
+          setNextCursor((current) => current ?? page.next_cursor);
+        }
         setUnread(counter.unread);
         setError("");
       })
@@ -99,7 +125,22 @@ export function ResidentNotificationsView({ initialFilter = "TODOS", role = "res
       active = false;
       unsubscribe();
     };
-  }, []);
+  }, [filter]);
+
+  async function loadMore() {
+    if (!nextCursor) return;
+    try {
+      setLoadingMore(true);
+      setError("");
+      const page = await getNotificationsPageRequest({ filtro: filter, cursor: nextCursor });
+      setNotifications((current) => mergeFreshPage(current, page.items));
+      setNextCursor(page.next_cursor);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "No fue posible cargar mas avisos.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   async function markAsRead(notification: NotificationRecord) {
     if (notification.leido) return;
@@ -184,14 +225,14 @@ export function ResidentNotificationsView({ initialFilter = "TODOS", role = "res
           </div>
           {error ? <Alert variant="destructive" className="mb-4"><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
           {loading ? <p className="py-8 text-center text-sm text-slate-500">Cargando notificaciones...</p> : null}
-          {!loading && notifications.length === 0 ? (
+          {!loading && !error && filter === "TODOS" && notifications.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center">
               <Check className="mx-auto size-8 text-emerald-600" />
               <p className="mt-3 font-semibold text-slate-900">No tienes notificaciones</p>
               <p className="mt-1 text-sm text-slate-500">Los nuevos avisos apareceran en este espacio.</p>
             </div>
           ) : null}
-          {!loading && notifications.length > 0 && visibleNotifications.length === 0 ? (
+          {!loading && !error && (filter !== "TODOS" || notifications.length > 0) && visibleNotifications.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500">
               No hay avisos para el filtro seleccionado.
             </p>
@@ -229,6 +270,13 @@ export function ResidentNotificationsView({ initialFilter = "TODOS", role = "res
               </article>
             ))}
           </div>
+          {!loading && nextCursor ? (
+            <div className="mt-4 flex justify-center">
+              <Button type="button" variant="outline" disabled={loadingMore} onClick={() => void loadMore()}>
+                {loadingMore ? "Cargando..." : "Ver más avisos"}
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </AppShell>

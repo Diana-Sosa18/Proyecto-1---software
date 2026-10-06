@@ -17,6 +17,7 @@ import { getResidentAccountStatementRequest } from "@/services/accountService";
 import { createResidentCheckoutRequest, redirectToRecurrente } from "@/services/recurrenteCheckoutService";
 import { getErrorMessage } from "@/utils/errorMessages";
 import type { AccountQuota, AccountQuotaStatus, AccountStatement } from "@/types/account";
+import { quotaStatusLabels, quotaStatusStyles } from "@/utils/quotaStatus";
 
 type AccountFilter = "TODAS" | AccountQuotaStatus;
 
@@ -27,17 +28,8 @@ const filterLabels: Record<AccountFilter, string> = {
   PAGADA: "Pagadas",
 };
 
-const statusLabels: Record<AccountQuotaStatus, string> = {
-  PAGADA: "Pagada",
-  PENDIENTE: "Pendiente",
-  VENCIDA: "Vencida",
-};
-
-const statusStyles: Record<AccountQuotaStatus, string> = {
-  PAGADA: "bg-emerald-100 text-emerald-700 ring-emerald-200",
-  PENDIENTE: "bg-amber-100 text-amber-700 ring-amber-200",
-  VENCIDA: "bg-rose-100 text-rose-700 ring-rose-200",
-};
+const statusLabels = quotaStatusLabels;
+const statusStyles = quotaStatusStyles;
 
 const emptyStatement: AccountStatement = {
   resumen: {
@@ -337,7 +329,7 @@ export function ResidenteAccountView() {
                       </td>
                       <td className="px-5 py-4 text-sm text-slate-600">
                         {formatCurrency(quota.monto_pagado)}
-                        {(quota.reembolsado || 0)>0 && <p>Devuelto {formatCurrency(quota.reembolsado || 0)} ? Neto {formatCurrency(quota.abono_neto || 0)}</p>}
+                        {(quota.reembolsado || 0)>0 && <p>Devuelto {formatCurrency(quota.reembolsado || 0)} · Neto {formatCurrency(quota.abono_neto || 0)}</p>}
                         <p className="mt-1 text-xs text-slate-400">
                           {quota.ultimo_pago ? `Ultimo pago ${formatDate(quota.ultimo_pago)}` : "Sin pagos"}
                         </p>

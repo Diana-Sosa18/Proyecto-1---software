@@ -747,17 +747,8 @@ async function ensureSprintUserStoriesSchema() {
       )
   `);
 
-  await query(`
-    INSERT INTO PERMISO_INQUILINO (id_usuario, nombre, descripcion, restriccion, fecha_inicio, fecha_fin, estado)
-    SELECT u.id_usuario, 'Reservas de amenidades', 'Puede solicitar reservas segun disponibilidad de la unidad.', 'Requiere autorizacion digital para horarios o acciones restringidas.', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 1 YEAR), 'ACTIVO'
-    FROM USUARIO u
-    INNER JOIN TIPO_USUARIO tu ON tu.id_tipo_usuario = u.id_tipo_usuario
-    WHERE tu.nombre = 'inquilino'
-      AND NOT EXISTS (
-        SELECT 1 FROM PERMISO_INQUILINO pi
-        WHERE pi.id_usuario = u.id_usuario AND pi.nombre = 'Reservas de amenidades'
-      )
-  `);
+  // HU32: ya no se siembra "Reservas de amenidades": el inquilino no puede reservar
+  // amenidades (requireResident). Los registros existentes se conservan.
 
   await query(`
     INSERT INTO REGLAMENTO (categoria, titulo, contenido)
@@ -1023,38 +1014,11 @@ async function ensureDemoRequestsSchema() {
   }
 }
 
-async function ensureTenantAccountSeed() {
-  await query(`
-    INSERT INTO SERVICIO (nombre, tipo_servicio, descripcion)
-    SELECT 'Alquiler residencial', 'Alquiler', 'Cuota mensual de alquiler asociada al inquilino.'
-    WHERE NOT EXISTS (
-      SELECT 1 FROM SERVICIO WHERE LOWER(nombre) = 'alquiler residencial' LIMIT 1
-    )
-  `);
-
-  await query(`
-    INSERT IGNORE INTO CASA_SERVICIO (id_casa, id_servicio, activo, estado_validacion)
-    SELECT ic.id_casa, s.id_servicio, TRUE, 'VALIDADO'
-    FROM INQUILINO_CASA ic
-    INNER JOIN INQUILINO i ON i.id_inquilino = ic.id_inquilino
-    INNER JOIN SERVICIO s ON s.nombre = 'Alquiler residencial'
-    WHERE i.autorizado = TRUE
-  `);
-
-  await query(`
-    INSERT INTO CUOTA (id_servicio, id_casa, monto, fecha_limite)
-    SELECT s.id_servicio, ic.id_casa, 2200.00, LAST_DAY(CURDATE())
-    FROM INQUILINO_CASA ic
-    INNER JOIN INQUILINO i ON i.id_inquilino = ic.id_inquilino
-    INNER JOIN SERVICIO s ON s.nombre = 'Alquiler residencial'
-    WHERE i.autorizado = TRUE
-      AND NOT EXISTS (
-        SELECT 1 FROM CUOTA cu
-        WHERE cu.id_casa = ic.id_casa AND cu.id_servicio = s.id_servicio
-        LIMIT 1
-      )
-  `);
-}
+// HU32: la antigua ensureTenantAccountSeed() creaba al arrancar una cuota real de
+// "Alquiler residencial" por Q2,200.00 para cada casa con inquilino. Una obligacion
+// financiera no debe nacer como efecto secundario del arranque: se movio al fixture
+// de pruebas (test/integration/support/tenantAccountFixture.js). Las cuotas ya
+// creadas se conservan intactas.
 
 module.exports = {
   pool,
@@ -1078,5 +1042,4 @@ module.exports = {
   ensureRemindersSchema,
   ensureSimulatedPaymentsSchema,
   ensureDemoRequestsSchema,
-  ensureTenantAccountSeed,
 };

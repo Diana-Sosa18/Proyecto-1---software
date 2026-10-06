@@ -1,5 +1,6 @@
 const {
   listNotifications,
+  listNotificationsPage,
   countUnreadNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
@@ -9,6 +10,19 @@ async function getNotifications(req, res, next) {
   try {
     const notifications = await listNotifications(req.authUser.id);
     res.status(200).json(notifications);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getNotificationsPage(req, res, next) {
+  try {
+    const page = await listNotificationsPage(req.authUser.id, {
+      filtro: req.query.filtro,
+      cursor: req.query.cursor,
+      limit: req.query.limit,
+    });
+    res.status(200).json(page);
   } catch (error) {
     next(error);
   }
@@ -43,6 +57,7 @@ async function patchAllNotificationsRead(req, res, next) {
 
 module.exports = {
   getNotifications,
+  getNotificationsPage,
   getUnreadCount,
   patchNotificationRead,
   patchAllNotificationsRead,

@@ -1,5 +1,6 @@
 const { pool, query } = require("../database/mysql");
 const { QUOTA_BALANCES_SQL } = require("./financialBalance");
+const { guatemalaToday } = require("../utils/guatemalaTime");
 
 const TYPES = ["PORCENTAJE", "FIJO"];
 const DEFAULT_RULE = { dia_limite: 10, tipo: "PORCENTAJE", porcentaje: 5, monto_fijo: 0, dias_gracia: 0, activo: true, vigente_desde: "2026-01-01" };
@@ -46,9 +47,13 @@ async function saveRule(payload) {
     return rule;
   } catch (error) { await connection.rollback(); throw error; } finally { connection.release(); }
 }
-async function applySurcharges(userId) {
+// Accion administrativa explicita (POST /admin/recargos/aplicar). No se ejecuta al
+// arrancar ni por scheduler. Idempotente: uq_recargo_cuota + INSERT IGNORE impiden
+// un segundo recargo por cuota. "Hoy" es el dia de Guatemala, no CURDATE() (UTC).
+async function applySurcharges(userId, { now = new Date() } = {}) {
   const rule = await getRule();
-  if (!rule.activo) return { aplicados: 0 };
+  const today = guatemalaToday(now);
+  if (!rule.activo) return { aplicados: 0, activo: false, fecha_revision: today };
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -56,19 +61,19 @@ async function applySurcharges(userId) {
       SELECT cu.id_cuota, cu.id_casa, cu.monto, cu.fecha_limite,
         balance.capital_pendiente saldo
       FROM CUOTA cu INNER JOIN (${QUOTA_BALANCES_SQL}) balance ON balance.id_cuota = cu.id_cuota
-      WHERE cu.fecha_limite >= ? AND DATE_ADD(cu.fecha_limite, INTERVAL ? DAY) < CURDATE()
+      WHERE cu.fecha_limite >= ? AND DATE_ADD(cu.fecha_limite, INTERVAL ? DAY) < ?
         AND balance.capital_pendiente > 0 AND balance.sobrepago = 0 AND balance.reembolso_inconsistente = 0
-      FOR UPDATE`, [rule.vigente_desde, rule.dias_gracia]);
+      FOR UPDATE`, [rule.vigente_desde, rule.dias_gracia, today]);
     let applied = 0;
     for (const fee of fees) {
       const amount = calculateSurcharge(Number(fee.saldo), rule);
       const [result] = await connection.execute(`INSERT IGNORE INTO RECARGO_APLICADO
         (id_cuota,id_casa,tipo_regla,monto_original,monto_recargo,fecha_aplicacion,aplicado_por)
-        VALUES (?,?,?,?,?,CURDATE(),?)`, [fee.id_cuota, fee.id_casa, rule.tipo, fee.saldo, amount, userId]);
+        VALUES (?,?,?,?,?,?,?)`, [fee.id_cuota, fee.id_casa, rule.tipo, fee.saldo, amount, today, userId]);
       applied += Number(result.affectedRows || 0);
     }
     await connection.commit();
-    return { aplicados: applied };
+    return { aplicados: applied, activo: true, fecha_revision: today };
   } catch (error) { await connection.rollback(); throw error; } finally { connection.release(); }
 }
 module.exports = { getRule, saveRule, applySurcharges, validateRule, calculateSurcharge, DEFAULT_RULE };

@@ -164,3 +164,9 @@ describe("Dashboard del residente", () => {
     expect(within(kpi("Avisos no leídos")).getByText("Todo al día")).toBeInTheDocument();
   });
 });
+
+it("HU32: los paneles pueden encogerse (min-w-0) para que nombres largos no desborden en móvil", async () => {
+  render(<MemoryRouter><ResidenteView /></MemoryRouter>);
+  const panel = await screen.findByRole("region", { name: "Visitas recientes" });
+  expect(panel.className).toContain("min-w-0");
+});

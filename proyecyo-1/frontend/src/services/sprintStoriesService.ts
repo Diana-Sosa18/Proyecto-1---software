@@ -1,6 +1,8 @@
 import { apiRequest } from "@/services/api";
 import type {
+  AuthorizationDecision,
   AuthorizationRequest,
+  OwnerAuthorizationRequest,
   GuardAccessHistoryRecord,
   Regulation,
   TenantPermission,
@@ -18,6 +20,18 @@ export function createTenantAuthorizationRequest(payload: { accion: string; moti
   return apiRequest<AuthorizationRequest>("/inquilino/autorizaciones", {
     method: "POST",
     body: payload,
+  });
+}
+
+/** Solicitudes de inquilinos de las unidades del residente autenticado. */
+export function getOwnerAuthorizationRequestsRequest(estado: "PENDIENTE" | "TODAS" = "PENDIENTE") {
+  return apiRequest<OwnerAuthorizationRequest[]>(`/residente/solicitudes-autorizacion?estado=${estado}`);
+}
+
+export function resolveOwnerAuthorizationRequest(id: number, decision: AuthorizationDecision, respuesta = "") {
+  return apiRequest<OwnerAuthorizationRequest>(`/residente/solicitudes-autorizacion/${id}`, {
+    method: "PATCH",
+    body: { decision, respuesta },
   });
 }
 

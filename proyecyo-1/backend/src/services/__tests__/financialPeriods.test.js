@@ -12,7 +12,7 @@ test("detalle conserva saldo real con pagos anteriores y movimientos vacios", as
     .mockResolvedValueOnce([]).mockResolvedValueOnce([]);
   const result = await getFinancialDetail(1, { desde: "2026-08-01", hasta: "2026-08-31" });
   expect(result.resumen).toMatchObject({ saldo_pendiente: 100, total_pagado: 115, total_pagado_periodo: 0 });
-  expect(result.cargos[0]).toMatchObject({ saldo: 0, estado: "PAGADO" });
+  expect(result.cargos[0]).toMatchObject({ saldo: 0, estado: "PAGADA", pago_parcial: false });
   expect(result.pagos).toEqual([]);
   expect(query.mock.calls[1][1]).toEqual([1]);
   expect(query.mock.calls[1][0]).not.toContain("fecha_pago >=");

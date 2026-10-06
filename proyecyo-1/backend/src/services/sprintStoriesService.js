@@ -1,4 +1,5 @@
 const { query } = require("../database/mysql");
+const { guatemalaToday, sqlUtcTimeToGuatemala } = require("../utils/guatemalaTime");
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -39,6 +40,11 @@ async function getTenantHouse(userId) {
   return rows[0];
 }
 
+// Permisos historicos que prometen capacidades que el backend NO ofrece al
+// inquilino (las reservas de amenidades exigen requireResident). Los registros
+// se conservan; solo dejan de mostrarse como capacidades vigentes.
+const UNSUPPORTED_TENANT_PERMISSIONS = ["Reservas de amenidades"];
+
 async function listTenantPermissions(userId) {
   const rows = await query(
     `
@@ -52,9 +58,10 @@ async function listTenantPermissions(userId) {
         estado
       FROM PERMISO_INQUILINO
       WHERE id_usuario = ?
+        AND nombre NOT IN (${UNSUPPORTED_TENANT_PERMISSIONS.map(() => "?").join(", ")})
       ORDER BY estado ASC, fecha_fin ASC, nombre ASC
     `,
-    [userId],
+    [userId, ...UNSUPPORTED_TENANT_PERMISSIONS],
   );
 
   return rows.map((row) => ({
@@ -188,19 +195,42 @@ async function listResidentRegulations(filters = {}) {
   }));
 }
 
+// Estado operativo para garita a partir de los estados reales de ACCESO:
+// AUTORIZADA, INGRESO_REGISTRADO, SALIDA_REGISTRADA, CANCELADA,
+// PENDIENTE_APROBACION y RECHAZADA. Solo AUTORIZADA sin ingreso es PENDIENTE.
+function mapGuardHistoryStatus(row) {
+  if (row.hora_salida) return "SALIDA";
+  if (row.hora_ingreso) return "INGRESO";
+  const accessStatus = String(row.estado_acceso || "AUTORIZADA").toUpperCase();
+  if (accessStatus === "CANCELADA") return "CANCELADA";
+  if (accessStatus === "RECHAZADA") return "RECHAZADA";
+  if (accessStatus === "PENDIENTE_APROBACION") return "PENDIENTE_APROBACION";
+  if (accessStatus === "SALIDA_REGISTRADA") return "SALIDA";
+  if (accessStatus === "INGRESO_REGISTRADO") return "INGRESO";
+  return "PENDIENTE";
+}
+
 async function listGuardDailyAccessHistory(filters = {}) {
-  const date = normalizeDate(filters.date) || new Date().toISOString().slice(0, 10);
+  const date = normalizeDate(filters.date) || guatemalaToday();
   const status = normalizeString(filters.status).toUpperCase();
   const search = normalizeString(filters.search).toLowerCase();
   const sqlFilters = ["a.fecha = ?"];
   const params = [date];
 
+  // Los filtros usan las mismas reglas que mapGuardHistoryStatus para que
+  // frontend, backend y KPIs del dashboard coincidan.
   if (status === "INGRESO") {
     sqlFilters.push("ra.hora_ingreso IS NOT NULL AND ra.hora_salida IS NULL");
   } else if (status === "SALIDA") {
     sqlFilters.push("ra.hora_salida IS NOT NULL");
   } else if (status === "PENDIENTE") {
     sqlFilters.push("ra.hora_ingreso IS NULL AND COALESCE(a.estado_acceso, 'AUTORIZADA') = 'AUTORIZADA'");
+  } else if (status === "CANCELADA") {
+    sqlFilters.push("ra.hora_ingreso IS NULL AND a.estado_acceso = 'CANCELADA'");
+  } else if (status === "RECHAZADA") {
+    sqlFilters.push("ra.hora_ingreso IS NULL AND a.estado_acceso = 'RECHAZADA'");
+  } else if (status === "PENDIENTE_APROBACION") {
+    sqlFilters.push("ra.hora_ingreso IS NULL AND a.estado_acceso = 'PENDIENTE_APROBACION'");
   }
 
   if (search) {
@@ -218,14 +248,14 @@ async function listGuardDailyAccessHistory(filters = {}) {
         a.tipo_visita,
         a.estado_acceso,
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_programada,
-        TIME_FORMAT(ra.hora_ingreso, '%H:%i') AS hora_ingreso,
-        TIME_FORMAT(ra.hora_salida, '%H:%i') AS hora_salida
+        TIME_FORMAT(${sqlUtcTimeToGuatemala("ra.hora_ingreso")}, '%H:%i') AS hora_ingreso,
+        TIME_FORMAT(${sqlUtcTimeToGuatemala("ra.hora_salida")}, '%H:%i') AS hora_salida
       FROM ACCESO a
       INNER JOIN VISITANTE v ON v.id_visitante = a.id_visitante
       INNER JOIN CASA c ON c.id_casa = a.id_casa
       LEFT JOIN REGISTRO_ACCESO ra ON ra.id_acceso = a.id_acceso
       WHERE ${sqlFilters.join(" AND ")}
-      ORDER BY COALESCE(ra.hora_ingreso, a.hora_inicio) DESC, a.id_acceso DESC
+      ORDER BY COALESCE(${sqlUtcTimeToGuatemala("ra.hora_ingreso")}, a.hora_inicio) DESC, a.id_acceso DESC
     `,
     params,
   );
@@ -236,8 +266,7 @@ async function listGuardDailyAccessHistory(filters = {}) {
     placa: row.placa || "Sin placa",
     casa: row.casa,
     tipo_visita: row.tipo_visita,
-    estado:
-      row.hora_salida ? "SALIDA" : row.hora_ingreso ? "INGRESO" : row.estado_acceso === "CANCELADA" ? "CANCELADA" : "PENDIENTE",
+    estado: mapGuardHistoryStatus(row),
     hora_programada: row.hora_programada,
     hora_ingreso: row.hora_ingreso || null,
     hora_salida: row.hora_salida || null,
@@ -250,4 +279,6 @@ module.exports = {
   createTenantAuthorizationRequest,
   listResidentRegulations,
   listGuardDailyAccessHistory,
+  mapGuardHistoryStatus,
+  UNSUPPORTED_TENANT_PERMISSIONS,
 };

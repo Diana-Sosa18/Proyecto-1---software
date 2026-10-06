@@ -4,6 +4,7 @@ const { assertVisitTimesAllowed } = require("./configurationService");
 const { ensureValidVehiclePlate } = require("../utils/vehiclePlate");
 const { ensureValidDate, ensureValidTime } = require("../utils/dateTimeValidation");
 const crypto = require("crypto");
+const { guatemalaToday, sqlUtcTimeToGuatemala } = require("../utils/guatemalaTime");
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 
 function normalizeString(value) {
@@ -223,7 +224,7 @@ async function listResidentVisits(userId, role = "residente") {
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
         (
-          SELECT TIME_FORMAT(ra.hora_salida, '%H:%i')
+          SELECT TIME_FORMAT(${sqlUtcTimeToGuatemala("ra.hora_salida")}, '%H:%i')
           FROM REGISTRO_ACCESO ra
           WHERE ra.id_acceso = a.id_acceso
           LIMIT 1
@@ -419,7 +420,7 @@ async function deleteVisit(userId, role = "residente", accessId) {
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
         (
-          SELECT TIME_FORMAT(ra.hora_salida, '%H:%i')
+          SELECT TIME_FORMAT(${sqlUtcTimeToGuatemala("ra.hora_salida")}, '%H:%i')
           FROM REGISTRO_ACCESO ra
           WHERE ra.id_acceso = a.id_acceso
           LIMIT 1
@@ -501,7 +502,7 @@ async function updateVisit(userId, role = "residente", accessId, payload = {}) {
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
         (
-          SELECT TIME_FORMAT(ra.hora_salida, '%H:%i')
+          SELECT TIME_FORMAT(${sqlUtcTimeToGuatemala("ra.hora_salida")}, '%H:%i')
           FROM REGISTRO_ACCESO ra
           WHERE ra.id_acceso = a.id_acceso
           LIMIT 1
@@ -864,7 +865,7 @@ async function getGuardShiftVisits() {
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
         (
-          SELECT TIME_FORMAT(ra.hora_salida, '%H:%i')
+          SELECT TIME_FORMAT(${sqlUtcTimeToGuatemala("ra.hora_salida")}, '%H:%i')
           FROM REGISTRO_ACCESO ra
           WHERE ra.id_acceso = a.id_acceso
           LIMIT 1
@@ -883,9 +884,13 @@ async function getGuardShiftVisits() {
         ON v.id_visitante = a.id_visitante
       INNER JOIN CASA c
         ON c.id_casa = a.id_casa
+      -- "Visitas recientes": hoy y dias anteriores en Guatemala; las fechas
+      -- futuras no se presentan como si ya hubieran ocurrido.
+      WHERE a.fecha <= ?
       ORDER BY a.fecha DESC, a.hora_inicio DESC, a.id_acceso DESC
       LIMIT 20
     `,
+    [guatemalaToday()],
   );
 
   return rows.map(mapVisit);
@@ -1026,7 +1031,7 @@ async function findVisitByQrToken(normalizedToken) {
         TIME_FORMAT(a.hora_inicio, '%H:%i') AS hora_inicio,
         TIME_FORMAT(a.hora_fin, '%H:%i') AS hora_fin,
         (
-          SELECT TIME_FORMAT(ra.hora_salida, '%H:%i')
+          SELECT TIME_FORMAT(${sqlUtcTimeToGuatemala("ra.hora_salida")}, '%H:%i')
           FROM REGISTRO_ACCESO ra
           WHERE ra.id_acceso = a.id_acceso
           LIMIT 1
