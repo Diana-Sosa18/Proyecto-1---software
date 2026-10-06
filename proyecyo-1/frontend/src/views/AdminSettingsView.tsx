@@ -23,6 +23,7 @@ import {
   validateBackupRequest,
 } from "@/services/restoresService";
 import type { BackupPayload, BackupValidation, RestoreHistoryRecord } from "@/types/restores";
+import { formatUtcTimestamp } from "@/utils/guatemalaTime";
 
 type ProcessStatus = "idle" | "selected" | "validating" | "valid" | "restoring" | "completed" | "error";
 
@@ -58,6 +59,7 @@ export function AdminSettingsView() {
   const [backup, setBackup] = useState<BackupPayload | null>(null);
   const [validation, setValidation] = useState<BackupValidation | null>(null);
   const [history, setHistory] = useState<RestoreHistoryRecord[]>([]);
+  const [historyError, setHistoryError] = useState("");
   const [status, setStatus] = useState<ProcessStatus>("idle");
   const [message, setMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -74,8 +76,10 @@ export function AdminSettingsView() {
     try {
       const records = await getRestoreHistoryRequest();
       setHistory(records);
-    } catch {
-      setHistory([]);
+      setHistoryError("");
+    } catch (error) {
+      // Un fallo no se presenta como historial vacio.
+      setHistoryError(error instanceof Error && error.message ? error.message : "No fue posible cargar el historial.");
     }
   }
 
@@ -298,7 +302,9 @@ export function AdminSettingsView() {
         <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
           <h2 className="text-[1.12rem] font-semibold text-slate-950">Historial</h2>
           <div className="mt-4 grid gap-3">
-            {history.length ? (
+            {historyError ? (
+              <p role="alert" className="rounded-lg bg-rose-50 px-3.5 py-3 text-sm text-rose-700">{historyError}</p>
+            ) : history.length ? (
               history.map((record) => (
                 <article
                   key={record.id_restauracion}
@@ -309,7 +315,7 @@ export function AdminSettingsView() {
                       <p className="truncate text-sm font-semibold text-slate-950">
                         {record.nombre_archivo}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">{record.creado_en}</p>
+                      <p className="mt-1 text-xs text-slate-500">{formatUtcTimestamp(record.creado_en)}</p>
                     </div>
                     <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[0.68rem] font-semibold text-slate-600">
                       {record.estado}

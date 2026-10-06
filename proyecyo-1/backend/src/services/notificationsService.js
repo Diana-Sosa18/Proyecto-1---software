@@ -18,9 +18,9 @@ function normalizeNotification(row) {
   };
 }
 
-async function listNotifications(userId) {
-  const rows = await query(
-    `
+// Columnas y joins compartidos por el listado reciente y el paginado; siempre
+// se filtra por n.id_usuario del usuario autenticado.
+const NOTIFICATION_SELECT = `
       SELECT
         n.id_notificacion,
         n.id_usuario,
@@ -42,7 +42,12 @@ async function listNotifications(userId) {
       LEFT JOIN ENTREGA_NOTIFICACION_FINANCIERA e ON e.id_notificacion=n.id_notificacion AND e.id_usuario=n.id_usuario
       LEFT JOIN ACCESO a ON a.id_acceso = n.id_acceso
       LEFT JOIN VISITANTE v ON v.id_visitante = a.id_visitante
-      LEFT JOIN CASA c ON c.id_casa = a.id_casa
+      LEFT JOIN CASA c ON c.id_casa = a.id_casa`;
+
+/** Ultimas 20 notificaciones (vista previa del dashboard y alertas de garita). */
+async function listNotifications(userId) {
+  const rows = await query(
+    `${NOTIFICATION_SELECT}
       WHERE n.id_usuario = ?
       ORDER BY n.creado_en DESC, n.id_notificacion DESC
       LIMIT 20
@@ -51,6 +56,58 @@ async function listNotifications(userId) {
   );
 
   return rows.map(normalizeNotification);
+}
+
+const PAGE_FILTERS = {
+  TODOS: "",
+  SIN_LEER: " AND n.leido = FALSE",
+  COMUNICADOS: " AND n.tipo = 'COMUNICADO'",
+  OTROS: " AND n.tipo <> 'COMUNICADO'",
+};
+const CURSOR_PATTERN = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\|(\d+)$/;
+
+function badRequest(message) {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+}
+
+/**
+ * Pagina estable (keyset) de notificaciones del usuario autenticado.
+ * Orden determinista: creado_en DESC, id_notificacion DESC. El cursor es
+ * "YYYY-MM-DD HH:mm:ss|id" de la ultima fila recibida.
+ */
+async function listNotificationsPage(userId, options = {}) {
+  const filter = String(options.filtro || "TODOS").toUpperCase();
+  if (!Object.prototype.hasOwnProperty.call(PAGE_FILTERS, filter)) throw badRequest("El filtro de avisos es invalido.");
+  const requestedLimit = options.limit === undefined || options.limit === "" ? 20 : Number(options.limit);
+  if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 50) throw badRequest("El limite debe estar entre 1 y 50.");
+
+  const params = [userId];
+  let cursorSql = "";
+  if (options.cursor) {
+    const match = CURSOR_PATTERN.exec(String(options.cursor));
+    if (!match) throw badRequest("El cursor de avisos es invalido.");
+    cursorSql = " AND (n.creado_en < ? OR (n.creado_en = ? AND n.id_notificacion < ?))";
+    params.push(match[1], match[1], Number(match[2]));
+  }
+
+  // Se pide una fila extra para saber si existe otra pagina sin contar toda la tabla.
+  const rows = await query(
+    `${NOTIFICATION_SELECT}
+      WHERE n.id_usuario = ?${PAGE_FILTERS[filter]}${cursorSql}
+      ORDER BY n.creado_en DESC, n.id_notificacion DESC
+      LIMIT ${requestedLimit + 1}
+    `,
+    params,
+  );
+
+  const items = rows.slice(0, requestedLimit).map(normalizeNotification);
+  const last = items[items.length - 1];
+  return {
+    items,
+    next_cursor: rows.length > requestedLimit && last ? `${last.creado_en}|${last.id_notificacion}` : null,
+  };
 }
 
 async function countUnreadNotifications(userId) {
@@ -140,6 +197,7 @@ async function markAllNotificationsAsRead(userId) {
 
 module.exports = {
   listNotifications,
+  listNotificationsPage,
   countUnreadNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,

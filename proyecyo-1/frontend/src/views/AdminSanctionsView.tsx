@@ -27,6 +27,7 @@ import type {
   AdminSanctionStatus,
   AdminSanctionSummary,
 } from "@/types/sanctions";
+import { formatUtcTimestamp } from "@/utils/guatemalaTime";
 
 const fieldClassName =
   "h-10 rounded-xl border border-slate-200 bg-white px-3 text-[0.82rem] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
@@ -453,7 +454,7 @@ export function AdminSanctionsView() {
               ) : (
                 history.map((event) => (
                   <tr key={event.id_historial} className="border-b border-slate-100 last:border-b-0">
-                    <td className="px-5 py-3 text-sm text-slate-500">{event.creado_en}</td>
+                    <td className="px-5 py-3 text-sm text-slate-500">{formatUtcTimestamp(event.creado_en)}</td>
                     <td className="px-5 py-3 text-sm font-medium text-slate-950">
                       {event.casa_unidad}
                     </td>

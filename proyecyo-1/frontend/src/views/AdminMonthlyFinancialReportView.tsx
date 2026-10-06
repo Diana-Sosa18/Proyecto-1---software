@@ -26,7 +26,7 @@ export function AdminMonthlyFinancialReportView() {
       <h2 className="font-semibold">Movimientos del mes</h2>
       {report.pagos.length === 0 ? <p className="mt-2 text-sm text-slate-500">No hay pagos en el mes seleccionado.</p> :
         <ul className="mt-2 space-y-2">{report.pagos.map((p) => <li key={p.id_pago} className="text-sm">Pago #{p.id_pago} · Cuota #{p.id_cuota} · {p.fecha_pago} · {money(p.monto_pagado)}</li>)}</ul>}
-      {(report.reembolsos || []).map(r=><p key={r.id_reembolso}>Reembolso #{r.id_reembolso} ? Cuota #{r.id_cuota} ? {r.fecha_reembolso} ? Devuelto {money(r.monto_centavos/100)}</p>)}
+      {(report.reembolsos || []).map(r=><p key={r.id_reembolso}>Reembolso #{r.id_reembolso} · Cuota #{r.id_cuota} · {r.fecha_reembolso} · Devuelto {money(r.monto_centavos/100)}</p>)}
     </section> : null}
   </AdminLayout>;
 }

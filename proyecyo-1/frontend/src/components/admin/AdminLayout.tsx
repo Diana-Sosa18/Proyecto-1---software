@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
   BellRing,
   FileText,
@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   LogOut,
   Megaphone,
+  Menu,
   Settings,
   ShieldAlert,
   UserCheck,
@@ -14,8 +15,9 @@ import {
   BriefcaseBusiness,
   MessageSquareText,
   MonitorSmartphone,
+  X,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 
 import { cn } from "@/components/ui/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -127,10 +129,66 @@ function getInitials(email: string | undefined) {
 
 export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutProps) {
   const { user, logout } = useAuth();
+  const { pathname } = useLocation();
+  // HU32: en movil/tablet el menu es un panel desplegable; antes empujaba todo el
+  // contenido debajo de ~19 enlaces. En escritorio (lg) el sidebar sigue fijo.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuId = useId();
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [menuOpen]);
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] text-slate-900">
-      <aside className="flex w-full flex-col border-b border-slate-200 bg-white lg:fixed lg:inset-y-0 lg:left-0 lg:h-screen lg:w-[232px] lg:overflow-hidden lg:border-b-0 lg:border-r">
+      <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
+        <div className="min-w-0">
+          <p className="text-lg font-semibold leading-none tracking-tight text-blue-600">NexusResidencial</p>
+          <p className="mt-1 truncate text-xs text-slate-500">{"Panel de Administraci\u00f3n"}</p>
+        </div>
+        <button
+          ref={menuButtonRef}
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-expanded={menuOpen}
+          aria-controls={menuId}
+          aria-label={menuOpen ? "Cerrar men\u00fa" : "Abrir men\u00fa"}
+          className="inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        >
+          {menuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+        </button>
+      </div>
+
+      {menuOpen ? (
+        <div
+          className="fixed inset-0 z-30 bg-slate-950/40 lg:hidden"
+          aria-hidden="true"
+          onClick={() => setMenuOpen(false)}
+          data-testid="admin-drawer-backdrop"
+        />
+      ) : null}
+
+      <aside
+        id={menuId}
+        aria-label={"Navegaci\u00f3n del administrador"}
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 flex w-[264px] max-w-[85vw] flex-col overflow-hidden border-r border-slate-200 bg-white transition-transform duration-200 lg:w-[232px] lg:translate-x-0",
+          menuOpen ? "visible translate-x-0 shadow-xl" : "invisible -translate-x-full lg:visible",
+        )}
+      >
         <div className="shrink-0 border-b border-slate-200 px-5 py-5">
           <p className="text-[1.34rem] font-semibold leading-none tracking-tight text-blue-600">
             NexusResidencial
@@ -140,7 +198,7 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
           </p>
         </div>
 
-        <nav className="px-3 py-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-3 lg:py-5">
+        <nav aria-label={"M\u00f3dulos del administrador"} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 lg:py-5">
           <div className="grid gap-1">
             {adminMenuItems.map(({ label, icon: Icon, to, end }) => (
               <NavLink
@@ -163,9 +221,9 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
           </div>
         </nav>
 
-        <div className="mt-auto shrink-0 border-t border-slate-200 bg-white px-5 py-5">
+        <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-5">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-9 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600">
               {getInitials(user?.email)}
             </div>
             <div className="min-w-0">
@@ -181,7 +239,7 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-[0.84rem] font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-950"
           >
             <LogOut className="size-4" />
-            Cerrar sesi\u00f3n
+            {"Cerrar sesi\u00f3n"}
           </button>
           <NavLink
             to="/cuenta/sesiones"
@@ -197,7 +255,7 @@ export function AdminLayout({ title, subtitle, children, actions }: AdminLayoutP
         <div className="px-4 py-4 sm:px-5 lg:px-6 lg:py-6">
           <div className="mx-auto max-w-[1240px]">
             <header className="flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between">
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-2xl font-semibold tracking-tight text-slate-950 md:text-[2.05rem]">
                   {title}
                 </h1>

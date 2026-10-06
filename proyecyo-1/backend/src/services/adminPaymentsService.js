@@ -1,4 +1,5 @@
 const { query } = require("../database/mysql");
+const { sqlGuatemalaTodayLiteral } = require("../utils/guatemalaTime");
 const { calculateBalance, balanceDetails, sumMoney, toMoney, QUOTA_BALANCES_SQL } = require("./financialBalance");
 
 function normalizeString(value) {
@@ -100,7 +101,7 @@ async function listDelinquentResidents(filters = {}) {
             MIN(CASE WHEN cu.saldo_pendiente > 0 THEN cu.fecha_limite END) AS proxima_fecha_limite,
             MAX(
               CASE
-                WHEN cu.saldo_pendiente > 0 AND cu.fecha_limite < CURDATE() THEN 1
+                WHEN cu.saldo_pendiente > 0 AND cu.fecha_limite < ${sqlGuatemalaTodayLiteral()} THEN 1
                 ELSE 0
               END
             ) AS tiene_mora

@@ -22,7 +22,7 @@ const residentSidebarConfig: RoleSidebarConfig<ResidentBadgeKey> = {
   homePath: "/residente",
   sections: residentNavSections,
   sessionsItem: residentSessionsItem,
-  counterLabels: { unreadNotifications: "sin leer", pendingProviders: "pendientes" },
+  counterLabels: { unreadNotifications: "sin leer", pendingProviders: "pendientes", pendingTenantRequests: "solicitudes pendientes" },
 };
 
 /** Layout del panel de residente: solo expone modulos del rol residente. */

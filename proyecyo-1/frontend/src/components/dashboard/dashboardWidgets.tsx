@@ -12,17 +12,15 @@ import {
 } from "@/services/notificationsService";
 import type { NotificationRecord } from "@/types/notifications";
 import type { VisitRecord } from "@/types/visits";
+import { formatUtcTimestamp, guatemalaToday } from "@/utils/guatemalaTime";
 
 // Piezas visuales compartidas por los dashboards de rol (residente, inquilino, guardia).
 
 export type Loadable<T> = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; data: T };
 
+/** Fecha calendario en America/Guatemala, independiente de la zona del navegador. */
 export function localDate(offsetDays = 0) {
-  const date = new Date();
-  date.setDate(date.getDate() + offsetDays);
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
+  return guatemalaToday(offsetDays);
 }
 
 export function formatCurrency(value: number) {
@@ -35,10 +33,9 @@ export function formatDay(value: string) {
   return new Intl.DateTimeFormat("es-GT", { day: "numeric", month: "short", year: "numeric" }).format(date);
 }
 
+/** Instantes del backend (creado_en de avisos y solicitudes) guardados en UTC, mostrados en Guatemala. */
 export function formatDateTime(value: string) {
-  const date = new Date(value.includes("T") ? value : value.replace(" ", "T"));
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("es-GT", { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return formatUtcTimestamp(value);
 }
 
 export function errorMessage(error: unknown, fallback: string) {
@@ -159,7 +156,8 @@ export function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label={title}>
+    // min-w-0: en grillas de una columna, textos con truncate no deben ensanchar el panel (overflow movil).
+    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label={title}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <h2 className="flex items-center gap-2 text-base font-semibold text-slate-950">
           <Icon className="size-4 text-blue-600" aria-hidden="true" />

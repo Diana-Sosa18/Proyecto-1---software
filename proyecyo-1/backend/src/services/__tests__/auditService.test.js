@@ -33,7 +33,8 @@ describe("auditService", () => {
     const [sql, params] = query.mock.calls[0];
     expect(sql).toContain("a.id_usuario = ?");
     expect(sql).toContain("a.accion = ?");
-    expect(params).toEqual([7, "USER_UPDATED", "2026-09-01 00:00:00", "2026-09-30 00:00:00"]);
+    // HU32: los dias del filtro son de Guatemala (UTC-6) y creado_en esta en UTC.
+    expect(params).toEqual([7, "USER_UPDATED", "2026-09-01 06:00:00", "2026-10-01 06:00:00"]);
   });
 
   it("rechaza acciones y rangos de fecha no permitidos", async () => {

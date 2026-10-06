@@ -18,6 +18,14 @@ export interface AuthorizationRequest {
   actualizado_en: string;
 }
 
+/** Solicitud vista por el residente propietario de la unidad (HU32). */
+export interface OwnerAuthorizationRequest extends AuthorizationRequest {
+  inquilino: string | null;
+  unidad: string | null;
+}
+
+export type AuthorizationDecision = "APROBADO" | "RECHAZADO";
+
 export interface Regulation {
   id_reglamento: number;
   categoria: string;
@@ -32,7 +40,7 @@ export interface GuardAccessHistoryRecord {
   placa: string;
   casa: string;
   tipo_visita: string;
-  estado: "PENDIENTE" | "INGRESO" | "SALIDA" | "CANCELADA";
+  estado: "PENDIENTE" | "INGRESO" | "SALIDA" | "CANCELADA" | "RECHAZADA" | "PENDIENTE_APROBACION";
   hora_programada: string;
   hora_ingreso: string | null;
   hora_salida: string | null;

@@ -3,10 +3,8 @@ import { BellRing, Clock3, DoorOpen, History, LogIn, ScanLine, UserRoundCheck } 
 import { Link } from "react-router-dom";
 
 import {
-  formatDateTime,
   KpiCard,
   KpiGrid,
-  localDate,
   Panel,
   PanelGrid,
   PanelLink,
@@ -17,21 +15,29 @@ import { AppShell } from "@/components/layout/AppShell";
 import { getGuardNotificationsRequest } from "@/services/notificationsService";
 import { getGuardAccessHistoryRequest } from "@/services/sprintStoriesService";
 import type { GuardAccessHistoryRecord } from "@/types/sprintStories";
+import { formatUtcTimestamp, guatemalaToday } from "@/utils/guatemalaTime";
 
 const movementLabels: Record<GuardAccessHistoryRecord["estado"], { label: string; className: string }> = {
   PENDIENTE: { label: "Pendiente", className: "bg-amber-50 text-amber-700" },
   INGRESO: { label: "Ingresó", className: "bg-emerald-50 text-emerald-700" },
   SALIDA: { label: "Salida", className: "bg-blue-50 text-blue-700" },
   CANCELADA: { label: "Cancelada", className: "bg-rose-50 text-rose-700" },
+  RECHAZADA: { label: "Rechazada", className: "bg-rose-50 text-rose-700" },
+  PENDIENTE_APROBACION: { label: "Por aprobar", className: "bg-violet-50 text-violet-700" },
 };
 
+// Solo cuentan los accesos autorizados (pendientes, dentro o con salida);
+// cancelados, rechazados y por aprobar no forman parte de la operacion del dia.
+const AUTHORIZED_FLOW: GuardAccessHistoryRecord["estado"][] = ["PENDIENTE", "INGRESO", "SALIDA"];
+
+// El backend devuelve hora_ingreso/hora_salida ya convertidas a hora de Guatemala ("HH:mm").
 function lastMovement(record: GuardAccessHistoryRecord) {
   return record.hora_salida ?? record.hora_ingreso ?? "";
 }
 
 /** Dashboard operativo de garita: indicadores del dia a partir del historial real. */
 export function GuardiaDashboardView() {
-  const today = localDate();
+  const today = guatemalaToday();
   const [history] = useLoadable(
     () => getGuardAccessHistoryRequest({ date: today }),
     "No fue posible cargar los accesos del día.",
@@ -40,7 +46,7 @@ export function GuardiaDashboardView() {
   const [alerts] = useLoadable(getGuardNotificationsRequest, "No fue posible cargar las alertas.", []);
 
   const records = history.status === "ready" ? history.data : [];
-  const scheduled = records.filter((record) => record.estado !== "CANCELADA");
+  const scheduled = records.filter((record) => AUTHORIZED_FLOW.includes(record.estado));
   const pending = useMemo(
     () =>
       records
@@ -149,7 +155,7 @@ export function GuardiaDashboardView() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-slate-900">{record.visitante}</p>
                       <p className="text-xs text-slate-500">
-                        Unidad {record.casa} · {formatDateTime(lastMovement(record))}
+                        Unidad {record.casa} · {lastMovement(record)}
                       </p>
                     </div>
                     <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}>{status.label}</span>
@@ -170,7 +176,7 @@ export function GuardiaDashboardView() {
               <li key={alert.id_notificacion} className="rounded-xl border border-rose-100 bg-rose-50/60 px-3.5 py-3">
                 <p className="text-sm font-semibold text-slate-900">{alert.titulo}</p>
                 <p className="mt-0.5 line-clamp-2 text-sm text-slate-600">{alert.mensaje}</p>
-                <p className="mt-1.5 text-xs text-slate-400">{formatDateTime(alert.creado_en)}</p>
+                <p className="mt-1.5 text-xs text-slate-400">{formatUtcTimestamp(alert.creado_en)}</p>
               </li>
             ))}
           </ul>

@@ -10,6 +10,7 @@ import {
   sendAnnouncementRequest,
 } from "@/services/announcementsService";
 import type { AnnouncementRecipientType, AnnouncementRecord } from "@/types/announcements";
+import { formatUtcTimestamp } from "@/utils/guatemalaTime";
 
 const recipientOptions: Array<{ value: AnnouncementRecipientType; label: string }> = [
   { value: "todos", label: "Todos los usuarios" },
@@ -29,13 +30,8 @@ const recipientLabels: Record<AnnouncementRecipientType, string> = {
 
 function formatDateTime(value: string) {
   if (!value) return "--";
-  return new Intl.DateTimeFormat("es-GT", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value.replace(" ", "T")));
+  // enviado_en es un instante UTC (NOW()); se muestra en hora de Guatemala.
+  return formatUtcTimestamp(value, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export function AdminCommunicationsView() {

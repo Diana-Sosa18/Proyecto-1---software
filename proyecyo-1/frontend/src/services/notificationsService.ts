@@ -1,8 +1,18 @@
 import { apiRequest } from "@/services/api";
-import type { NotificationRecord, UnreadNotificationsResponse } from "@/types/notifications";
+import type { NotificationPage, NotificationPageFilter, NotificationRecord, UnreadNotificationsResponse } from "@/types/notifications";
 
 export function getNotificationsRequest() {
   return apiRequest<NotificationRecord[]>("/notificaciones");
+}
+
+/** Pagina estable de avisos del usuario; los filtros se aplican en el backend. */
+export function getNotificationsPageRequest(options: { filtro?: NotificationPageFilter; cursor?: string | null; limit?: number } = {}) {
+  const query = new URLSearchParams();
+  if (options.filtro && options.filtro !== "TODOS") query.set("filtro", options.filtro);
+  if (options.cursor) query.set("cursor", options.cursor);
+  if (options.limit) query.set("limit", String(options.limit));
+  const qs = query.toString();
+  return apiRequest<NotificationPage>(qs ? `/notificaciones/pagina?${qs}` : "/notificaciones/pagina");
 }
 
 export function getUnreadNotificationsRequest() {

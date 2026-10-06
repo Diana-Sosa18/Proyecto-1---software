@@ -10,10 +10,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/hooks/useAuth";
 import { closeActiveSessionRequest, getActiveSessionsRequest } from "@/services/sessionsService";
 import type { ActiveSession } from "@/types/sessions";
+import { formatUtcTimestamp } from "@/utils/guatemalaTime";
 
+// Las marcas de sesion (NOW()) son instantes UTC; se muestran en hora de Guatemala.
 function formatDate(value: string) {
-  const date = new Date(value.includes("T") ? value : value.replace(" ", "T"));
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("es-GT", { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return formatUtcTimestamp(value);
 }
 
 export function ActiveSessionsView() {

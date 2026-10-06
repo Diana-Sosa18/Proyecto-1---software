@@ -20,7 +20,7 @@ vi.mock("@/services/tenantAccountService", () => ({ getTenantAccountStatementReq
 vi.mock("@/services/providersService", () => ({ getOwnerProvidersRequest: vi.fn(async () => []), getTenantProvidersRequest: vi.fn(async () => []) }));
 vi.mock("@/services/amenitiesService", () => ({ getAmenitiesReservationsRequest: vi.fn(async () => []) }));
 vi.mock("@/services/visitsService", () => ({ getVisitsRequest: vi.fn(async () => []) }));
-vi.mock("@/services/sprintStoriesService", () => ({ getTenantAuthorizationRequestsRequest: vi.fn(async () => []) }));
+vi.mock("@/services/sprintStoriesService", () => ({ getTenantAuthorizationRequestsRequest: vi.fn(async () => []), getOwnerAuthorizationRequestsRequest: vi.fn(async () => []) }));
 
 // GET /notificaciones solo devuelve las 20 mas recientes; el total real viene del conteo.
 const latestTwenty: NotificationRecord[] = Array.from({ length: 20 }, (_, index) => ({

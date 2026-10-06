@@ -22,7 +22,6 @@ const {
   ensureRemindersSchema,
   ensureSimulatedPaymentsSchema,
   ensureDemoRequestsSchema,
-  ensureTenantAccountSeed,
   pool,
   query,
 } = require("./src/database/mysql");
@@ -82,7 +81,6 @@ async function startServer() {
   try { await applyRecurrentePreparation(migrationConnection); await applyRecurrenteCheckoutMigration(migrationConnection); await applyRecurrenteConfirmationMigration(migrationConnection); await applyRecurrenteAttemptsMigration(migrationConnection); await applyRecurrenteRefundsMigration(migrationConnection); await applyRecurrenteIntentHistoryMigration(migrationConnection); await applyRecurrenteReviewPrecisionMigration(migrationConnection); await applyFinancialNotificationsMigration(migrationConnection); }
   finally { migrationConnection.release(); }
   await ensureDemoRequestsSchema();
-  await ensureTenantAccountSeed();
   startScheduler();
   startReminderScheduler();
 

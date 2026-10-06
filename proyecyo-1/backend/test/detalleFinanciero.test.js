@@ -10,13 +10,6 @@ test("normalizeDate acepta formato ISO y descarta el resto", () => {
   assert.equal(__private__.normalizeDate(""), "");
 });
 
-test("computeChargeStatus distingue pagado, parcial y pendiente", () => {
-  assert.equal(__private__.computeChargeStatus(100, 100), "PAGADO");
-  assert.equal(__private__.computeChargeStatus(100, 120), "PAGADO");
-  assert.equal(__private__.computeChargeStatus(100, 40), "PARCIAL");
-  assert.equal(__private__.computeChargeStatus(100, 0), "PENDIENTE");
-});
-
 test("mapCharge calcula saldo con recargo y estado", () => {
   const record = __private__.mapCharge({
     id_cuota: "7",
@@ -25,7 +18,7 @@ test("mapCharge calcula saldo con recargo y estado", () => {
     pagado: "200.00",
     recargo: "25.00",
     fecha_limite: "2026-07-30",
-  });
+  }, "2026-08-04");
 
   assert.deepEqual(record, {
     id_cuota: 7,
@@ -37,7 +30,9 @@ test("mapCharge calcula saldo con recargo y estado", () => {
     capital_pendiente: 325, recargo_pendiente: 0, sobrepago: 0, requiere_revision: false,
     cobrado_bruto: 200, reembolsado: 0, abono_neto: 200,
     fecha_limite: "2026-07-30",
-    estado: "PARCIAL",
+    // HU32: misma regla que "Mis pagos"; el abono parcial es un dato aparte.
+    estado: "VENCIDA",
+    pago_parcial: true,
   });
 });
 
@@ -52,7 +47,8 @@ test("mapCharge deja saldo en cero cuando el pago cubre monto y recargo", () => 
   });
 
   assert.equal(record.saldo, 0);
-  assert.equal(record.estado, "PAGADO");
+  assert.equal(record.estado, "PAGADA");
+  assert.equal(record.pago_parcial, false);
 });
 
 test("mapSurcharge convierte filas de recargo", () => {

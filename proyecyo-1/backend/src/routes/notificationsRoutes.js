@@ -2,6 +2,7 @@ const express = require("express");
 
 const {
   getNotifications,
+  getNotificationsPage,
   getUnreadCount,
   patchNotificationRead,
   patchAllNotificationsRead,
@@ -13,6 +14,7 @@ const { requireNotificationUser } = require("../middlewares/requireNotificationU
 const router = express.Router();
 
 router.get("/notificaciones", requireNotificationUser, getNotifications);
+router.get("/notificaciones/pagina", requireNotificationUser, getNotificationsPage);
 router.get("/notificaciones/no-leidas", requireNotificationUser, getUnreadCount);
 router.patch("/notificaciones/:id/leida", requireNotificationUser, patchNotificationRead);
 router.patch("/notificaciones/marcar-todas-leidas", requireNotificationUser, patchAllNotificationsRead);

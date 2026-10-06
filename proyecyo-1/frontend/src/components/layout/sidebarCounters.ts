@@ -39,7 +39,10 @@ export function useSidebarCounters<Key extends string>(loaders: Record<Key, () =
     function load() {
       const request = ++generation;
       (Object.keys(loaders) as Key[]).forEach((key) => {
-        loaders[key]()
+        // Promise.resolve().then(...) convierte tambien errores sincronos del loader
+        // en un rechazo: un badge que falla solo se oculta, nunca rompe el layout.
+        Promise.resolve()
+          .then(() => loaders[key]())
           .then((value) => {
             if (active && request === generation) setCounters((current) => ({ ...current, [key]: value }));
           })

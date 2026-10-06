@@ -19,7 +19,7 @@ import {
   type RoleNavSection,
 } from "@/components/layout/roleNavigation";
 
-export type ResidentBadgeKey = "unreadNotifications" | "pendingProviders";
+export type ResidentBadgeKey = "unreadNotifications" | "pendingProviders" | "pendingTenantRequests";
 
 export type ResidentNavItem = RoleNavItem<ResidentBadgeKey>;
 export type ResidentNavSection = RoleNavSection<ResidentBadgeKey>;
@@ -34,7 +34,7 @@ export const residentNavSections: ResidentNavSection[] = [
     title: "Mi unidad",
     items: [
       { label: "Mis visitas", icon: UserRoundCheck, to: "/residente/visitas" },
-      { label: "Accesos y reservas", icon: KeyRound, to: "/residente/unificado" },
+      { label: "Accesos y reservas", icon: KeyRound, to: "/residente/unificado", badge: "pendingTenantRequests" },
       { label: "Amenidades", icon: CalendarDays, to: "/residente/amenidades" },
       {
         label: "Proveedores",

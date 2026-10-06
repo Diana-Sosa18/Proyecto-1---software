@@ -47,7 +47,7 @@ test("HU10 accesos aplica búsqueda, unidad, placa, tipo y estado igual que la p
   assert.deepEqual(params, ["2026-09-01", "2026-09-07", "%ana%", "%ana%", "%ana%", "%a-1%", "%p123%"]);
   assert.match(sql, /'VISITA', 'DELIVERY', 'VISITANTE'/);
   assert.match(sql, /SALIDA_REGISTRADA/);
-  assert.match(sql, /TIME_FORMAT\(ra.hora_salida/);
+  assert.match(sql, /TIME_FORMAT\(TIME\(CONVERT_TZ\(TIMESTAMP\('2000-01-01', ra\.hora_salida\), '\+00:00', '-06:00'\)\)/);
 });
 
 test("HU10 exporta más de 500 filas y rechaza exceso sin truncamiento silencioso", async () => {

@@ -6,19 +6,8 @@ import { FinancialReviewNotice } from "@/components/payments/FinancialReviewNoti
 import { Input } from "@/components/ui/input";
 import { downloadResidentPaymentReceiptRequest, getFinancialDetailRequest } from "@/services/financialDetailService";
 import { savePaymentReceipt } from "@/services/paymentReceiptService";
-import type { ChargeStatus, FinancialDetail } from "@/types/financialDetail";
-
-const chargeStatusStyles: Record<ChargeStatus, string> = {
-  PAGADO: "bg-emerald-100 text-emerald-700",
-  PARCIAL: "bg-amber-100 text-amber-700",
-  PENDIENTE: "bg-rose-100 text-rose-700",
-};
-
-const chargeStatusLabels: Record<ChargeStatus, string> = {
-  PAGADO: "Pagado",
-  PARCIAL: "Parcial",
-  PENDIENTE: "Pendiente",
-};
+import type { FinancialDetail } from "@/types/financialDetail";
+import { quotaStatusLabels, quotaStatusStyles } from "@/utils/quotaStatus";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("es-GT", {
@@ -111,8 +100,8 @@ export function ResidenteFinancialDetailView() {
             ))}
           </div>
 
-          {(detail.resumen.total_reembolsado || 0)>0 && <p>Pagado bruto {formatCurrency(detail.resumen.total_pagado)} ? Devuelto {formatCurrency(detail.resumen.total_reembolsado || 0)} ? Abono neto {formatCurrency(detail.resumen.abono_neto || 0)}</p>}
-          {(detail.reembolsos || []).map(r=><p key={r.id_reembolso}>Reembolso #{r.id_reembolso} ? {r.servicio} ? {r.fecha_reembolso} ? Devuelto {formatCurrency(r.monto_centavos/100)}</p>)}
+          {(detail.resumen.total_reembolsado || 0)>0 && <p>Pagado bruto {formatCurrency(detail.resumen.total_pagado)} · Devuelto {formatCurrency(detail.resumen.total_reembolsado || 0)} · Abono neto {formatCurrency(detail.resumen.abono_neto || 0)}</p>}
+          {(detail.reembolsos || []).map(r=><p key={r.id_reembolso}>Reembolso #{r.id_reembolso} · {r.servicio} · {r.fecha_reembolso} · Devuelto {formatCurrency(r.monto_centavos/100)}</p>)}
           <FinancialReviewNotice {...detail.resumen} />
           <p className="text-sm text-slate-500">Los totales incluyen todos los abonos confirmados. Las fechas filtran los movimientos de pagos y recargos.</p>
           <section className="rounded-xl border border-slate-200 bg-white">
@@ -142,15 +131,16 @@ export function ResidenteFinancialDetailView() {
                         <td className="px-5 py-3 text-sm text-slate-950">{cargo.servicio}</td>
                         <td className="px-5 py-3 text-sm text-slate-500">{formatCurrency(cargo.monto)}</td>
                         <td className="px-5 py-3 text-sm text-slate-500">{formatCurrency(cargo.recargo)}</td>
-                        <td className="px-5 py-3 text-sm text-slate-500">{formatCurrency(cargo.pagado)}{(cargo.reembolsado || 0)>0 && <p>Devuelto {formatCurrency(cargo.reembolsado || 0)} ? Neto {formatCurrency(cargo.abono_neto || 0)}</p>}</td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{formatCurrency(cargo.pagado)}{(cargo.reembolsado || 0)>0 && <p>Devuelto {formatCurrency(cargo.reembolsado || 0)} · Neto {formatCurrency(cargo.abono_neto || 0)}</p>}</td>
                         <td className="px-5 py-3 text-sm text-slate-700">{formatCurrency(cargo.saldo)}</td>
                         <td className="px-5 py-3 text-sm text-slate-500">{cargo.fecha_limite}</td>
                         <td className="px-5 py-3">
                           <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ${chargeStatusStyles[cargo.estado]}`}
+                            className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium ring-1 ${quotaStatusStyles[cargo.estado]}`}
                           >
-                            {chargeStatusLabels[cargo.estado]}
+                            {quotaStatusLabels[cargo.estado]}
                           </span>
+                          {cargo.pago_parcial ? <p className="mt-1 text-[0.7rem] text-slate-500">Pago parcial</p> : null}
                         </td>
                       </tr>
                     ))}

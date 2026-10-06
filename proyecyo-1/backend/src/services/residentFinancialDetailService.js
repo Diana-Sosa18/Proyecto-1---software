@@ -1,5 +1,7 @@
 const { query } = require("../database/mysql");
 const { calculateBalance, balanceDetails, sumMoney, refundedQuotaSql } = require("./financialBalance");
+const { getQuotaStatus, isPartiallyPaid } = require("./quotaStatus");
+const { guatemalaToday } = require("../utils/guatemalaTime");
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -10,21 +12,9 @@ function normalizeDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
 }
 
-function computeChargeStatus(monto, pagado) {
-  const { saldo } = calculateBalance({ monto, pagado });
-
-  if (saldo <= 0) {
-    return "PAGADO";
-  }
-
-  if (Number(pagado || 0) > 0) {
-    return "PARCIAL";
-  }
-
-  return "PENDIENTE";
-}
-
-function mapCharge(row) {
+// HU32: el estado usa la misma regla que "Mis pagos" (quotaStatus). Antes este
+// detalle ignoraba la fecha limite y una cuota vencida aparecia como "Pendiente".
+function mapCharge(row, today = guatemalaToday()) {
   const balance = calculateBalance(row);
   const { monto, pagado, recargo } = balance;
 
@@ -37,7 +27,8 @@ function mapCharge(row) {
     saldo: balance.saldo,
     ...balanceDetails(balance),
     fecha_limite: row.fecha_limite,
-    estado: balance.saldo === 0 ? "PAGADO" : balance.abono_neto > 0 ? "PARCIAL" : "PENDIENTE",
+    estado: getQuotaStatus({ saldo: balance.saldo, fecha_limite: row.fecha_limite }, today),
+    pago_parcial: isPartiallyPaid(balance),
   };
 }
 
@@ -87,12 +78,19 @@ async function getResidentHouse(userId) {
   return rows[0];
 }
 
+// HU32: misma politica de visibilidad que "Mis pagos" (residentAccountService) y los
+// avisos de deuda HU19: el alquiler pertenece al inquilino y no es una obligacion
+// del propietario. Solo filtra lo que se muestra; no altera calculos ni historicos.
+const OWNER_VISIBLE_SERVICE_SQL = `LOWER(COALESCE(srv.tipo_servicio, '')) <> 'alquiler'
+        AND LOWER(srv.nombre) NOT LIKE '%alquiler%'
+        AND LOWER(srv.nombre) NOT LIKE '%renta%'`;
+
 async function getFinancialDetail(userId, filters = {}) {
   const desde = normalizeDate(filters.desde);
   const hasta = normalizeDate(filters.hasta);
   const house = await getResidentHouse(userId);
 
-  const chargeFilters = ["cu.id_casa = ?"];
+  const chargeFilters = ["cu.id_casa = ?", OWNER_VISIBLE_SERVICE_SQL];
   const chargeParams = [house.id_casa];
 
   const charges = await query(
@@ -119,7 +117,7 @@ async function getFinancialDetail(userId, filters = {}) {
     chargeParams,
   );
 
-  const surchargeFilters = ["rec.id_casa = ?"];
+  const surchargeFilters = ["rec.id_casa = ?", OWNER_VISIBLE_SERVICE_SQL];
   const surchargeParams = [house.id_casa];
   if (desde) {
     surchargeFilters.push("rec.fecha_aplicacion >= ?");
@@ -149,7 +147,7 @@ async function getFinancialDetail(userId, filters = {}) {
     surchargeParams,
   );
 
-  const paymentFilters = ["cu.id_casa = ?"];
+  const paymentFilters = ["cu.id_casa = ?", OWNER_VISIBLE_SERVICE_SQL];
   const paymentParams = [house.id_casa];
   if (desde) {
     paymentFilters.push("pg.fecha_pago >= ?");
@@ -177,13 +175,14 @@ async function getFinancialDetail(userId, filters = {}) {
     paymentParams,
   );
 
-  const refundWhere=["cu.id_casa=?","rr.estado='CONFIRMADO'","rr.aplicado_en IS NOT NULL"], refundParams=[house.id_casa];
+  const refundWhere=["cu.id_casa=?","rr.estado='CONFIRMADO'","rr.aplicado_en IS NOT NULL",OWNER_VISIBLE_SERVICE_SQL], refundParams=[house.id_casa];
   if(desde){refundWhere.push('rr.fecha_contable>=?');refundParams.push(desde);} if(hasta){refundWhere.push('rr.fecha_contable<=?');refundParams.push(hasta);}
   const reembolsos=await query(`SELECT rr.id_reembolso,tr.id_pago,tr.id_cuota,rr.monto_centavos,
     DATE_FORMAT(rr.fecha_contable,'%Y-%m-%d') fecha_reembolso,srv.nombre servicio FROM REEMBOLSO_RECURRENTE rr
     JOIN TRANSACCION_RECURRENTE tr ON tr.id_transaccion=rr.id_transaccion JOIN CUOTA cu ON cu.id_cuota=tr.id_cuota
     JOIN SERVICIO srv ON srv.id_servicio=cu.id_servicio WHERE ${refundWhere.join(' AND ')} ORDER BY rr.fecha_contable DESC,rr.id_reembolso DESC`,refundParams);
-  const cargos = charges.map(mapCharge);
+  const today = guatemalaToday();
+  const cargos = charges.map((row) => mapCharge(row, today));
   const recargos = surcharges.map(mapSurcharge);
   const pagos = payments.map(mapPayment);
 
@@ -218,7 +217,6 @@ module.exports = {
   getFinancialDetail,
   __private__: {
     normalizeDate,
-    computeChargeStatus,
     mapCharge,
     mapSurcharge,
     mapPayment,

@@ -111,6 +111,8 @@ async function prepareSuiteDatabase(context) {
   await require("./initializeTestSchema").initializeTestSchema();
   const db = require("../../../src/database/mysql");
   for (const [name, ensure] of Object.entries(db)) if (name.startsWith("ensure")) await ensure();
+  // HU32: el alquiler de Q2,200 ya no se siembra al arrancar; las suites lo reciben como fixture explicito.
+  await require("./tenantAccountFixture").seedTenantAccountFixture(db.query);
   const target = await connect(context.name);
   try {
     const migrations = require("../../../src/database/recurrenteMigration");

@@ -5,6 +5,10 @@ const {
   listResidentRegulations,
   listGuardDailyAccessHistory,
 } = require("../services/sprintStoriesService");
+const {
+  listOwnerAuthorizationRequests,
+  resolveOwnerAuthorizationRequest,
+} = require("../services/tenantAuthorizationRequestsService");
 
 async function getTenantPermissions(req, res, next) {
   try {
@@ -51,7 +55,25 @@ async function getGuardAccessHistory(req, res, next) {
   }
 }
 
+async function getOwnerAuthorizationRequests(req, res, next) {
+  try {
+    res.status(200).json(await listOwnerAuthorizationRequests(req.authUser.id, { estado: req.query.estado }));
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function patchOwnerAuthorizationRequest(req, res, next) {
+  try {
+    res.status(200).json(await resolveOwnerAuthorizationRequest(req.authUser.id, req.params.id, req.body || {}));
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
+  getOwnerAuthorizationRequests,
+  patchOwnerAuthorizationRequest,
   getTenantPermissions,
   getTenantAuthorizationRequests,
   postTenantAuthorizationRequest,

@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getUnifiedAmenityAvailabilityRequest } from "@/services/amenitiesService";
 import type { AmenityAvailabilityResponse, AmenityAvailabilitySlot } from "@/types/amenities";
+import { guatemalaToday } from "@/utils/guatemalaTime";
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Fecha minima reservable: hoy en Guatemala (toISOString daria el dia UTC).
+const today = () => guatemalaToday();
 
 export function ResidenteUnifiedAmenitiesAvailabilityView() {
   const navigate = useNavigate();

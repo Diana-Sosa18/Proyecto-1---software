@@ -92,3 +92,42 @@ describe("GuardiaView por secciones", () => {
     expect(markAllGuardNotificationsAsReadRequest).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("HU32 Guardia: estados y errores", () => {
+  it("un fallo del historial se muestra como error, no como 'Sin registros'", async () => {
+    vi.mocked(getGuardAccessHistoryRequest).mockRejectedValue(new Error("Garita sin conexión"));
+    renderSection("historial");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Garita sin conexión");
+    expect(screen.queryByText("Sin registros para los filtros actuales.")).not.toBeInTheDocument();
+  });
+
+  it("el filtro Canceladas y los estados reales se envían al backend con etiquetas legibles", async () => {
+    vi.mocked(getGuardAccessHistoryRequest).mockResolvedValue([
+      { id_acceso: 9, visitante: "Rita Rechazo", placa: "Sin placa", casa: "A-1", tipo_visita: "VISITA", estado: "RECHAZADA", hora_programada: "10:00", hora_ingreso: null, hora_salida: null },
+    ]);
+    renderSection("historial");
+    expect(await screen.findByText("Rechazada")).toBeInTheDocument();
+    for (const option of ["Canceladas", "Rechazadas", "Por aprobar"]) expect(screen.getByRole("option", { name: option })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Filtrar por estado"), { target: { value: "CANCELADA" } });
+    await waitFor(() => expect(getGuardAccessHistoryRequest).toHaveBeenLastCalledWith(expect.objectContaining({ status: "CANCELADA" })));
+  });
+
+  it("la fecha por defecto del historial es el día de Guatemala", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-05T05:30:00Z")); // 23:30 del 4 en Guatemala
+    try {
+      renderSection("historial");
+      await waitFor(() => expect(getGuardAccessHistoryRequest).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-10-04" })));
+      expect(screen.getByLabelText("Fecha del historial")).toHaveValue("2026-10-04");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("si las alertas fallan se informa el error en lugar de 'No hay alertas'", async () => {
+    vi.mocked(getGuardNotificationsRequest).mockRejectedValue(new Error("Servicio de alertas caído"));
+    renderSection("alertas");
+    expect(await screen.findByText("Servicio de alertas caído")).toBeInTheDocument();
+    expect(screen.queryByText(/No hay alertas pendientes/)).not.toBeInTheDocument();
+  });
+});

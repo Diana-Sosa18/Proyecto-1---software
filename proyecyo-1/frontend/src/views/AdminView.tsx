@@ -5,7 +5,6 @@ import {
   Clock3,
   KeyRound,
   UserRound,
-  Wrench,
   XCircle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -21,6 +20,7 @@ import { getAdminAmenityStatsRequest } from "@/services/amenitiesService";
 import type { AdminAccessHourlyPoint, AdminAccessRecord, AdminAccessSummary } from "@/types/accesses";
 import type { AmenityStatsResponse } from "@/types/amenities";
 import { subscribeToAccessCounterUpdates } from "@/utils/accessCounterUpdates";
+import { guatemalaToday } from "@/utils/guatemalaTime";
 
 function buildDashboardCards(summary: AdminAccessSummary) {
   return [
@@ -92,7 +92,7 @@ function formatRefreshTime(date: Date | null) {
 }
 
 export function AdminView() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = guatemalaToday();
   const [summary, setSummary] = useState<AdminAccessSummary>({
     total_dia: 0,
     aprobados: 0,
@@ -107,6 +107,7 @@ export function AdminView() {
   const [statsFrom, setStatsFrom] = useState(today);
   const [statsTo, setStatsTo] = useState(today);
   const [amenityStats, setAmenityStats] = useState<AmenityStatsResponse | null>(null);
+  const [amenityStatsError, setAmenityStatsError] = useState("");
   const latestAccessRequestRef = useRef(0);
 
   useEffect(() => {
@@ -173,11 +174,14 @@ export function AdminView() {
       .then((response) => {
         if (active) {
           setAmenityStats(response);
+          setAmenityStatsError("");
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        // Un fallo de la API no se presenta como "Sin reservas en el rango".
         if (active) {
           setAmenityStats(null);
+          setAmenityStatsError(error instanceof Error && error.message ? error.message : "No fue posible cargar las estadisticas de amenidades.");
         }
       });
 
@@ -285,7 +289,11 @@ export function AdminView() {
                 <p className="text-sm text-slate-500">{item.total_reservas} reservas</p>
               </div>
             ))}
-            {!amenityStats?.por_amenidad.length ? (
+            {amenityStatsError ? (
+              <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-700">{amenityStatsError}</p>
+            ) : !amenityStats ? (
+              <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Cargando estadisticas...</p>
+            ) : !amenityStats.por_amenidad.length ? (
               <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Sin reservas en el rango.</p>
             ) : null}
           </div>
@@ -301,7 +309,7 @@ export function AdminView() {
                   <span className="rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700">{item.activas}</span>
                 </div>
               ))}
-              {!amenityStats?.ranking.length ? (
+              {amenityStats && !amenityStats.ranking.length ? (
                 <p className="text-sm text-slate-500">Sin ranking disponible.</p>
               ) : null}
             </div>
@@ -399,56 +407,38 @@ export function AdminView() {
         </article>
       </section>
 
-      <section className="mt-5 grid gap-4 xl:grid-cols-3">
+      {/* HU32: accesos directos a modulos reales; se eliminaron las tarjetas decorativas
+          ("Mantenimiento" no tenia fuente de datos ni accion). */}
+      <section className="mt-5 grid gap-4 md:grid-cols-2">
         {[
           {
             title: "Monitoreo de accesos",
             text: "Registro del dia con busqueda por nombre, unidad o placa y filtros por tipo y estado.",
             icon: UserRound,
+            to: "/admin/accesos",
+            cta: "Ir a control con filtros",
           },
           {
-            title: "Mantenimiento",
-            text: "Espacio secundario para avisos o recordatorios operativos del turno.",
-            icon: Wrench,
-          },
-          {
-            title: "Reservas",
-            text: "El dashboard mantiene el mismo lenguaje visual para cada seccion administrativa.",
+            title: "Reservas de amenidades",
+            text: "Consulte, cree reservas y ajuste horarios de las amenidades del residencial.",
             icon: CalendarDays,
+            to: "/admin/amenidades",
+            cta: "Ir a amenidades",
           },
-        ].map(({ title, text, icon: Icon }) => {
-          const body = (
-            <>
-              <div className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <Icon className="size-5" />
-              </div>
-              <h2 className="mt-4 text-[1.12rem] font-semibold text-slate-950">{title}</h2>
-              <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-500">{text}</p>
-            </>
-          );
-
-          if (title === "Monitoreo de accesos") {
-            return (
-              <Link
-                key={title}
-                to="/admin/accesos"
-                className="block rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition hover:border-blue-200 hover:shadow-[0_12px_36px_rgba(37,99,235,0.08)]"
-              >
-                {body}
-                <p className="mt-3 text-[0.78rem] font-medium text-blue-600">Ir a control con filtros</p>
-              </Link>
-            );
-          }
-
-          return (
-            <article
-              key={title}
-              className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
-            >
-              {body}
-            </article>
-          );
-        })}
+        ].map(({ title, text, icon: Icon, to, cta }) => (
+          <Link
+            key={title}
+            to={to}
+            className="block rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition hover:border-blue-200 hover:shadow-[0_12px_36px_rgba(37,99,235,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            <div className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <Icon className="size-5" aria-hidden="true" />
+            </div>
+            <h2 className="mt-4 text-[1.12rem] font-semibold text-slate-950">{title}</h2>
+            <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-500">{text}</p>
+            <p className="mt-3 text-[0.78rem] font-medium text-blue-600">{cta}</p>
+          </Link>
+        ))}
       </section>
 
       <section className="mt-5">

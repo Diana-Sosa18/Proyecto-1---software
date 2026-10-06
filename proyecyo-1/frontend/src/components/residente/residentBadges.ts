@@ -8,6 +8,7 @@ import { loadUnreadNotificationsCount } from "@/components/notifications/unreadN
 import type { ResidentBadgeKey } from "@/components/residente/residentNavigation";
 import { getResidentAccountStatementRequest } from "@/services/accountService";
 import { getOwnerProvidersRequest } from "@/services/providersService";
+import { getOwnerAuthorizationRequestsRequest } from "@/services/sprintStoriesService";
 
 /** Avisa al sidebar que debe recalcular sus contadores (p. ej. al marcar avisos como leidos). */
 export const notifyResidentBadgesChanged = notifySidebarCountersChanged;
@@ -17,6 +18,7 @@ export type ResidentBadges = SidebarCounters<ResidentBadgeKey>;
 const residentCounterLoaders: Record<ResidentBadgeKey, () => Promise<number>> = {
   unreadNotifications: loadUnreadNotificationsCount,
   pendingProviders: () => getOwnerProvidersRequest({ status: "PENDIENTE" }).then((response) => response.length),
+  pendingTenantRequests: () => getOwnerAuthorizationRequestsRequest("PENDIENTE").then((response) => response.length),
 };
 
 // La unidad solo se muestra si el backend la reporta en el estado de cuenta.

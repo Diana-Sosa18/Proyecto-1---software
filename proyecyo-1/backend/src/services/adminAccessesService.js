@@ -1,4 +1,5 @@
 const { query } = require("../database/mysql");
+const { sqlUtcTimeToGuatemala } = require("../utils/guatemalaTime");
 
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 
@@ -270,13 +271,14 @@ function createHourlyAccessBuckets() {
 
 // SCRUM-172: Agrupar accesos por hora del dia actual.
 // La hora de referencia es: hora_ingreso del registro si existe, sino hora_inicio del acceso.
+// hora_ingreso se guarda en UTC (CURTIME()); se convierte a Guatemala para no mezclar escalas.
 // Esto representa la ventana en que se espera/registra el acceso.
 async function getAdminAccessHourlyChart() {
   const currentDate = getCurrentDateInTimezone();
   const rows = await query(
     `
       SELECT
-        HOUR(COALESCE(ra.hora_ingreso, a.hora_inicio)) AS hora,
+        HOUR(COALESCE(${sqlUtcTimeToGuatemala("ra.hora_ingreso")}, a.hora_inicio)) AS hora,
         COUNT(DISTINCT a.id_acceso) AS total,
         COUNT(DISTINCT
           CASE
@@ -300,8 +302,8 @@ async function getAdminAccessHourlyChart() {
       LEFT JOIN REGISTRO_ACCESO ra
         ON ra.id_acceso = a.id_acceso
       WHERE a.fecha = ?
-        AND COALESCE(ra.hora_ingreso, a.hora_inicio) IS NOT NULL
-      GROUP BY HOUR(COALESCE(ra.hora_ingreso, a.hora_inicio))
+        AND COALESCE(${sqlUtcTimeToGuatemala("ra.hora_ingreso")}, a.hora_inicio) IS NOT NULL
+      GROUP BY HOUR(COALESCE(${sqlUtcTimeToGuatemala("ra.hora_ingreso")}, a.hora_inicio))
       ORDER BY hora ASC
     `,
     [currentDate],
@@ -438,11 +440,11 @@ async function listAdminAccesses(filters = {}, reportRange = null) {
         a.id_acceso,
         DATE_FORMAT(a.fecha, '%Y-%m-%d') AS fecha,
         COALESCE(
-          TIME_FORMAT(ra.hora_ingreso, '%H:%i'),
+          TIME_FORMAT(${sqlUtcTimeToGuatemala("ra.hora_ingreso")}, '%H:%i'),
           TIME_FORMAT(a.hora_inicio, '%H:%i'),
           '--:--'
         ) AS hora,
-        TIME_FORMAT(ra.hora_salida, '%H:%i') AS hora_salida,
+        TIME_FORMAT(${sqlUtcTimeToGuatemala("ra.hora_salida")}, '%H:%i') AS hora_salida,
         a.tipo_visita,
         a.estado_acceso,
         a.es_acceso_especial,
@@ -466,7 +468,7 @@ async function listAdminAccesses(filters = {}, reportRange = null) {
       WHERE ${sqlFilters.join(" AND ")}
       ORDER BY
         a.fecha DESC,
-        COALESCE(ra.hora_ingreso, a.hora_inicio, '00:00:00') DESC,
+        COALESCE(${sqlUtcTimeToGuatemala("ra.hora_ingreso")}, a.hora_inicio, '00:00:00') DESC,
         a.id_acceso DESC
       ${reportRange ? "LIMIT 10001" : ""}
     `,

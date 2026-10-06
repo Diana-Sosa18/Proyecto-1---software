@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getAuditLogsRequest } from "@/services/auditService";
 import type { AuditFilters, AuditRecord } from "@/types/audit";
+import { formatUtcTimestamp } from "@/utils/guatemalaTime";
 
 const actions = [
   ["", "Todas las acciones"],
@@ -69,7 +70,7 @@ export function AdminAuditView() {
         <div className="divide-y divide-slate-100">
           {records.map((record) => (
             <article key={record.id_auditoria} className="grid gap-3 p-5 lg:grid-cols-[180px_220px_minmax(0,1fr)]">
-              <div><p className="text-xs text-slate-500">{record.creado_en}</p><p className="mt-1 text-sm font-semibold text-blue-700">{record.accion}</p></div>
+              <div><p className="text-xs text-slate-500">{formatUtcTimestamp(record.creado_en)}</p><p className="mt-1 text-sm font-semibold text-blue-700">{record.accion}</p></div>
               <div><p className="text-sm font-semibold text-slate-900">{record.usuario_nombre || "Sistema"}</p><p className="text-xs text-slate-500">{record.usuario_correo || `Usuario #${record.id_usuario || "-"}`}</p><p className="mt-1 text-xs text-slate-500">{record.entidad} {record.entidad_id ? `#${record.entidad_id}` : ""}</p></div>
               <details className="rounded-xl bg-slate-50 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Ver cambios</summary><div className="mt-3 grid gap-3 md:grid-cols-2"><div><p className="text-xs font-semibold uppercase text-slate-500">Anterior</p><pre className="mt-1 overflow-auto whitespace-pre-wrap text-xs text-slate-700">{formatData(record.datos_anteriores)}</pre></div><div><p className="text-xs font-semibold uppercase text-slate-500">Nuevo</p><pre className="mt-1 overflow-auto whitespace-pre-wrap text-xs text-slate-700">{formatData(record.datos_nuevos)}</pre></div></div></details>
             </article>

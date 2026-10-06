@@ -1,5 +1,7 @@
+import type { AccountQuotaStatus } from "./account";
 import type { FinancialBalanceDetails, FinancialReview } from "./financialBalance";
-export type ChargeStatus = "PAGADO" | "PARCIAL" | "PENDIENTE";
+// HU32: mismo estado que Mis pagos (regla unica del backend).
+export type ChargeStatus = AccountQuotaStatus;
 
 export interface FinancialCharge extends FinancialBalanceDetails {
   id_cuota: number;
@@ -10,6 +12,7 @@ export interface FinancialCharge extends FinancialBalanceDetails {
   saldo: number;
   fecha_limite: string;
   estado: ChargeStatus;
+  pago_parcial: boolean;
 }
 
 export interface FinancialSurcharge {
