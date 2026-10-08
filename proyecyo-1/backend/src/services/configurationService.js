@@ -1,5 +1,6 @@
 const { pool, query } = require("../database/mysql");
 const { ensureValidTime: ensureStrictTime } = require("../utils/dateTimeValidation");
+const { ensureBoolean } = require("../utils/booleanValidation");
 
 const CONFIG_KEYS = {
   HORA_APERTURA: "visitas_hora_apertura",
@@ -47,30 +48,6 @@ function toMinutes(time) {
   const normalized = time.length === 5 ? `${time}:00` : time;
   const [hours, minutes] = normalized.split(":").map(Number);
   return hours * 60 + minutes;
-}
-
-function ensureBoolean(value, fallback) {
-  if (typeof value === "boolean") {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-
-    if (normalized === "true") {
-      return true;
-    }
-
-    if (normalized === "false") {
-      return false;
-    }
-  }
-
-  if (typeof value === "number") {
-    return value !== 0;
-  }
-
-  return fallback;
 }
 
 function ensureValidDurationHours(value) {
