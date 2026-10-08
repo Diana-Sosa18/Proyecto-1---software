@@ -14,6 +14,7 @@ import {
 import { getOwnerProvidersRequest } from "@/services/providersService";
 import { getVisitsRequest } from "@/services/visitsService";
 import { ResidenteView } from "./ResidenteView";
+import { guatemalaToday } from "@/utils/guatemalaTime";
 
 vi.mock("@/components/layout/AppShell", () => ({ AppShell: ({ children }: { children: ReactNode }) => <main>{children}</main> }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: 17, email: "residente@nexus.test", role: "residente" } }) }));
@@ -26,9 +27,7 @@ vi.mock("@/services/amenitiesService", () => ({ getAmenitiesReservationsRequest:
 vi.mock("@/services/visitsService", () => ({ getVisitsRequest: vi.fn() }));
 
 function isoDate(offset = 0) {
-  const date = new Date();
-  date.setDate(date.getDate() + offset);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return guatemalaToday(offset);
 }
 
 const summary = {

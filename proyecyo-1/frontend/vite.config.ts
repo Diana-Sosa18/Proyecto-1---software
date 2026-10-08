@@ -29,6 +29,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './src/test/setupTests.ts',
+    // Con css:true jsdom aplica el tema completo; bajo carga paralela algunas pruebas pasan de 5 s.
+    testTimeout: 15000,
     css: true,
     coverage: {
       provider: 'v8',

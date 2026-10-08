@@ -1020,9 +1020,76 @@ async function ensureDemoRequestsSchema() {
 // de pruebas (test/integration/support/tenantAccountFixture.js). Las cuotas ya
 // creadas se conservan intactas.
 
+// Viviendas: CASA ya es la vivienda (id_casa lo usan cuotas, pagos, accesos, etc.),
+// asi que se extiende de forma ADITIVA. Nada se borra ni se renumera.
+// - id_residente pasa a admitir NULL: una vivienda sin residente esta DISPONIBLE.
+//   Solo se relaja la restriccion; la FK y los datos existentes no cambian.
+// - Los indices unicos son funcionales (COALESCE(torre,'')): su columna oculta no
+//   aparece en SELECT *, asi que los respaldos (INSERT por nombre de columna) siguen
+//   restaurando. Si una base tiene duplicados previos, no se crea el indice y el
+//   servicio sigue validando bajo bloqueo.
+const HOUSE_COLUMNS = [
+  ["precio", "DECIMAL(12,2) NULL"],
+  ["area_terreno", "DECIMAL(8,2) NULL"],
+  ["area_construccion", "DECIMAL(8,2) NULL"],
+  ["habitaciones", "TINYINT UNSIGNED NULL"],
+  ["banos", "DECIMAL(3,1) NULL"],
+  ["niveles", "TINYINT UNSIGNED NULL"],
+  ["modelo", "VARCHAR(60) NULL"],
+  ["mapa_fila", "TINYINT UNSIGNED NULL"],
+  ["mapa_columna", "TINYINT UNSIGNED NULL"],
+  ["activo", "BOOLEAN NOT NULL DEFAULT TRUE"],
+  ["creado_en", "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"],
+];
+
+async function ensureHousesSchema() {
+  const [residentColumn] = await query(
+    `SELECT IS_NULLABLE AS nullable FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'CASA' AND COLUMN_NAME = 'id_residente'`,
+    [env.DB_NAME],
+  );
+  if (residentColumn && residentColumn.nullable === "NO") {
+    await query("ALTER TABLE CASA MODIFY id_residente INT NULL");
+  }
+
+  for (const [column, definition] of HOUSE_COLUMNS) {
+    if (!(await columnExists("CASA", column))) {
+      await query(`ALTER TABLE CASA ADD COLUMN ${escapeIdentifier(column)} ${definition}`);
+    }
+  }
+
+  if (!(await indexExists("CASA", "uq_casa_codigo"))) {
+    const duplicates = await query(
+      "SELECT 1 FROM CASA GROUP BY COALESCE(torre, ''), numero HAVING COUNT(*) > 1 LIMIT 1",
+    );
+    if (duplicates.length > 0) {
+      logger.warn("CASA tiene codigos repetidos; no se crea uq_casa_codigo (el servicio valida bajo bloqueo).");
+    } else {
+      await query("ALTER TABLE CASA ADD UNIQUE INDEX uq_casa_codigo ((COALESCE(torre, '')), numero)");
+    }
+  }
+
+  if (!(await indexExists("CASA", "uq_casa_mapa"))) {
+    await query("ALTER TABLE CASA ADD UNIQUE INDEX uq_casa_mapa ((COALESCE(torre, '')), mapa_fila, mapa_columna)");
+  }
+
+  const [check] = await query(
+    `SELECT 1 AS existe FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'CASA' AND CONSTRAINT_NAME = 'chk_casa_vivienda'`,
+    [env.DB_NAME],
+  );
+  if (!check) {
+    await query(`ALTER TABLE CASA ADD CONSTRAINT chk_casa_vivienda CHECK (
+      (precio IS NULL OR precio >= 0) AND (area_terreno IS NULL OR area_terreno >= 0)
+      AND (area_construccion IS NULL OR area_construccion >= 0) AND (banos IS NULL OR banos >= 0)
+      AND (niveles IS NULL OR niveles BETWEEN 1 AND 5))`);
+  }
+}
+
 module.exports = {
   pool,
   query,
+  ensureHousesSchema,
   ensureVisitQrSchema,
   ensureQrValidationAttemptsSchema,
   ensureAmenityReservationsSchema,

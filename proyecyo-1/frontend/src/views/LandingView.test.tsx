@@ -58,7 +58,7 @@ describe("Landing comercial", () => {
     expect(demoService.createDemoRequest).toHaveBeenCalledTimes(1);
     resolve({ id: 1, message: "Solicitud recibida correctamente" });
     expect(await screen.findByText(/Gracias por tu interés/)).toBeInTheDocument();
-  });
+  }, 15000);
 
   it("conserva los datos y muestra el error seguro del backend", async () => {
     vi.mocked(demoService.createDemoRequest).mockRejectedValue(new Error("Servicio temporalmente no disponible."));
@@ -73,7 +73,7 @@ describe("Landing comercial", () => {
     await user.click(screen.getAllByRole("button", { name: "Solicitar demostración" }).at(-1)!);
     expect(await screen.findByText("Servicio temporalmente no disponible.")).toBeInTheDocument();
     expect(screen.getByLabelText("Nombre completo")).toHaveValue("María López");
-  });
+  }, 15000);
 
   it("muestra la política pública", () => {
     render(<PrivacyView />, { wrapper: MemoryRouter });

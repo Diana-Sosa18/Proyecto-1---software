@@ -414,12 +414,17 @@ else {
     });
     test('CLI real procesa pendientes, cierra pool y termina sin proveedor', async () => {
       const {execFile} = require('node:child_process'), {promisify} = require('node:util');
-      const run = promisify(execFile), id = await quota();
-      await job().generateDeadlines();
+      // La CLI usa el reloj real: su fixture debe compartir la fecha operativa,
+      // no el 4 de octubre fijo de los otros casos con reloj inyectado.
+      const today = guatemalaDate();
+      const run = promisify(execFile), id = await quota({deadline:today});
+      await job(today).generateDeadlines();
       const result = await run(process.execPath,['scripts/run-financial-notifications.js'],
         {cwd:require('node:path').resolve(__dirname,'../..'),env:process.env,windowsHide:true,timeout:60000});
       const summary = JSON.parse(result.stdout.trim()); assert.equal(summary.errores,0);
-      assert((await entries(id)).every(r => r.estado === 'ENTREGADA'));
+      const delivered = await entries(id);
+      assert(delivered.length > 0);
+      assert(delivered.every(r => r.estado === 'ENTREGADA'));
       assert.equal(externalCalls,0);
     });
   });

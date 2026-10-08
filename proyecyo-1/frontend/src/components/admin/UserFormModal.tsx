@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 
+import { HousePicker } from "@/components/houses/HousePicker";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ApiError } from "@/services/api";
+import type { HouseRecord, HouseSelectionRole } from "@/types/houses";
 import type { UserFormValues, UserRecord, UserTypeOption } from "@/types/users";
 
 type UserFormModalProps = {
@@ -24,9 +26,11 @@ const emptyValues: UserFormValues = {
   password: "",
   telefono: "",
   id_tipo_usuario: "",
-  numero_casa: "",
-  torre: "",
+  id_casa: null,
 };
+
+// Rechazos del backend por la vivienda: se limpia la seleccion y se recarga el mapa.
+const HOUSE_CONFLICTS = new Set(["VIVIENDA_OCUPADA", "VIVIENDA_INACTIVA", "VIVIENDA_NO_ELEGIBLE", "VIVIENDA_CONFLICTO"]);
 
 export function UserFormModal({
   isOpen,
@@ -37,45 +41,51 @@ export function UserFormModal({
   onSubmit,
 }: UserFormModalProps) {
   const [values, setValues] = useState<UserFormValues>(emptyValues);
+  const [house, setHouse] = useState<HouseRecord | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [serverError, setServerError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const titleId = useId();
 
   useEffect(() => {
+    setErrors({});
+    setServerError("");
+    setHouse(null);
     if (!isOpen) {
       setValues(emptyValues);
-      setErrors({});
-      setServerError("");
       return;
     }
-
-    if (editingUser) {
-      setValues({
-        nombre: editingUser.nombre,
-        correo: editingUser.correo,
-        password: "",
-        telefono: editingUser.telefono ?? "",
-        id_tipo_usuario: String(editingUser.id_tipo_usuario),
-        numero_casa: editingUser.numero_casa ?? "",
-        torre: editingUser.torre ?? "",
-      });
-      return;
-    }
-
-    setValues(emptyValues);
+    setValues(editingUser ? {
+      nombre: editingUser.nombre,
+      correo: editingUser.correo,
+      password: "",
+      telefono: editingUser.telefono ?? "",
+      id_tipo_usuario: String(editingUser.id_tipo_usuario),
+      id_casa: editingUser.id_casa ?? null,
+    } : emptyValues);
   }, [editingUser, isOpen]);
 
-  const title = useMemo(
-    () => (editingUser ? "Editar usuario" : "Crear usuario"),
-    [editingUser],
-  );
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !isSubmitting) onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, isSubmitting, onClose]);
 
+  const title = editingUser ? "Editar usuario" : "Crear usuario";
   const selectedRole = useMemo(
-    () =>
-      userTypes.find((option) => String(option.id) === values.id_tipo_usuario)?.nombre?.toLowerCase() ?? "",
+    () => userTypes.find((option) => String(option.id) === values.id_tipo_usuario)?.nombre?.toLowerCase() ?? "",
     [userTypes, values.id_tipo_usuario],
   );
+  const houseRole: HouseSelectionRole | null = selectedRole === "residente" || selectedRole === "inquilino" ? selectedRole : null;
+  // Al editar, la vivienda actual solo aplica si el rol no cambio.
+  const sameRole = Boolean(editingUser && editingUser.rol === selectedRole);
 
-  const requiresHouse = selectedRole === "residente" || selectedRole === "inquilino";
+  const chooseHouse = useCallback((next: HouseRecord | null) => {
+    setHouse(next);
+    setValues((current) => ({ ...current, id_casa: next?.id_casa ?? null }));
+    setErrors((current) => ({ ...current, id_casa: undefined }));
+  }, []);
 
   if (!isOpen) {
     return null;
@@ -83,46 +93,25 @@ export function UserFormModal({
 
   const validate = () => {
     const nextErrors: FormErrors = {};
-
-    if (!values.nombre.trim()) {
-      nextErrors.nombre = "El nombre es obligatorio.";
-    }
-
-    if (!values.correo.trim()) {
-      nextErrors.correo = "El correo es obligatorio.";
-    } else if (!/\S+@\S+\.\S+/.test(values.correo)) {
-      nextErrors.correo = "Ingrese un correo valido.";
-    }
-
-    if (!editingUser && !values.password.trim()) {
-      nextErrors.password = "La contrasena es obligatoria.";
-    } else if (values.password && values.password.trim().length < 4) {
-      nextErrors.password = "La contrasena debe tener al menos 4 caracteres.";
-    }
-
-    if (!values.id_tipo_usuario) {
-      nextErrors.id_tipo_usuario = "Seleccione un rol.";
-    }
-
-    if (requiresHouse && !values.numero_casa.trim()) {
-      nextErrors.numero_casa = "La casa es obligatoria para este rol.";
-    }
-
+    if (!values.nombre.trim()) nextErrors.nombre = "El nombre es obligatorio.";
+    if (!values.correo.trim()) nextErrors.correo = "El correo es obligatorio.";
+    else if (!/\S+@\S+\.\S+/.test(values.correo)) nextErrors.correo = "Ingrese un correo valido.";
+    if (!editingUser && !values.password.trim()) nextErrors.password = "La contrasena es obligatoria.";
+    else if (values.password && values.password.trim().length < 4) nextErrors.password = "La contrasena debe tener al menos 4 caracteres.";
+    if (!values.id_tipo_usuario) nextErrors.id_tipo_usuario = "Seleccione un rol.";
+    if (houseRole && !values.id_casa) nextErrors.id_casa = "Selecciona y confirma una vivienda en el mapa.";
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleChange = (field: keyof UserFormValues, value: string) => {
+  const handleChange = (field: "nombre" | "correo" | "password" | "telefono", value: string) => {
     setValues((current) => ({ ...current, [field]: value }));
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setServerError("");
-
-    if (!validate()) {
-      return;
-    }
+    if (!validate()) return;
 
     try {
       await onSubmit({
@@ -131,138 +120,108 @@ export function UserFormModal({
         correo: values.correo.trim().toLowerCase(),
         telefono: values.telefono.trim(),
         password: values.password.trim(),
-        numero_casa: values.numero_casa.trim(),
-        torre: values.torre.trim(),
+        id_casa: houseRole ? values.id_casa : null,
       });
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "No fue posible guardar el usuario.");
+      const code = error instanceof ApiError ? (error.payload as { code?: string } | undefined)?.code : undefined;
+      if (code && HOUSE_CONFLICTS.has(code)) {
+        chooseHouse(null);
+        setRefreshKey((key) => key + 1);
+      }
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <Card className="w-full max-w-2xl border-slate-200 shadow-2xl">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle>{title}</CardTitle>
-          <button type="button" aria-label="Cerrar" className="text-slate-400 hover:text-slate-700" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 backdrop-blur-sm sm:items-center sm:p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby={titleId}
+        className={`max-h-[94vh] w-full overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl ${houseRole ? "max-w-4xl" : "max-w-2xl"}`}>
+        <div className="flex items-center justify-between px-5 pt-5">
+          <h2 id={titleId} className="text-lg font-semibold text-slate-950">{title}</h2>
+          <button type="button" aria-label="Cerrar" className="rounded-md p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" onClick={onClose}>
             <X className="size-5" />
           </button>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            {serverError ? (
-              <Alert variant="destructive">
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{serverError}</AlertDescription>
-              </Alert>
-            ) : null}
+        </div>
+        <form className="space-y-5 p-5" onSubmit={handleSubmit} noValidate>
+          {serverError ? (
+            <Alert variant="destructive">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{serverError}</AlertDescription>
+            </Alert>
+          ) : null}
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label htmlFor="user-name" className="mb-2 block text-sm text-slate-700">Nombre</label>
-                <Input id="user-name" value={values.nombre} onChange={(event) => handleChange("nombre", event.target.value)} />
-                {errors.nombre ? <p className="mt-2 text-sm text-red-600">{errors.nombre}</p> : null}
-              </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="user-name" className="mb-2 block text-sm text-slate-700">Nombre</label>
+              <Input id="user-name" value={values.nombre} onChange={(event) => handleChange("nombre", event.target.value)} />
+              {errors.nombre ? <p className="mt-2 text-sm text-red-600">{errors.nombre}</p> : null}
+            </div>
 
-              <div>
-                <label htmlFor="user-email" className="mb-2 block text-sm text-slate-700">Correo</label>
-                <Input id="user-email" type="email" value={values.correo} onChange={(event) => handleChange("correo", event.target.value)} />
-                {errors.correo ? <p className="mt-2 text-sm text-red-600">{errors.correo}</p> : null}
-              </div>
+            <div>
+              <label htmlFor="user-email" className="mb-2 block text-sm text-slate-700">Correo</label>
+              <Input id="user-email" type="email" value={values.correo} onChange={(event) => handleChange("correo", event.target.value)} />
+              {errors.correo ? <p className="mt-2 text-sm text-red-600">{errors.correo}</p> : null}
+            </div>
 
-              <div>
-                <label htmlFor="user-password" className="mb-2 block text-sm text-slate-700">
-                  {editingUser ? "Nueva contrasena (opcional)" : "Contrasena"}
-                </label>
-                <Input
-                  type="password"
-                  id="user-password"
-                  value={values.password}
-                  onChange={(event) => handleChange("password", event.target.value)}
+            <div>
+              <label htmlFor="user-password" className="mb-2 block text-sm text-slate-700">
+                {editingUser ? "Nueva contrasena (opcional)" : "Contrasena"}
+              </label>
+              <Input type="password" id="user-password" value={values.password} onChange={(event) => handleChange("password", event.target.value)} />
+              {errors.password ? <p className="mt-2 text-sm text-red-600">{errors.password}</p> : null}
+            </div>
+
+            <div>
+              <label htmlFor="user-phone" className="mb-2 block text-sm text-slate-700">Telefono</label>
+              <Input id="user-phone" value={values.telefono} onChange={(event) => handleChange("telefono", event.target.value)} />
+            </div>
+
+            <div className="md:col-span-2">
+              <label htmlFor="user-role" className="mb-2 block text-sm text-slate-700">Tipo de usuario</label>
+              <select
+                id="user-role"
+                value={values.id_tipo_usuario}
+                onChange={(event) => {
+                  const nextRoleId = event.target.value;
+                  setValues((current) => ({ ...current, id_tipo_usuario: nextRoleId, id_casa: null }));
+                  setHouse(null);
+                }}
+                className="flex h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <option value="">Seleccione un rol</option>
+                {userTypes.map((option) => (
+                  <option key={option.id} value={option.id}>{option.nombre}</option>
+                ))}
+              </select>
+              {errors.id_tipo_usuario ? <p className="mt-2 text-sm text-red-600">{errors.id_tipo_usuario}</p> : null}
+            </div>
+
+            {houseRole ? (
+              <div className="min-w-0 md:col-span-2">
+                <HousePicker
+                  key={houseRole}
+                  role={houseRole}
+                  userId={editingUser?.id_usuario ?? null}
+                  value={house}
+                  onChange={chooseHouse}
+                  refreshKey={refreshKey}
+                  initialHouseId={sameRole ? editingUser?.id_casa ?? null : null}
                 />
-                {errors.password ? <p className="mt-2 text-sm text-red-600">{errors.password}</p> : null}
+                {errors.id_casa ? <p className="mt-2 text-sm text-red-600" role="alert">{errors.id_casa}</p> : null}
               </div>
+            ) : null}
+          </div>
 
-              <div>
-                <label htmlFor="user-phone" className="mb-2 block text-sm text-slate-700">Telefono</label>
-                <Input id="user-phone" value={values.telefono} onChange={(event) => handleChange("telefono", event.target.value)} />
-              </div>
-
-              <div className="md:col-span-2">
-                <label htmlFor="user-role" className="mb-2 block text-sm text-slate-700">Tipo de usuario</label>
-                <select
-                  id="user-role"
-                  value={values.id_tipo_usuario}
-                  onChange={(event) => {
-                    const nextRoleId = event.target.value;
-                    const nextRole =
-                      userTypes.find((option) => String(option.id) === nextRoleId)?.nombre?.toLowerCase() ?? "";
-
-                    setValues((current) => ({
-                      ...current,
-                      id_tipo_usuario: nextRoleId,
-                      numero_casa:
-                        nextRole === "residente" || nextRole === "inquilino" ? current.numero_casa : "",
-                      torre: nextRole === "residente" || nextRole === "inquilino" ? current.torre : "",
-                    }));
-                  }}
-                  className="flex h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400"
-                >
-                  <option value="">Seleccione un rol</option>
-                  {userTypes.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.nombre}
-                    </option>
-                  ))}
-                </select>
-                {errors.id_tipo_usuario ? <p className="mt-2 text-sm text-red-600">{errors.id_tipo_usuario}</p> : null}
-              </div>
-
-              {requiresHouse ? (
-                <>
-                  <div>
-                    <label htmlFor="user-house" className="mb-2 block text-sm text-slate-700">Numero de casa</label>
-                    <Input
-                      id="user-house"
-                      value={values.numero_casa}
-                      onChange={(event) => handleChange("numero_casa", event.target.value)}
-                      placeholder={selectedRole === "inquilino" ? "Ej. 302" : "Ej. 101"}
-                    />
-                    {errors.numero_casa ? (
-                      <p className="mt-2 text-sm text-red-600">{errors.numero_casa}</p>
-                    ) : null}
-                  </div>
-
-                  <div>
-                    <label htmlFor="user-tower" className="mb-2 block text-sm text-slate-700">Torre (opcional)</label>
-                    <Input
-                      id="user-tower"
-                      value={values.torre}
-                      onChange={(event) => handleChange("torre", event.target.value)}
-                      placeholder="Ej. B"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                    {selectedRole === "residente"
-                      ? "Para residentes se crea o actualiza su casa en la tabla CASA."
-                      : "Para inquilinos la casa debe existir previamente en la base de datos, porque se relaciona por INQUILINO_CASA."}
-                  </div>
-                </>
-              ) : null}
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Guardando..." : editingUser ? "Actualizar usuario" : "Crear usuario"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Guardando..." : editingUser ? "Actualizar usuario" : "Crear usuario"}
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

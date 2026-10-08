@@ -3,6 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { UserFormModal } from "@/components/admin/UserFormModal";
+import { getHousesRequest } from "@/services/housesService";
+
+vi.mock("@/services/housesService", () => ({ getHousesRequest: vi.fn() }));
 
 const userTypes = [
   { id: 1, nombre: "admin" },
@@ -53,18 +56,19 @@ describe("UserFormModal", () => {
       password: "clave123",
       telefono: "",
       id_tipo_usuario: "1",
-      numero_casa: "",
-      torre: "",
+      id_casa: null,
     });
   });
 
-  it("solicita casa solo cuando se selecciona el rol residente", async () => {
+  it("solicita vivienda (selector de mapa) solo cuando se selecciona el rol residente", async () => {
+    vi.mocked(getHousesRequest).mockResolvedValue({ resumen: { total: 0, disponibles: 0, ocupadas: 0, inactivas: 0 }, viviendas: [] });
     const user = userEvent.setup();
     renderModal();
 
-    expect(screen.queryByLabelText("Numero de casa")).not.toBeInTheDocument();
+    expect(screen.queryByText("Seleccionar vivienda")).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Tipo de usuario"), "3");
-    expect(screen.getByLabelText("Numero de casa")).toBeInTheDocument();
-    expect(screen.getByText(/Para residentes se crea o actualiza su casa/)).toBeInTheDocument();
+    expect(screen.getByText("Seleccionar vivienda")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Numero de casa")).not.toBeInTheDocument();
+    expect(getHousesRequest).toHaveBeenCalledWith({ seleccion: "residente", id_usuario: null });
   });
 });

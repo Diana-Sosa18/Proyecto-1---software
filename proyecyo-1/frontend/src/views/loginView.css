@@ -1,0 +1,109 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+
+/* Diseño "NexusResidencial — Login · Noche Residencial" (port fiel; todo bajo .nr-root). */
+.nr-root{--nr-accent:#2563EB;min-height:100vh;display:flex;flex-wrap:wrap;background:#F8FAFC;color:#0F172A;font-family:"Plus Jakarta Sans","Segoe UI",system-ui,sans-serif}
+.nr-root a{color:#1D4ED8}.nr-root a:hover{color:#1E3A8A}
+.nr-root *{box-sizing:border-box}
+.nr-mono{font-family:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace}
+
+/* entrada */
+.nr-rise{opacity:0;animation:nr-rise .8s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes nr-rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+/* cielo de día */
+.nr-dots{position:absolute;inset:0;background-image:radial-gradient(#C7D5F2 1px,transparent 1.2px);background-size:22px 22px;opacity:.55;pointer-events:none}
+.nr-cloud{position:absolute;height:22px;border-radius:999px;background:#FFFFFF;box-shadow:18px -10px 0 4px #FFFFFF,40px 0 0 0 #FFFFFF;opacity:.9}
+.nr-cloud.a{width:70px;top:110px;animation:nr-drift 48s linear infinite;animation-delay:-12s}
+.nr-cloud.b{width:56px;top:190px;animation:nr-drift 64s linear infinite;animation-delay:-40s;opacity:.7}
+@keyframes nr-drift{from{left:-12%}to{left:108%}}
+.nr-sun{animation:nr-float 9s ease-in-out infinite}
+@keyframes nr-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+/* edificios */
+.nr-tower{position:relative;background:#FFFFFF;border:1px solid #D6E0F5;border-bottom:0;border-radius:8px 8px 0 0;padding:12px 10px 10px;transition:transform .6s cubic-bezier(.2,.8,.2,1),background .4s,border-color .4s,box-shadow .4s}
+.nr-tower.is-active{transform:translateY(-12px);background:#F1F6FF;border-color:var(--nr-accent);box-shadow:0 -10px 40px -18px var(--nr-accent)}
+.nr-win{width:14px;height:18px;border-radius:3px;background:#E3EAF8;transition:background .4s}
+.nr-win.on{background:var(--nr-accent);opacity:.85}
+.nr-win.flick{animation:nr-flick 9s steps(1,end) infinite}
+@keyframes nr-flick{0%,38%{background:#E3EAF8}40%,82%{background:var(--nr-accent)}84%,100%{background:#E3EAF8}}
+.nr-tower.is-active .nr-win.off{background:#C9D9FB}
+.nr-beacon{position:absolute;top:-16px;left:50%;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--nr-accent);animation:nr-beacon 1.6s ease-in-out infinite}
+@keyframes nr-beacon{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--nr-accent) 60%,transparent)}50%{box-shadow:0 0 0 10px transparent}}
+.nr-car{position:absolute;bottom:8px;width:14px;height:6px;border-radius:3px;background:var(--nr-accent)}
+.nr-car.a{animation:nr-drive 11s linear infinite}
+.nr-car.b{background:#94A3B8;bottom:4px;animation:nr-drive-back 15s linear infinite;animation-delay:-6s}
+@keyframes nr-drive{from{left:-4%}to{left:104%}}
+@keyframes nr-drive-back{from{left:104%}to{left:-4%}}
+.nr-pulse{animation:nr-pulse 2s ease-in-out infinite}
+@keyframes nr-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* notificaciones */
+.nr-toast{will-change:transform,opacity}
+.nr-toast.in{animation:nr-toast-in .5s cubic-bezier(.2,.9,.3,1.2) forwards}
+.nr-toast.out{animation:nr-toast-out .35s ease forwards}
+@keyframes nr-toast-in{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes nr-toast-out{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-10px) scale(.98)}}
+.nr-bob{animation:nr-float 6s ease-in-out infinite}
+
+/* formulario */
+.nr-card{animation:nr-rise .8s cubic-bezier(.2,.8,.2,1) both}
+.nr-role{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 12px;border-radius:12px;border:1px solid #E2E8F0;background:#FFFFFF;color:#334155;font:600 14px/1.2 "Plus Jakarta Sans","Segoe UI",system-ui,sans-serif;transition:border-color .25s,background .25s,transform .2s,color .25s,box-shadow .25s}
+.nr-role:hover{border-color:#BFD0F5;transform:translateY(-1px);box-shadow:0 6px 16px -10px rgba(15,23,42,.25)}
+.nr-role.is-on{border-color:var(--nr-accent);background:color-mix(in srgb,var(--nr-accent) 8%,#FFFFFF);color:color-mix(in srgb,var(--nr-accent) 80%,#000)}
+.nr-role-ico{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:#F1F5F9;color:#64748B;transition:all .25s;flex:none}
+.nr-role.is-on .nr-role-ico{background:var(--nr-accent);color:#FFFFFF}
+.nr-role:focus-visible,.nr-btn:focus-visible,.nr-eye:focus-visible,.nr-link:focus-visible{outline:2px solid var(--nr-accent);outline-offset:2px}
+
+.nr-field{position:relative;display:flex;align-items:center;border-radius:12px;border:1px solid #E2E8F0;background:#F8FAFC;transition:border-color .25s,box-shadow .25s,background .25s}
+.nr-field:focus-within{border-color:var(--nr-accent);background:#FFFFFF;box-shadow:0 0 0 4px color-mix(in srgb,var(--nr-accent) 15%,transparent)}
+.nr-field.is-err{border-color:#DC2626;background:#FFFBFB}
+.nr-field.is-err:focus-within{box-shadow:0 0 0 4px rgba(220,38,38,.12)}
+.nr-field.is-ok{border-color:#10B981}
+.nr-field svg{flex:none}
+.nr-input{all:unset;box-sizing:border-box;flex:1;min-width:0;height:50px;padding:0 14px 0 0;color:#0F172A;font:500 15px/1 "Plus Jakarta Sans","Segoe UI",system-ui,sans-serif}
+.nr-input::placeholder{color:#94A3B8}
+.nr-eye{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;width:44px;height:44px;margin-right:3px;border-radius:10px;color:#64748B}
+.nr-eye:hover{color:#0F172A;background:#EEF2F7}
+.nr-check-ok{animation:nr-pop .35s cubic-bezier(.3,1.6,.5,1)}
+.nr-err{animation:nr-rise .3s ease forwards}
+.nr-shake1{animation:nr-shake1 .45s ease}
+.nr-shake2{animation:nr-shake2 .45s ease}
+@keyframes nr-shake1{0%,100%{transform:none}20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
+@keyframes nr-shake2{0%,100%{transform:none}20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
+
+.nr-btn{all:unset;box-sizing:border-box;position:relative;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:52px;border-radius:12px;background:var(--nr-accent);color:#FFFFFF;font:700 15px/1 "Plus Jakarta Sans","Segoe UI",system-ui,sans-serif;transition:transform .2s,box-shadow .3s,background .3s}
+.nr-btn:hover{transform:translateY(-2px);background:color-mix(in srgb,var(--nr-accent) 85%,#000);box-shadow:0 14px 28px -14px var(--nr-accent)}
+.nr-btn:active{transform:translateY(0)}
+.nr-btn::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.35),rgba(255,255,255,0));transform:skewX(-20deg)}
+.nr-btn:hover::after{animation:nr-sheen .9s ease}
+@keyframes nr-sheen{to{left:130%}}
+.nr-btn .nr-arrow{transition:transform .25s}
+.nr-btn:hover .nr-arrow{transform:translateX(4px)}
+.nr-btn.is-done{background:#047857}
+.nr-btn.is-busy{cursor:progress}
+.nr-bar{position:absolute;left:0;bottom:0;height:3px;background:rgba(255,255,255,.75);animation:nr-bar 1.6s ease-in-out forwards}
+@keyframes nr-bar{from{width:0}to{width:100%}}
+.nr-spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);border-top-color:#FFFFFF;animation:nr-spin .7s linear infinite}
+@keyframes nr-spin{to{transform:rotate(360deg)}}
+.nr-pop{animation:nr-pop .45s cubic-bezier(.3,1.6,.5,1)}
+@keyframes nr-pop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.nr-hint{animation:nr-rise .45s ease forwards}
+.nr-link{font-weight:600;text-decoration:none;border-radius:4px}
+.nr-link:hover{text-decoration:underline}
+.nr-cb{width:18px;height:18px;margin:0;accent-color:var(--nr-accent);cursor:pointer}
+.nr-server-err{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;border:1px solid #FECACA;background:#FEF2F2;color:#991B1B;font-size:13.5px;line-height:1.5}
+
+@media (max-width:700px){
+.nr-sky{height:250px !important}
+.nr-sky .nr-tower:nth-child(n+4){display:none}
+.nr-left{padding:28px 22px 0 !important}
+.nr-toastwrap{display:none !important}
+}
+@media (max-width:420px){
+.nr-role{gap:8px;padding:10px 8px;font-size:13px}
+.nr-role > span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+@media (prefers-reduced-motion:reduce){
+.nr-root *,.nr-root *::after{animation:none !important;transition:none !important}
+.nr-rise,.nr-toast{opacity:1}
+}

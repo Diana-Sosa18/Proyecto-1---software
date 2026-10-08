@@ -15,14 +15,14 @@ describe("LoginView error state", () => {
     vi.mocked(useAuth).mockReturnValue({ login } as ReturnType<typeof useAuth>);
 
     render(<MemoryRouter><LoginView /></MemoryRouter>);
-    const email = screen.getByLabelText("Correo electronico");
-    const password = screen.getByLabelText("Contrasena");
+    const email = screen.getByLabelText("Correo electrónico");
+    const password = screen.getByLabelText("Contraseña");
     fireEvent.change(email, { target: { value: "usuario@nexus.test" } });
     fireEvent.change(password, { target: { value: "clave-segura" } });
-    fireEvent.click(screen.getByRole("button", { name: "Ingresar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ingresar como administrador" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Credenciales incorrectas.");
-    await waitFor(() => expect(screen.getByRole("button", { name: "Ingresar" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ingresar como administrador" })).toBeEnabled());
     expect(email).toHaveValue("usuario@nexus.test");
     expect(password).toHaveValue("clave-segura");
     expect(login).toHaveBeenCalledOnce();
@@ -32,8 +32,8 @@ describe("LoginView error state", () => {
     vi.mocked(useAuth).mockReturnValue({ login: vi.fn() } as ReturnType<typeof useAuth>);
     render(<MemoryRouter><LoginView /></MemoryRouter>);
 
-    fireEvent.click(screen.getByRole("button", { name: "Ingresar" }));
-    const email = screen.getByLabelText("Correo electronico");
+    fireEvent.click(screen.getByRole("button", { name: "Ingresar como administrador" }));
+    const email = screen.getByLabelText("Correo electrónico");
     expect(email).toHaveAttribute("aria-invalid", "true");
     fireEvent.change(email, { target: { value: "usuario@nexus.test" } });
     expect(email).toHaveAttribute("aria-invalid", "false");

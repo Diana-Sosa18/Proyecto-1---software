@@ -21,9 +21,14 @@
     "test:functional": "node --test test/*.functional.test.js",
     "test:hu18:mysql": "node scripts/run-isolated-tests.js hu18",
     "test:hu32:mysql": "node scripts/run-isolated-tests.js hu32",
+    "test:viviendas:mysql": "node scripts/run-isolated-tests.js viviendas",
     "test:correlation:mysql": "node scripts/run-isolated-tests.js correlation",
     "test:hu19:mysql": "node scripts/run-isolated-tests.js hu19",
-    "notifications:run": "node scripts/run-financial-notifications.js"
+    "notifications:run": "node scripts/run-financial-notifications.js",
+    "test:tarea5:mysql": "node scripts/run-isolated-tests.js tarea5",
+    "test:integration": "node scripts/run-isolated-tests.js integration",
+    "test:regression": "node scripts/run-isolated-tests.js regression",
+    "test:tarea5:demo": "node ../docs/tarea5-pruebas/scripts/demonstrate-regression.cjs"
   },
   "keywords": [],
   "author": "",

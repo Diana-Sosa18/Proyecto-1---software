@@ -1,0 +1,109 @@
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Figtree:wght@400;500;600;700&display=swap");
+
+/* Diseño de la referencia "Residencial Los Pinos · Elige tu lote", acotado a .pinos
+   para no afectar al resto del panel administrativo. */
+.pinos {
+  --bg:#EEF2F1; --surface:#FFFFFF; --glass:rgba(255,255,255,.80); --ink:#14201A; --muted:#5E6B64; --line:rgba(20,32,26,.12);
+  --accent:#1E4D3A; --accent-ink:#FFFFFF;
+  --avail:#2E9E68; --res:#E09A2E; --sold:#98A1A8;
+  --serif:"Instrument Serif", Georgia, "Times New Roman", serif;
+  --sans:"Figtree", "Segoe UI", system-ui, sans-serif;
+  --shadow:0 18px 40px -18px rgba(14,30,22,.35);
+  background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.5;
+  -webkit-font-smoothing:antialiased; border-radius:24px; padding-bottom:8px;
+}
+@media (prefers-color-scheme: dark) {
+  .pinos {
+    --bg:#0F1512; --surface:#18201C; --glass:rgba(22,30,26,.82); --ink:#E8EEEA; --muted:#9AA8A0; --line:rgba(255,255,255,.12);
+    --accent:#8ED1AC; --accent-ink:#0F1512; --avail:#4CC38A; --res:#F0B451; --sold:#7C878F;
+    --shadow:0 18px 40px -18px rgba(0,0,0,.7);
+  }
+}
+.pinos *, .pinos *::before, .pinos *::after { box-sizing:border-box; }
+.pinos button { font-family:inherit; }
+.pinos :is(button, select, input, a):focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+/* ---------- Hero 3D ---------- */
+.pinos .hero { position:relative; height:calc(100svh - 190px); min-height:600px; border-radius:24px; overflow:hidden; background:#cfdde6; }
+.pinos .scene { position:absolute; inset:0; touch-action:none; }
+.pinos .glass { background:var(--glass); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4);
+  border:1px solid var(--line); box-shadow:var(--shadow); }
+
+.pinos .intro { position:absolute; left:16px; top:16px; z-index:3; width:min(370px, calc(100% - 32px)); border-radius:20px; padding:22px; }
+.pinos .intro h1 { font-family:var(--serif); font-weight:400; font-size:clamp(2.1rem, 3.4vw, 2.8rem); line-height:1.02; margin:0 0 10px; letter-spacing:-0.01em; }
+.pinos .intro p { margin:0 0 16px; color:var(--muted); font-size:.95rem; }
+.pinos .intro p strong { color:var(--ink); font-weight:600; }
+.pinos .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.pinos .chip { display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line); background:var(--surface); color:var(--ink);
+  font-weight:500; font-size:.86rem; padding:6px 11px; border-radius:999px; cursor:pointer; transition:opacity .15s; }
+.pinos .chip .dot { width:9px; height:9px; border-radius:50%; }
+.pinos .chip .count { color:var(--muted); font-variant-numeric:tabular-nums; }
+.pinos .chip[aria-pressed="false"] { opacity:.4; }
+.pinos .selects { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.pinos select { width:100%; font:500 .88rem var(--sans); color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:8px 10px; }
+
+.pinos .controls { position:absolute; right:16px; top:16px; z-index:2; display:flex; gap:8px; }
+.pinos .seg { display:flex; padding:4px; border-radius:999px; }
+.pinos .seg button { border:0; background:transparent; color:var(--ink); font-weight:600; font-size:.84rem; padding:7px 13px; border-radius:999px; cursor:pointer; }
+.pinos .seg button[aria-pressed="true"] { background:var(--ink); color:var(--surface); }
+
+.pinos .hint { position:absolute; left:16px; bottom:16px; z-index:2; font-size:.82rem; color:var(--muted); padding:7px 12px; border-radius:999px; }
+.pinos .fallback { position:absolute; inset:0; display:grid; place-items:center; padding:24px; text-align:center; color:#36443c; }
+
+/* ---------- Panel de la vivienda ---------- */
+.pinos .panel { position:absolute; z-index:5; right:16px; top:76px; bottom:16px; width:350px; border-radius:22px; padding:24px;
+  overflow-y:auto; transform:translateX(calc(100% + 24px)); transition:transform .35s cubic-bezier(.2,.8,.2,1); }
+.pinos .panel.open { transform:none; }
+.pinos .close { position:absolute; right:14px; top:14px; width:34px; height:34px; border-radius:50%; border:1px solid var(--line);
+  background:var(--surface); color:var(--ink); font-size:1.2rem; line-height:1; cursor:pointer; }
+.pinos .lot-ref { color:var(--muted); font-size:.9rem; margin:0 0 2px; }
+.pinos .panel h2 { font-family:var(--serif); font-weight:400; font-size:2.4rem; line-height:1.05; margin:0 0 10px; }
+.pinos .status-row { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:18px; font-size:.88rem; color:var(--muted); }
+.pinos .badge { display:inline-flex; align-items:center; gap:6px; font-size:.82rem; font-weight:600; color:var(--ink); background:var(--surface);
+  border:1px solid var(--line); padding:4px 10px; border-radius:999px; }
+.pinos .badge i { width:8px; height:8px; border-radius:50%; }
+.pinos .price { font-size:2rem; font-weight:700; letter-spacing:-0.02em; margin:0; font-variant-numeric:tabular-nums; }
+.pinos .price-note { color:var(--muted); font-size:.85rem; margin:0 0 18px; }
+.pinos .specs { list-style:none; margin:0 0 20px; padding:0; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.pinos .specs li { display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 12px; min-width:0; }
+.pinos .specs svg { width:20px; height:20px; flex:none; color:var(--muted); }
+.pinos .specs b { display:block; font-size:.98rem; font-variant-numeric:tabular-nums; }
+.pinos .specs span { display:block; font-size:.78rem; color:var(--muted); line-height:1.2; }
+.pinos .people { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; margin:0 0 10px; font-size:.9rem; }
+.pinos .people h3 { font-size:.78rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin:0 0 6px; }
+.pinos .people p { margin:0; overflow-wrap:anywhere; }
+.pinos .people .muted { color:var(--muted); }
+.pinos .people ul { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.pinos .btn { display:block; width:100%; border:0; border-radius:12px; background:var(--accent); color:var(--accent-ink); font-weight:600; font-size:.98rem; padding:12px; cursor:pointer; text-align:center; text-decoration:none; }
+.pinos .btn.ghost { background:var(--surface); color:var(--ink); border:1px solid var(--line); margin-bottom:16px; }
+.pinos .btn:disabled { opacity:.5; cursor:not-allowed; }
+.pinos .actions { display:grid; gap:8px; margin-top:16px; }
+.pinos .actions .btn.ghost { margin-bottom:0; }
+.pinos .msg { font-size:.88rem; margin:10px 0 0; color:var(--muted); }
+
+/* ---------- Modelos ---------- */
+.pinos .modelos { max-width:1180px; margin:0 auto; padding:56px 20px 24px; }
+.pinos .modelos h2 { font-family:var(--serif); font-weight:400; font-size:clamp(2rem, 4vw, 3rem); line-height:1.05; margin:0 0 8px; }
+.pinos .modelos > p { color:var(--muted); margin:0 0 28px; max-width:56ch; }
+.pinos .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
+.pinos .modelo { background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:24px; display:flex; flex-direction:column; }
+.pinos .modelo h3 { font-family:var(--serif); font-weight:400; font-size:2rem; margin:0 0 6px; line-height:1.05; }
+.pinos .modelo .meta { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px; }
+.pinos .modelo .meta span { font-size:.82rem; border:1px solid var(--line); border-radius:999px; padding:3px 10px; }
+.pinos .modelo .desde { margin-top:auto; color:var(--muted); font-size:.85rem; }
+.pinos .modelo .desde b { display:block; color:var(--ink); font-size:1.5rem; letter-spacing:-0.02em; }
+.pinos .modelo .btn { margin-top:16px; }
+.pinos .state { padding:48px 20px; text-align:center; color:var(--muted); }
+
+/* ---------- Movil ---------- */
+@media (max-width:760px) {
+  .pinos { border-radius:0; }
+  .pinos .hero { height:auto; min-height:0; border-radius:0; overflow:visible; background:none; }
+  .pinos .intro { position:static; width:auto; margin:0 0 12px; box-shadow:none; background:var(--surface); backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .pinos .scene { position:relative; height:64svh; border-radius:20px; overflow:hidden; background:#cfdde6; }
+  .pinos .controls { right:10px; top:10px; flex-direction:column; align-items:flex-end; }
+  .pinos .hint { left:10px; bottom:10px; }
+  .pinos .panel { position:fixed; left:0; right:0; top:auto; bottom:0; width:auto; max-height:78svh; border-radius:22px 22px 0 0;
+    padding-bottom:calc(24px + env(safe-area-inset-bottom,0px)); transform:translateY(105%); }
+}
+@media (prefers-reduced-motion: reduce) { .pinos *, .pinos *::before, .pinos *::after { transition:none !important; } }

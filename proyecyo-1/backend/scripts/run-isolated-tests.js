@@ -7,13 +7,22 @@ const { openSuiteDatabase, prepareSuiteDatabase, closeSuiteDatabase } = require(
 const suite = process.argv[2];
 const repeatArg = process.argv.slice(3);
 const repeat = repeatArg.length === 0 ? 1 : repeatArg.length === 1 && repeatArg[0] === "--repeat=2" ? 2 : 0;
-const suites = new Set(["phase0", "hu13", "hu14", "hu15", "hu16", "hu17", "hu18", "hu19", "hu32", "correlation", "precision", "functional", "backend"]);
+const suites = new Set(["phase0", "hu13", "hu14", "hu15", "hu16", "hu17", "hu18", "hu19", "hu32", "viviendas", "correlation", "precision", "functional", "backend", "tarea5", "integration", "regression"]);
 
 function execute() {
   let executable = process.execPath;
   let args = ["--test", "--test-concurrency=1", `test/integration/${suite === "phase0" ? "phase0" : suite}.mysql.test.js`];
+  if (["tarea5", "integration", "regression"].includes(suite)) {
+    args = ["--test", "--test-concurrency=1", "--test-reporter=tap",
+      ...(suite === "integration" ? ["--test-name-pattern=^INT-"] : suite === "regression" ? ["--test-name-pattern=^REG-"] : []),
+      "test/integration/tarea5.mysql.test.js"];
+  }
   if (suite === "functional") args = ["scripts/test-phase0-functional.js"];
-  if (suite === "backend") { executable = "cmd.exe"; args = ["/d", "/s", "/c", "npm.cmd test"]; }
+  if (suite === "backend") {
+    if (process.env.npm_execpath) args = [process.env.npm_execpath, "test"];
+    else if (process.platform === "win32") { executable = "cmd.exe"; args = ["/d", "/s", "/c", "npm.cmd test"]; }
+    else { executable = "npm"; args = ["test"]; }
+  }
   return new Promise((resolve, reject) => {
     const child = spawn(executable, args, { cwd: path.resolve(__dirname, ".."), env: process.env, stdio: "inherit", windowsHide: true });
     child.once("error", reject); child.once("exit", (code) => resolve(code ?? 1));

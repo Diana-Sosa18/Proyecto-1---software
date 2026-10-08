@@ -20,6 +20,7 @@ const residentSidebarConfig: RoleSidebarConfig<ResidentBadgeKey> = {
   roleLabel: "Residente",
   roleNoun: "residente",
   homePath: "/residente",
+  accent: "#2563EB",
   sections: residentNavSections,
   sessionsItem: residentSessionsItem,
   counterLabels: { unreadNotifications: "sin leer", pendingProviders: "pendientes", pendingTenantRequests: "solicitudes pendientes" },

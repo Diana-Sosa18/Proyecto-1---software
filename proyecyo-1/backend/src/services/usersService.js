@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 
 const { pool, query } = require("../database/mysql");
+const { assignResidentToHouse, assignTenantToHouse, releaseResidentHouses } = require("./housesService");
 
 const SALT_ROUNDS = 10;
 
@@ -20,7 +21,8 @@ const USER_HOUSE_SUBQUERY = `
       ),
       ''
     ) AS torre,
-    GROUP_CONCAT(DISTINCT grouped_houses.unidad ORDER BY grouped_houses.unidad SEPARATOR ', ') AS unidad
+    GROUP_CONCAT(DISTINCT grouped_houses.unidad ORDER BY grouped_houses.unidad SEPARATOR ', ') AS unidad,
+    MIN(grouped_houses.sort_key) AS id_casa
   FROM (
     SELECT
       r.id_usuario,
@@ -74,25 +76,25 @@ function generateAutoDpi() {
   return `AUTO${timestamp}${random}`;
 }
 
-function normalizeHousePayload(payload) {
-  return {
-    numeroCasa: normalizeString(payload.numero_casa),
-    torre: normalizeString(payload.torre) || null,
-  };
+// La vivienda se elige en el mapa (id_casa). Ya no se escribe "numero/torre" a mano:
+// el backend revalida la vivienda bajo bloqueo dentro de la transaccion.
+function ensureHousePayloadForRole(roleName, payload) {
+  if (roleName !== "residente" && roleName !== "inquilino") return null;
+  const houseId = Number(payload.id_casa);
+  if (!Number.isInteger(houseId) || houseId <= 0) {
+    const error = new Error("Selecciona una vivienda en el mapa para residentes e inquilinos.");
+    error.status = 400;
+    throw error;
+  }
+  return houseId;
 }
 
-function ensureHousePayloadForRole(roleName, payload) {
-  const house = normalizeHousePayload(payload);
-
-  if (roleName === "residente" || roleName === "inquilino") {
-    if (!house.numeroCasa) {
-      const error = new Error("La casa es obligatoria para residentes e inquilinos.");
-      error.status = 400;
-      throw error;
-    }
+// Errores de concurrencia de MySQL se traducen a un conflicto entendible.
+function mapConcurrencyError(error) {
+  if (error?.code === "ER_LOCK_DEADLOCK" || error?.code === "ER_LOCK_WAIT_TIMEOUT") {
+    return Object.assign(new Error("La vivienda cambio mientras se guardaba. Actualiza el mapa e intenta de nuevo."), { status: 409, code: "VIVIENDA_CONFLICTO" });
   }
-
-  return house;
+  return error;
 }
 
 async function getUserTypeById(idTipoUsuario) {
@@ -198,136 +200,35 @@ async function removeTenantData(connection, userId) {
   await connection.execute("DELETE FROM INQUILINO WHERE id_usuario = ?", [userId]);
 }
 
+// Ya no se borra CASA: la vivienda (y su historial) se conserva y queda DISPONIBLE.
+// releaseResidentHouses bloquea si quedarian inquilinos huerfanos o historial financiero.
 async function removeResidentData(connection, userId) {
-  await connection.execute(
-    `
-      DELETE FROM INQUILINO_CASA
-      WHERE id_casa IN (
-        SELECT c.id_casa
-        FROM CASA c
-        INNER JOIN RESIDENTE r
-          ON r.id_residente = c.id_residente
-        WHERE r.id_usuario = ?
-      )
-    `,
-    [userId],
-  );
-  await connection.execute(
-    `
-      DELETE FROM CASA
-      WHERE id_residente IN (
-        SELECT id_residente
-        FROM RESIDENTE
-        WHERE id_usuario = ?
-      )
-    `,
-    [userId],
-  );
+  const residentId = await getResidentIdByUserId(connection, userId);
+  if (!residentId) return;
+  await releaseResidentHouses(connection, residentId);
   await connection.execute("DELETE FROM RESIDENTE WHERE id_usuario = ?", [userId]);
 }
 
-async function assignResidentHouse(connection, userId, house) {
+async function assignResidentHouse(connection, userId, houseId) {
   const residentId = await ensureResidentRecord(connection, userId);
-
-  const [conflictRows] = await connection.execute(
-    `
-      SELECT c.id_casa
-      FROM CASA c
-      WHERE c.numero = ?
-        AND (
-          (? IS NULL AND (c.torre IS NULL OR c.torre = ''))
-          OR c.torre = ?
-        )
-        AND c.id_residente <> ?
-      LIMIT 1
-    `,
-    [house.numeroCasa, house.torre, house.torre, residentId],
-  );
-
-  if (conflictRows.length > 0) {
-    const error = new Error("La casa indicada ya esta asignada a otro residente.");
-    error.status = 409;
-    throw error;
-  }
-
-  const [existingRows] = await connection.execute(
-    `
-      SELECT id_casa
-      FROM CASA
-      WHERE id_residente = ?
-      ORDER BY id_casa ASC
-      LIMIT 1
-      FOR UPDATE
-    `,
-    [residentId],
-  );
-
-  if (existingRows.length > 0) {
-    await connection.execute(
-      `
-        UPDATE CASA
-        SET numero = ?, torre = ?
-        WHERE id_casa = ?
-      `,
-      [house.numeroCasa, house.torre, existingRows[0].id_casa],
-    );
-    return;
-  }
-
-  await connection.execute(
-    `
-      INSERT INTO CASA (numero, torre, id_residente)
-      VALUES (?, ?, ?)
-    `,
-    [house.numeroCasa, house.torre, residentId],
-  );
+  await assignResidentToHouse(connection, residentId, houseId);
 }
 
-async function assignTenantHouse(connection, userId, house) {
+async function assignTenantHouse(connection, userId, houseId) {
   const inquilinoId = await ensureInquilinoRecord(connection, userId);
-  const [houseRows] = await connection.execute(
-    `
-      SELECT id_casa
-      FROM CASA
-      WHERE numero = ?
-        AND (
-          (? IS NULL AND (torre IS NULL OR torre = ''))
-          OR torre = ?
-        )
-      ORDER BY id_casa ASC
-      LIMIT 1
-    `,
-    [house.numeroCasa, house.torre, house.torre],
-  );
-
-  if (houseRows.length === 0) {
-    const error = new Error(
-      "La casa indicada no existe. Para inquilinos debes ingresar una casa ya registrada para un residente.",
-    );
-    error.status = 400;
-    throw error;
-  }
-
-  await connection.execute("DELETE FROM INQUILINO_CASA WHERE id_inquilino = ?", [inquilinoId]);
-  await connection.execute(
-    `
-      INSERT INTO INQUILINO_CASA (id_inquilino, id_casa)
-      VALUES (?, ?)
-    `,
-    [inquilinoId, houseRows[0].id_casa],
-  );
+  await assignTenantToHouse(connection, inquilinoId, houseId);
 }
 
-async function syncRoleRelations(connection, userId, roleName, house) {
+async function syncRoleRelations(connection, userId, roleName, houseId) {
   if (roleName === "residente") {
     await removeTenantData(connection, userId);
-    await assignResidentHouse(connection, userId, house);
+    await assignResidentHouse(connection, userId, houseId);
     return;
   }
 
   if (roleName === "inquilino") {
     await removeResidentData(connection, userId);
-    await assignTenantHouse(connection, userId, house);
+    await assignTenantHouse(connection, userId, houseId);
     return;
   }
 
@@ -344,6 +245,7 @@ function mapUser(row) {
     id_tipo_usuario: row.id_tipo_usuario,
     rol: row.rol,
     unidad: row.unidad || null,
+    id_casa: row.id_casa ? Number(row.id_casa) : null,
     numero_casa: row.numero_casa || null,
     torre: row.torre || null,
   };
@@ -360,6 +262,7 @@ async function listUsers() {
         u.id_tipo_usuario,
         tu.nombre AS rol,
         casa.unidad,
+        casa.id_casa,
         casa.numero_casa,
         casa.torre
       FROM USUARIO u
@@ -385,6 +288,7 @@ async function getUserById(id) {
         u.id_tipo_usuario,
         tu.nombre AS rol,
         casa.unidad,
+        casa.id_casa,
         casa.numero_casa,
         casa.torre
       FROM USUARIO u
@@ -474,7 +378,7 @@ async function createUser(payload) {
     return getUserById(result.insertId);
   } catch (error) {
     await connection.rollback();
-    throw error;
+    throw mapConcurrencyError(error);
   } finally {
     connection.release();
   }
@@ -559,7 +463,7 @@ async function updateUser(id, payload) {
     return getUserById(id);
   } catch (error) {
     await connection.rollback();
-    throw error;
+    throw mapConcurrencyError(error);
   } finally {
     connection.release();
   }
@@ -572,43 +476,10 @@ async function deleteUser(id) {
   try {
     await connection.beginTransaction();
 
-    await connection.execute(
-      `
-        DELETE FROM INQUILINO_CASA
-        WHERE id_inquilino IN (
-          SELECT id_inquilino
-          FROM INQUILINO
-          WHERE id_usuario = ?
-        )
-      `,
-      [id],
-    );
-    await connection.execute(
-      `
-        DELETE FROM INQUILINO_CASA
-        WHERE id_casa IN (
-          SELECT c.id_casa
-          FROM CASA c
-          INNER JOIN RESIDENTE r
-            ON r.id_residente = c.id_residente
-          WHERE r.id_usuario = ?
-        )
-      `,
-      [id],
-    );
-    await connection.execute(
-      `
-        DELETE FROM CASA
-        WHERE id_residente IN (
-          SELECT id_residente
-          FROM RESIDENTE
-          WHERE id_usuario = ?
-        )
-      `,
-      [id],
-    );
-    await connection.execute("DELETE FROM INQUILINO WHERE id_usuario = ?", [id]);
-    await connection.execute("DELETE FROM RESIDENTE WHERE id_usuario = ?", [id]);
+    // La vivienda NO se borra: queda DISPONIBLE (o se bloquea si tiene inquilinos o
+    // historial financiero). Solo se eliminan las relaciones del usuario.
+    await removeTenantData(connection, id);
+    await removeResidentData(connection, id);
     await connection.execute("DELETE FROM USUARIO WHERE id_usuario = ?", [id]);
 
     await connection.commit();

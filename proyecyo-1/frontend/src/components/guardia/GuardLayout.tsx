@@ -17,6 +17,7 @@ const guardSidebarConfig: RoleSidebarConfig<GuardBadgeKey> = {
   roleLabel: "Guardia",
   roleNoun: "guardia",
   homePath: "/guardia",
+  accent: "#047857",
   sections: guardNavSections,
   sessionsItem: guardSessionsItem,
   counterLabels: { unreadAlerts: "sin leer" },

@@ -20,6 +20,8 @@ import { AdminSanctionHistoryView } from "@/views/AdminSanctionHistoryView";
 import { AdminSettingsView } from "@/views/AdminSettingsView";
 import { AdminSpecialAccessView } from "@/views/AdminSpecialAccessView";
 import { AdminView } from "@/views/AdminView";
+import { AdminUsersView } from "@/views/AdminUsersView";
+import { AdminHousesView } from "@/views/AdminHousesView";
 import { GuardiaDashboardView } from "@/views/GuardiaDashboardView";
 import { GuardiaView } from "@/views/GuardiaView";
 import { InquilinoDashboardView } from "@/views/InquilinoDashboardView";
@@ -66,6 +68,8 @@ export function AppRouter() {
 
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route path="/admin" element={<AdminView />} />
+          <Route path="/admin/usuarios" element={<AdminUsersView />} />
+          <Route path="/admin/viviendas" element={<AdminHousesView />} />
           <Route path="/admin/accesos" element={<AdminAccessesView />} />
           <Route path="/admin/usuarios-autorizados" element={<AdminAuthorizedUsersView />} />
           <Route path="/admin/proveedores" element={<AdminProvidersView />} />

@@ -11,6 +11,7 @@ export interface UserRecord {
   id_tipo_usuario: number;
   rol: "admin" | "guardia" | "residente" | "inquilino";
   unidad: string | null;
+  id_casa: number | null;
   numero_casa: string | null;
   torre: string | null;
 }
@@ -21,6 +22,6 @@ export interface UserFormValues {
   password: string;
   telefono: string;
   id_tipo_usuario: string;
-  numero_casa: string;
-  torre: string;
+  // Vivienda elegida en el mapa (residente/inquilino). El backend la revalida bajo bloqueo.
+  id_casa: number | null;
 }

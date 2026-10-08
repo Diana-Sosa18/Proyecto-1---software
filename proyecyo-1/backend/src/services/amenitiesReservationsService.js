@@ -1280,6 +1280,9 @@ async function createAmenityReservation(viewer, payload) {
       throwReservationLimitError();
     }
 
+    // La PK incluye usuario/amenidad/fecha/inicio. El bloqueo y la validacion
+    // anteriores ya rechazan toda reserva activa superpuesta; una PK repetida
+    // solo puede reutilizar una cancelada. HISTORIAL_RESERVA se conserva intacto.
     await connection.execute(
       `
         INSERT INTO RESERVA (
@@ -1292,6 +1295,10 @@ async function createAmenityReservation(viewer, payload) {
           creado_en
         )
         VALUES (?, ?, ?, ?, ?, 'CONFIRMADA', NOW())
+        ON DUPLICATE KEY UPDATE
+          hora_fin = VALUES(hora_fin),
+          estado = 'CONFIRMADA',
+          creado_en = NOW()
       `,
       [
         userId,

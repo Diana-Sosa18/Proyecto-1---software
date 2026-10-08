@@ -22,6 +22,7 @@ const tenantSidebarConfig: RoleSidebarConfig<TenantBadgeKey> = {
   roleLabel: "Inquilino",
   roleNoun: "inquilino",
   homePath: "/inquilino",
+  accent: "#4F46E5",
   sections: tenantNavSections,
   sessionsItem: tenantSessionsItem,
   counterLabels: { unreadNotifications: "sin leer" },

@@ -1,0 +1,184 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+/* Diseño "NexusResidencial · Dashboard" (port del panel de administración; todo bajo .nd). */
+.nd{--nd-accent:#2563EB;background:#F6F8FC;color:#0F172A;font-family:"Plus Jakarta Sans","Segoe UI",system-ui,sans-serif}
+.nd *{box-sizing:border-box}
+.nd-mono{font-family:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace}
+.nd-rise{opacity:0;animation:nd-rise .7s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes nd-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.nd :focus-visible{outline:2px solid var(--nd-accent);outline-offset:2px}
+
+/* sidebar */
+.nd-side{transition:width .3s cubic-bezier(.2,.8,.2,1),transform .2s}
+.nd-brand-ico{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;background:var(--nd-accent);color:#FFFFFF;flex:none}
+.nd-nav{display:flex;align-items:center;gap:12px;min-height:42px;padding:8px 10px;border-radius:12px;color:#475569;text-decoration:none;font-size:14px;font-weight:600;transition:background .2s,color .2s}
+.nd-nav:hover{background:#F1F5F9;color:#0F172A}
+.nd-nav .nd-ico{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;flex:none;transition:transform .25s cubic-bezier(.3,1.6,.5,1),background .2s,color .2s}
+.nd-nav:hover .nd-ico{transform:scale(1.12) rotate(-6deg)}
+.nd-nav.is-on{background:color-mix(in srgb,var(--nd-accent) 10%,#FFFFFF);color:color-mix(in srgb,var(--nd-accent) 82%,#000)}
+.nd-nav.is-on .nd-ico{background:var(--nd-accent);color:#FFFFFF;box-shadow:0 6px 14px -6px var(--nd-accent)}
+.nd-nav.is-on:hover{color:color-mix(in srgb,var(--nd-accent) 82%,#000)}
+.nd-sec{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#64748B;padding:14px 10px 6px}
+.nd-ghost{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 12px;border-radius:12px;border:1px solid #E2E8F0;background:#FFFFFF;color:#334155;font:600 13px/1 "Plus Jakarta Sans","Segoe UI",system-ui,sans-serif;text-decoration:none;white-space:nowrap;transition:border-color .2s,transform .2s,box-shadow .2s,color .2s}
+.nd-ghost:hover{border-color:#CBD5E1;transform:translateY(-1px);box-shadow:0 8px 18px -12px rgba(15,23,42,.3);color:#0F172A}
+.nd-ghost.danger:hover{border-color:#FCA5A5;color:#B91C1C}
+.nd-ghost.danger:hover svg{transform:translateX(3px)}
+.nd-ghost svg{transition:transform .25s;flex:none}
+.nd-collapse{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;color:#64748B;transition:background .2s,transform .3s}
+.nd-collapse:hover{background:#F1F5F9;color:#0F172A}
+.nd-collapse.is-col{transform:rotate(180deg)}
+
+/* botones */
+.nd-primary{all:unset;box-sizing:border-box;cursor:pointer;position:relative;overflow:hidden;display:flex;align-items:center;gap:10px;min-height:46px;padding:0 18px;border-radius:12px;background:var(--nd-accent);color:#FFFFFF;font:700 14px/1 "Plus Jakarta Sans","Segoe UI",system-ui,sans-serif;text-decoration:none;transition:transform .2s,box-shadow .3s,background .3s}
+.nd-primary:hover{transform:translateY(-2px);background:color-mix(in srgb,var(--nd-accent) 86%,#000);box-shadow:0 14px 26px -14px var(--nd-accent);color:#FFFFFF}
+.nd-primary:active{transform:translateY(0) scale(.98)}
+.nd-primary .nd-plus{transition:transform .35s cubic-bezier(.3,1.6,.5,1)}
+.nd-primary:hover .nd-plus{transform:translateX(3px)}
+.nd-primary::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.35),rgba(255,255,255,0));transform:skewX(-20deg)}
+.nd-primary:hover::after{animation:nd-sheen .9s ease}
+@keyframes nd-sheen{to{left:130%}}
+.nd-icon-btn{all:unset;box-sizing:border-box;cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:12px;border:1px solid #E2E8F0;background:#FFFFFF;color:#475569;transition:transform .2s,border-color .2s,color .2s}
+.nd-icon-btn:hover{transform:translateY(-1px);border-color:#CBD5E1;color:#0F172A}
+.nd-icon-btn:hover svg{animation:nd-ring .6s ease}
+@keyframes nd-ring{0%,100%{transform:rotate(0)}25%{transform:rotate(14deg)}50%{transform:rotate(-12deg)}75%{transform:rotate(6deg)}}
+.nd-pulse{animation:nd-pulse 2s ease-in-out infinite}
+@keyframes nd-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.nd-ping-dot{animation:nd-ping 1.2s cubic-bezier(0,0,.2,1) infinite}
+@keyframes nd-ping{75%,100%{transform:scale(2.2);opacity:0}}
+
+/* tarjetas */
+.nd-card{background:#FFFFFF;border:1px solid #E6EBF3;border-radius:20px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.nd-kpi{position:relative;overflow:hidden;transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s,border-color .3s}
+.nd-kpi:hover{transform:translateY(-4px);box-shadow:0 20px 36px -24px rgba(15,23,42,.35);border-color:#D6DEEB}
+.nd-kpi .nd-kico{transition:transform .4s cubic-bezier(.3,1.6,.5,1)}
+.nd-kpi:hover .nd-kico{transform:rotate(-10deg) scale(1.1)}
+.nd-track{height:6px;border-radius:999px;background:#EEF2F7;overflow:hidden}
+.nd-fill{height:100%;border-radius:999px;transition:width 1.1s cubic-bezier(.2,.8,.2,1)}
+a.nd-kpi{text-decoration:none;color:inherit;display:block}
+
+.nd-seg{display:flex;padding:4px;gap:4px;border-radius:12px;background:#F1F5F9}
+.nd-seg button{all:unset;box-sizing:border-box;cursor:pointer;min-height:36px;padding:0 14px;border-radius:9px;font:600 13px/1 "Plus Jakarta Sans","Segoe UI",system-ui,sans-serif;color:#64748B;display:flex;align-items:center;gap:8px;transition:background .25s,color .25s,box-shadow .25s}
+.nd-seg button:hover{color:#0F172A}
+.nd-seg button.is-on{background:#FFFFFF;color:#0F172A;box-shadow:0 2px 8px -2px rgba(15,23,42,.18)}
+.nd-count{font-size:11px;padding:2px 7px;border-radius:999px;background:#E2E8F0;color:#475569}
+.nd-seg button.is-on .nd-count{background:color-mix(in srgb,var(--nd-accent) 14%,#FFFFFF);color:color-mix(in srgb,var(--nd-accent) 80%,#000)}
+
+.nd-am{display:grid;grid-template-columns:28px 36px minmax(110px,170px) minmax(0,1fr) 92px;align-items:center;gap:14px;padding:10px 12px;border-radius:14px;transition:background .25s,transform .25s}
+.nd-am:hover,.nd-am.is-hi{background:#F6F8FC;transform:translateX(4px)}
+.nd-donut{animation:nd-donut 1.1s cubic-bezier(.2,.8,.2,1) both;transition:background .3s}
+@keyframes nd-donut{from{transform:rotate(-120deg) scale(.7);opacity:0}to{transform:none;opacity:1}}
+.nd-range{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;border-radius:12px;border:1px solid #E2E8F0;background:#FFFFFF;color:#334155;transition:border-color .2s,box-shadow .2s}
+.nd-range:hover{border-color:#CBD5E1;box-shadow:0 8px 18px -12px rgba(15,23,42,.3)}
+.nd-range:focus-within{border-color:var(--nd-accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--nd-accent) 14%,transparent)}
+.nd-range input{all:unset;box-sizing:border-box;font:500 12.5px/1 "JetBrains Mono",ui-monospace,monospace;color:#0F172A;min-width:0;cursor:pointer}
+
+.nd-row{display:grid;grid-template-columns:54px 94px minmax(130px,1fr) 66px 100px 106px 36px;align-items:center;gap:10px;padding:12px 20px;border-top:1px solid #EEF2F7;transition:background .2s}
+.nd-row.body{opacity:0;animation:nd-rise .5s ease forwards}
+.nd-row.body:hover{background:#F8FAFD}
+.nd-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;white-space:nowrap}
+.nd-plate{display:inline-block;font-size:12.5px;font-weight:600;padding:4px 8px;border-radius:6px;border:1.5px solid #CBD5E1;background:#FFFFFF;color:#0F172A;letter-spacing:.04em}
+.nd-more{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;color:#64748B;transition:background .2s,color .2s}
+.nd-more:hover{background:#EEF2F7;color:#0F172A}
+.nd-search{display:flex;align-items:center;gap:8px;min-height:40px;padding:0 12px;border-radius:12px;border:1px solid #E2E8F0;background:#F8FAFC;transition:border-color .2s,box-shadow .2s,background .2s}
+.nd-search:focus-within{border-color:var(--nd-accent);background:#FFFFFF;box-shadow:0 0 0 4px color-mix(in srgb,var(--nd-accent) 14%,transparent)}
+.nd-search input{all:unset;flex:1;min-width:0;font:500 13.5px/1 "Plus Jakarta Sans","Segoe UI",system-ui,sans-serif;color:#0F172A}
+.nd-search input::placeholder{color:#94A3B8}
+
+.nd-bar{all:unset;cursor:pointer;position:relative;display:flex;align-items:flex-end;justify-content:center;flex:1;height:100%}
+.nd-bar-fill{width:100%;max-width:22px;border-radius:7px 7px 3px 3px;transition:height .9s cubic-bezier(.2,.8,.2,1),background .2s,transform .2s}
+.nd-bar:hover .nd-bar-fill,.nd-bar:focus-visible .nd-bar-fill{transform:scaleX(1.12)}
+.nd-tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;padding:7px 10px;border-radius:9px;background:#0F172A;color:#FFFFFF;font-size:12px;font-weight:600;pointer-events:none;z-index:2;animation:nd-tip .2s ease}
+@keyframes nd-tip{from{opacity:0;transform:translate(-50%,4px)}to{opacity:1;transform:translate(-50%,0)}}
+
+@media (max-width:760px){
+.nd-am{grid-template-columns:24px 32px minmax(0,1fr) auto;gap:6px 10px}
+.nd-am .nd-am-count{grid-row:1;grid-column:4;white-space:nowrap}
+.nd-am .nd-track{grid-row:2;grid-column:1/-1}
+}
+/* Paneles de rol con acento propio: la escala "blue" de Tailwind (variables
+   --color-blue-*) se deriva del acento, así botones, enlaces e iconos de cada
+   vista adoptan el color del rol sin editar vista por vista. */
+.nd.nd-tint{
+--color-blue-50:color-mix(in srgb,var(--nd-accent) 6%,#FFFFFF);
+--color-blue-100:color-mix(in srgb,var(--nd-accent) 13%,#FFFFFF);
+--color-blue-200:color-mix(in srgb,var(--nd-accent) 26%,#FFFFFF);
+--color-blue-300:color-mix(in srgb,var(--nd-accent) 44%,#FFFFFF);
+--color-blue-400:color-mix(in srgb,var(--nd-accent) 66%,#FFFFFF);
+--color-blue-500:color-mix(in srgb,var(--nd-accent) 86%,#FFFFFF);
+--color-blue-600:var(--nd-accent);
+--color-blue-700:color-mix(in srgb,var(--nd-accent) 86%,#000000);
+--color-blue-800:color-mix(in srgb,var(--nd-accent) 72%,#000000);
+--color-blue-900:color-mix(in srgb,var(--nd-accent) 58%,#000000);
+--color-blue-950:color-mix(in srgb,var(--nd-accent) 42%,#000000)}
+
+/* insignias del sidebar */
+.nd-badge{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;min-width:22px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--nd-accent) 12%,#FFFFFF);color:color-mix(in srgb,var(--nd-accent) 80%,#000);animation:nd-pop-in .45s cubic-bezier(.3,1.6,.5,1)}
+@keyframes nd-pop-in{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.nd-nav .nd-ico{position:relative}
+.nd-dot{position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:#EF4444;box-shadow:0 0 0 2px #FFFFFF}
+
+/* ============================================================
+   Capa de movimiento compartida para TODAS las vistas (admin,
+   residente, inquilino y guardia). Se aplica al contenido de
+   .nd-content sin tener que tocar cada vista.
+   ============================================================ */
+.nd-content{display:flex;flex-direction:column;gap:22px;min-width:0}
+/* Entrada escalonada de cada bloque de la vista. Al terminar queda transform:none
+   (no crea bloque contenedor para modales fijos). */
+.nd-content > *{animation:nd-rise .65s cubic-bezier(.2,.8,.2,1) both}
+.nd-content > *:nth-child(2){animation-delay:.06s}
+.nd-content > *:nth-child(3){animation-delay:.12s}
+.nd-content > *:nth-child(4){animation-delay:.18s}
+.nd-content > *:nth-child(5){animation-delay:.24s}
+.nd-content > *:nth-child(n+6){animation-delay:.3s}
+/* Las rejillas de tarjetas entran una a una. */
+.nd-content [class*="grid-cols"] > *{animation:nd-rise .6s cubic-bezier(.2,.8,.2,1) both}
+.nd-content [class*="grid-cols"] > *:nth-child(2){animation-delay:.07s}
+.nd-content [class*="grid-cols"] > *:nth-child(3){animation-delay:.14s}
+.nd-content [class*="grid-cols"] > *:nth-child(4){animation-delay:.21s}
+.nd-content [class*="grid-cols"] > *:nth-child(n+5){animation-delay:.28s}
+
+/* Tarjetas: estilo del diseño + elevación al pasar el cursor (no si contienen un diálogo abierto). */
+.nd-content [data-slot="card"],.nd-content article[class*="bg-white"]{border-color:#E6EBF3;border-radius:20px;box-shadow:0 1px 2px rgba(15,23,42,.04);transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s,border-color .3s}
+.nd-content [data-slot="card"]:hover:not(:focus-within),.nd-content article[class*="bg-white"]:hover:not(:focus-within),.nd-content a[class*="bg-white"][class*="rounded"]:hover{transform:translateY(-3px);box-shadow:0 20px 36px -24px rgba(15,23,42,.35);border-color:#D6DEEB}
+.nd-content a[class*="bg-white"][class*="rounded"]{transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s,border-color .3s}
+/* El icono destacado de una tarjeta gira un poco, como en los KPI del dashboard. */
+.nd-content .nd-kico,.nd-content [class*="rounded"] > svg:only-child{transition:transform .4s cubic-bezier(.3,1.6,.5,1)}
+.nd-content [data-slot="card"]:hover .nd-kico,.nd-content article:hover [class*="rounded"] > svg:only-child,.nd-content [data-slot="card"]:hover [class*="rounded"] > svg:only-child{transform:rotate(-10deg) scale(1.12)}
+
+/* Tablas: filas que aparecen en cascada y resaltan al pasar el cursor. */
+.nd-content table thead th{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:#64748B}
+.nd-content table tbody tr{animation:nd-row-in .45s ease both;transition:background .2s}
+.nd-content table tbody tr:nth-child(2){animation-delay:.04s}
+.nd-content table tbody tr:nth-child(3){animation-delay:.08s}
+.nd-content table tbody tr:nth-child(4){animation-delay:.12s}
+.nd-content table tbody tr:nth-child(5){animation-delay:.16s}
+.nd-content table tbody tr:nth-child(n+6){animation-delay:.2s}
+.nd-content table tbody tr:hover{background:#F8FAFD}
+@keyframes nd-row-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* Listas de elementos (li) entran suavemente. */
+.nd-content ul > li{animation:nd-row-in .4s ease both}
+
+/* Botones: respuesta táctil y brillo en los principales. */
+.nd-content button:not(:disabled):active{transform:scale(.98)}
+.nd-content button,.nd-content a{transition:transform .2s,box-shadow .25s,background-color .2s,border-color .2s,color .2s}
+.nd-content button[class*="bg-primary"]:not(:disabled):hover,.nd-content button[class*="bg-blue-6"]:not(:disabled):hover{transform:translateY(-1px);box-shadow:0 12px 22px -14px var(--nd-accent)}
+
+/* Campos con el foco del diseño. */
+.nd-content :is(input,select,textarea):not([type="checkbox"]):not([type="radio"]):not([type="range"]){transition:border-color .2s,box-shadow .2s,background .2s}
+.nd-content :is(input,select,textarea):not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus{border-color:var(--nd-accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--nd-accent) 14%,transparent);outline:none}
+
+/* Insignias / pills con aparición. */
+.nd-content [class*="rounded-full"][class*="px-2"][class*="text-"]{animation:nd-pop-in .4s cubic-bezier(.3,1.6,.5,1) both}
+
+/* Títulos de sección con la tipografía del diseño. */
+.nd-content h2{letter-spacing:-.02em}
+
+/* Tarjeta de indicador compartida (StatCard) con el lenguaje de los KPI. */
+.nd-stat-value{font-size:34px;line-height:1;font-weight:800;letter-spacing:-.04em;color:#0F172A}
+
+@media (prefers-reduced-motion:reduce){
+.nd *,.nd *::after{animation:none !important;transition:none !important}
+.nd-rise,.nd-row.body{opacity:1}
+}

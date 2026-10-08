@@ -18,6 +18,10 @@ const actions = [
   ["PASSWORD_RESET", "Contrasena recuperada"],
   ["VISIT_SCHEDULE_UPDATED", "Horario de visitas actualizado"],
   ["GENERAL_CONFIGURATION_UPDATED", "Configuracion general actualizada"],
+  ["HOUSE_CREATED", "Vivienda creada"],
+  ["HOUSE_UPDATED", "Vivienda actualizada"],
+  ["HOUSE_ACTIVATED", "Vivienda activada"],
+  ["HOUSE_DEACTIVATED", "Vivienda desactivada"],
 ];
 
 function formatData(value: Record<string, unknown> | null) {

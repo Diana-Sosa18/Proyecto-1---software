@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getGuardNotificationsRequest } from "@/services/notificationsService";
 import { getGuardAccessHistoryRequest } from "@/services/sprintStoriesService";
 import { GuardiaDashboardView } from "./GuardiaDashboardView";
+import { guatemalaToday } from "@/utils/guatemalaTime";
 
 vi.mock("@/components/layout/AppShell", () => ({
   AppShell: ({ children, actions }: { children: ReactNode; actions?: ReactNode }) => <main>{actions}{children}</main>,
@@ -14,8 +15,7 @@ vi.mock("@/services/notificationsService", () => ({ getGuardNotificationsRequest
 vi.mock("@/services/sprintStoriesService", () => ({ getGuardAccessHistoryRequest: vi.fn() }));
 
 function isoDate() {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return guatemalaToday();
 }
 
 const base = { placa: "", casa: "A-1", tipo_visita: "VISITA", hora_programada: "10:00", hora_ingreso: null, hora_salida: null };
