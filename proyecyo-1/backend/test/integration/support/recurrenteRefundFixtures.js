@@ -44,7 +44,6 @@ async function paidFixture(connection,{principal='5.00',surcharge='0.00',payment
   const transactions=await q('SELECT * FROM TRANSACCION_RECURRENTE WHERE id_cuota=? ORDER BY id_transaccion',[id]);
   return {id,local,pairs,transactions};
 }
-function assertProcessed(result){if(result!=='processed')throw new Error('Fixture payment not applied');}
 function mockClient({reply,send,get,open}={}) {
   let posts=0,gets=0;
   return { sandboxId:()=>TEST_SANDBOX,counts:()=>({posts,gets}),

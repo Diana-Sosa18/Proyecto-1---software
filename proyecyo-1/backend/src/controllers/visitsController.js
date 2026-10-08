@@ -7,7 +7,6 @@ const {
   cancelVisit,
   deleteFrequentVisitor,
   getGuardShiftVisits,
-  validateQrVisit,
   registerQrEntry,
   registerQrExit,
 } = require("../services/visitsService");

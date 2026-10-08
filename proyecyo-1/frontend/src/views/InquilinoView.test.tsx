@@ -48,14 +48,6 @@ vi.mock("@/services/notificationsService", () => ({
   markNotificationAsReadRequest: vi.fn(),
 }));
 
-function renderView() {
-  return render(
-    <MemoryRouter>
-      <InquilinoView section="visitas" />
-    </MemoryRouter>,
-  );
-}
-
 const approvedVisit = {
   id_acceso: 1,
   id_visitante: 1,

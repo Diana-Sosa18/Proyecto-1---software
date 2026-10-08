@@ -1,5 +1,5 @@
 const { receiveRefundWebhook } = require('./recurrenteRefundService');
-const { refundBlockingSql, assertRefundUnblocked } = require('./recurrenteRefundGuard');
+const { refundBlockingSql } = require('./recurrenteRefundGuard');
 const { createHash } = require("node:crypto");
 const { pool: defaultPool } = require("../database/mysql");
 const { calculateBalance, assertCollectible, toCents, refundedQuotaSql } = require("./financialBalance");

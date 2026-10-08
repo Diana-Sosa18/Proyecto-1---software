@@ -2,7 +2,6 @@ import {
   notifySidebarCountersChanged,
   useSidebarCounters,
   useSidebarDetail,
-  type SidebarCounters,
 } from "@/components/layout/sidebarCounters";
 import { loadUnreadNotificationsCount } from "@/components/notifications/unreadNotifications";
 import type { ResidentBadgeKey } from "@/components/residente/residentNavigation";
@@ -12,8 +11,6 @@ import { getOwnerAuthorizationRequestsRequest } from "@/services/sprintStoriesSe
 
 /** Avisa al sidebar que debe recalcular sus contadores (p. ej. al marcar avisos como leidos). */
 export const notifyResidentBadgesChanged = notifySidebarCountersChanged;
-
-export type ResidentBadges = SidebarCounters<ResidentBadgeKey>;
 
 const residentCounterLoaders: Record<ResidentBadgeKey, () => Promise<number>> = {
   unreadNotifications: loadUnreadNotificationsCount,

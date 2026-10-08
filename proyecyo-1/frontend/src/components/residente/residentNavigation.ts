@@ -14,7 +14,6 @@ import {
 
 import {
   findActiveNavItem,
-  isNavItemActive,
   type RoleNavItem,
   type RoleNavSection,
 } from "@/components/layout/roleNavigation";
@@ -78,8 +77,6 @@ export const residentSessionsItem: ResidentNavItem = {
   to: "/residente/sesiones",
   matches: ["/cuenta/sesiones"],
 };
-
-export const isResidentNavItemActive = isNavItemActive;
 
 export function findActiveResidentNavItem(pathname: string) {
   return findActiveNavItem(residentNavSections, [residentSessionsItem], pathname);

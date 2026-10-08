@@ -110,10 +110,6 @@ function mapVisit(row) {
   };
 }
 
-function combineVisitDateTime(fecha, hora) {
-  return new Date(`${fecha}T${hora && hora.length === 5 ? `${hora}:00` : hora}`);
-}
-
 function getCurrentDateTimeInTimezone() {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: RESIDENTIAL_TIMEZONE,

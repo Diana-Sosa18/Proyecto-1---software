@@ -1,7 +1,6 @@
 import { BellRing, History, LayoutDashboard, MonitorSmartphone, ScanLine, Users } from "lucide-react";
 
 import {
-  findActiveNavItem,
   type RoleNavItem,
   type RoleNavSection,
 } from "@/components/layout/roleNavigation";
@@ -35,7 +34,3 @@ export const guardSessionsItem: RoleNavItem<GuardBadgeKey> = {
   to: "/guardia/sesiones",
   matches: ["/cuenta/sesiones"],
 };
-
-export function findActiveGuardNavItem(pathname: string) {
-  return findActiveNavItem(guardNavSections, [guardSessionsItem], pathname);
-}

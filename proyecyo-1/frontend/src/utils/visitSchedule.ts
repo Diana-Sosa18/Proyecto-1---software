@@ -35,23 +35,6 @@ export function validateVisitTimesAgainstSchedule(
   return null;
 }
 
-export function validateVisitScheduleForm(payload: VisitScheduleConfig): string | null {
-  const rangeError = validateTimeRange(payload.hora_apertura, payload.hora_cierre);
-  if (rangeError) return rangeError.replace("hora de inicio", "hora de apertura").replace("hora de fin", "hora de cierre");
-
-  if (payload.duracion_maxima_horas < 1 || payload.duracion_maxima_horas > 12) {
-    return "La duracion maxima debe estar entre 1 y 12 horas.";
-  }
-
-  const windowMinutes = toMinutes(payload.hora_cierre) - toMinutes(payload.hora_apertura);
-
-  if (windowMinutes < payload.duracion_maxima_horas * 60) {
-    return "La duracion maxima no puede ser mayor al rango horario permitido.";
-  }
-
-  return null;
-}
-
 export function formatVisitScheduleSummary(schedule: VisitScheduleConfig) {
   return `${schedule.hora_apertura} - ${schedule.hora_cierre} (max. ${schedule.duracion_maxima_horas} h)`;
 }

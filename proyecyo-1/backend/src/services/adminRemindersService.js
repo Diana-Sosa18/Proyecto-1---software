@@ -1,10 +1,8 @@
 const { pool, query } = require("../database/mysql");
-const { QUOTA_BALANCES_SQL } = require("./financialBalance");
 const { logger } = require("../utils/safeLogger");
 
 const RESIDENTIAL_TIMEZONE = "America/Guatemala";
 const REMINDER_TYPES = ["PROXIMO_VENCIMIENTO", "VENCIDO"];
-const NOTIFICATION_TYPE = "RECORDATORIO_PAGO";
 const RESERVATION_NOTIFICATION_TYPE = "RECORDATORIO_RESERVA";
 const RESERVATION_REMINDER_MINUTES = 60;
 

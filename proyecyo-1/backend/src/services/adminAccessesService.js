@@ -330,16 +330,7 @@ async function getAdminAccessHourlyChart() {
   return buckets;
 }
 
-// SCRUM-172: Helper - obtiene la hora con mayor afluencia del dia
-function getBusiestHourFromBuckets(buckets) {
-  return buckets.reduce(
-    (best, current) => (current.total > best.total ? current : best),
-    { hora: "--:--", total: 0, aprobados: 0, pendientes: 0, rechazados: 0 },
-  );
-}
-
 function getDateNDaysAgo(daysAgo) {
-  const now = new Date();
   // Convertir a fecha base GT y restar dias
   const isoCurrent = getCurrentDateInTimezone();
   const [year, month, day] = isoCurrent.split("-").map(Number);

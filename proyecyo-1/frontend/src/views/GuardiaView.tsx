@@ -122,12 +122,6 @@ function getVisitBadge(visit: VisitRecord): { label: string; className: string }
     className: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200",
   };
 }
-const visitTypeBadge = {
-  VISITA: { label: "Visita", className: "bg-blue-50 text-blue-700" },
-  DELIVERY: { label: "Delivery", className: "bg-amber-50 text-amber-700" },
-  PROVEEDOR: { label: "Proveedor", className: "bg-violet-50 text-violet-700" },
-} as const;
-
 function formatRefreshTime(date: Date | null) {
   if (!date) {
     return "Sin sincronizar";

@@ -10,7 +10,7 @@ else {
   const db = require('../../src/database/mysql');
   const migrations = require('../../src/database/recurrenteMigration');
   const { createFinancialNotificationsService, guatemalaDate, __private__: rules } = require('../../src/services/financialNotificationsService');
-  const { enqueuePayment, enqueueAttempt } = require('../../src/services/financialNotificationOutbox');
+  const { enqueuePayment } = require('../../src/services/financialNotificationOutbox');
   const { createWebhookService } = require('../../src/services/recurrenteWebhookService');
   const { createRefundService } = require('../../src/services/recurrenteRefundService');
   const { QUOTA_BALANCES_SQL, calculateBalance } = require('../../src/services/financialBalance');
