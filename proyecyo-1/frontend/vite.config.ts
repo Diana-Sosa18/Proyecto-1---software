@@ -20,7 +20,10 @@ export default defineConfig({
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
  preview: {
-    allowedHosts: ['fantastic-acceptance-production-9e4b.up.railway.app'],
+    allowedHosts: [
+    'fantastic-acceptance-production-9e4b.up.railway.app',
+    'nexus-residencial.com',
+    ],
   },
   test: {
     environment: 'jsdom',
