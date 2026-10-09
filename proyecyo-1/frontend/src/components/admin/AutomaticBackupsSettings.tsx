@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, Loader2, Play } from "lucide-react";
-import { apiRequest, ApiError } from "@/services/api";
+import { apiDownload, apiRequest, ApiError } from "@/services/api";
 import { Button } from "@/components/ui/button";
 
 type Config = { activo: boolean; frecuencia: "DIARIO" | "SEMANAL" | "MENSUAL"; hora: string; retencion: number };
@@ -37,10 +37,12 @@ export function AutomaticBackupsSettings() {
     finally { setBusy(false); }
   }
   async function download(id: number, filename: string) {
-    const session = JSON.parse(localStorage.getItem("nexus.session") || "{}");
-    const response = await fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:3000"}/admin/respaldos/${id}/descargar`, { headers: { "x-user-role": session.role || "", "x-user-id": String(session.id || "") } });
-    if (!response.ok) { setMessage("No fue posible descargar el respaldo."); return; }
-    const url = URL.createObjectURL(await response.blob());
+    // apiDownload envía el token Bearer de la sesión; antes se usaban cabeceras heredadas
+    // (x-user-role / x-user-id) que el backend no acepta fuera de pruebas y la descarga fallaba.
+    let blob: Blob;
+    try { blob = await apiDownload(`/admin/respaldos/${id}/descargar`); }
+    catch (error) { setMessage(error instanceof ApiError ? error.message : "No fue posible descargar el respaldo."); return; }
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a"); link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url);
   }
 
