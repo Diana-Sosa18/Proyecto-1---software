@@ -13,8 +13,9 @@ const {
   updateAmenitySchedule,
 } = require("../services/amenitiesReservationsService");
 
+// Identidad del administrador desde la sesion validada por requireAdmin (no desde x-user-id).
 function getAdminViewer(req) {
-  const headerUserId = Number(req.header("x-user-id"));
+  const headerUserId = Number(req.authUser?.id);
 
   return {
     role: "admin",
